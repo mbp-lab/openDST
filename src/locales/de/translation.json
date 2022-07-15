@@ -1,0 +1,500 @@
+{
+  "mobile-only": "Bitte nutzen Sie ein Smartphone, um an dieser Studie teilzunehmen!",
+  "button": {
+    "continue": "Weiter",
+    "back": "Zurück",
+    "start": "Start",
+    "agree": "Einverstanden",
+    "disagree": "Ablehnen",
+    "cancel": "Abbrechen",
+    "ready": "Fertig!"
+  },
+  "permissions": "Prüfen Sie bitte, ob ihr Browser die Berechtigung hat auf Mikrophon und Kamera zuzugreifen.",
+  "startPage": {
+    "navbar": "Digital Health Studies",
+    "header": "Herzlich Willkommen!",
+    "text1": "Vielen Dank für Ihr Interesse an unserer Online-Studie zum Thema:",
+    "title": "Verhaltensanalyse bei einem kognitiv-sprachlichen Belastungstest",
+    "text2": "Mit Ihrer Teilnahme unterstützen Sie uns, individuelle Belastbarkeit besser zu verstehen.",
+    "footer": "Diese Studie wurde am Digital-Health-Center des Hasso-Plattner-Instituts, an der Universität Potsdam und der Universität Bielefeld entwickelt.",
+    "button": "Hier gehts los!",
+    "language": "DE",
+    "noLogging": "Dies ist eine Präsentationsvariante. Es werden keine Daten dauerhaft gespeichert oder ausgewertet."
+  },
+  "study_introduction_0": {
+    "header": "Worum geht es?",
+    "text0": "Wir forschen an digitalen Methoden zur Einschätzung der individuellen Belastbarkeit.",
+    "text1": "In dieser Studie vergleichen wir dafür verschiedene Varianten eines neuen Smartphone-Tests.",
+    "text2": "Wir ordnen Sie zufällig einer der Test-Varianten zu.",
+    "text3": "HINWEIS: Dies ist eine Präsentations-Variante und dient lediglich dem Ausprobieren. Es werden KEINE Daten gespeichert. Die Datenschutzerklärung trifft für diese Version nicht zu."
+  },
+  "checking_participation":{
+    "question": "Haben Sie bereits an der Studie teilgenommen?",
+    "yes": "Ja",
+    "no": "Nein",
+    "feedback": "Bitte wählen Sie einer der beiden Optionen aus"
+  },
+  "study_introduction_1": {
+    "header": "Ablauf der Studie",
+    "text0_1": "Sie absolvieren einen zweiteiligen mathematischen und sprachlichen Leistungstest.",
+    "text0_2": "In einer der Varianten werden Sie dabei von Ihrer Frontkamera gefilmt.",
+    "text0_3": "Mit diesen Aufnahmen messen wir Ihre Belastbarkeit.",
+    "text0_4": "Anschließend beantworten Sie einen kurzen Fragebogen (~5 Min.) und erhalten eine Einschätzung Ihrer individuellen Belastbarkeit.",
+    "text0_5": "Führen Sie den Test am besten in einer ungestörten Umgebung und vor einem neutralen Hintergrund durch.",
+
+    "text2": "Die Ergebnisse Ihres Leistungstests werden mit denen der anderen TeilnehmerSuper.. verglichen."
+  },
+  "study_introduction_2": {
+    "header": "Risiken und Unannehmlichkeiten",
+    "text0_1": "Diese Studie beinhaltet einen psychosozialen Belastungstest.",
+    "text0_2": "Die Belastung geht dabei nicht über ein Alltagsmaß hinaus und ist vergleichbar mit einer Prüfungssituation.",
+    "text0_3": "Sollten Sie sich dennoch unwohl oder überfordert fühlen, können Sie jederzeit abbrechen, indem Sie beispielsweise den Browser schließen.",
+    "text0_4": "Bitte nehmen Sie trotzdem nur teil, wenn Sie sich psychisch gesund fühlen."
+  },
+  "study_introduction_3": {
+    "header": "Datenschutz",
+    "text1": "Für die Teilnahme an dieser Studie müssen Sie keine Namen oder E-Mail-Adressen angeben.",
+    "text1_1": "In allen Varianten dieser Studie werden die Ergebnisse des Leistungstests, der Fragebögen sowie allgemeine Nutzungsstatistiken gespeichert.",
+    "text2": "Falls Sie zusätzlich gefilmt werden, weisen wir Sie vorher explizit darauf hin.",
+    "text3": "Alle Daten (inkl. Videoaufnahmen) werden auf einem gesicherten Server gespeichert und nach der wissenschaftlichen Auswertung (spätestens nach 10 Jahren) gelöscht.",
+    "text3_2": "Bei Bedarf können Sie Ihre Daten einsehen und löschen lassen. Dazu erhalten Sie zum Abschluss der Studie eine individuelle Zahlenfolge.",
+    "text4": "Die Gesamtergebnisse dieser Studie, jedoch keine individuellen Daten, können als wissenschaftliche Publikation veröffentlicht werden.",
+    "text5a": "Sie können jederzeit abbrechen, indem Sie den ",
+    "text5b": " Button klicken. In diesem Fall werden keine Daten gespeichert.",
+    "consensus": "Ihre Teilnahme ist freiwillig. Sie können jederzeit abbrechen.",
+    "additional_info": "Weiterführende Informationen herunterladen"
+  },
+  "study_introduction_3_5": {
+    "header": "Einverständnis",
+    "consensus_0": "Ich habe den Hintergrund, Ablauf und die damit verbundenen Risiken in der Studie verstanden.",
+    "consensus_1": "Ich willige in die mit der Durchführung der Studie verbundene Verarbeitung meiner personenbezogenen Daten, einschließlich von Angaben, die Rückschlüsse auf meine Stimmungslage zulassen können, ein.",
+    "consensus_2": "Ich erkläre mich hiermit freiwillig und unter Umständen, die meine freie Entscheidung nicht beeinträchtigen, bereit, an der Studie teilzunehmen.",
+    "consensus_3a": "Zusätzlich habe ich die  ",
+    "consensus_3b": "weiterführenden Informationen",
+    "consensus_3c": " heruntergeladen und gelesen."
+  },
+  "study_introduction_4": {
+    "header": "Momentane Stimmung 1/2",
+    "header2": "Momentane Stimmung",
+    "text0_1": "Bevor Sie den Test starten:",
+    "text0_2": "Bitte antworten Sie noch kurz auf die Fragen zu Ihrer momentanen Stimmung - so, wie Sie sich im Moment fühlen. Es gibt dabei kein richtig oder falsch.",
+    "text1": "Fühlen Sie sich in diesem Moment",
+    "text2": "gestresst?",
+    "text3": "Bevor Sie mit dem sprachlichen Teil des Leistungstests fortfahren:",
+    "text4": "Nachdem Sie nun beide Teile des Leistungstests absolviert haben:",
+    "text5": " "
+
+  },
+  "study_introduction_5": {
+    "text1": "Fühlen Sie sich in diesem Moment",
+    "text2": "frustriert?",
+    "text3": "Bevor Sie mit dem sprachlichen Teil des Leistungstests fortfahren:",
+    "text4": "Nachdem Sie nun beide Teile des Leistungstests absolviert haben:"
+
+
+  },
+  "study_introduction_6": {
+    "text1": "Fühlen Sie sich in diesem Moment",
+    "text2": "überfordert?",
+    "text3": "Bevor Sie mit dem sprachlichen Teil des Leistungstests fortfahren:",
+    "text4": "Nachdem Sie nun beide Teile des Leistungstests absolviert haben:"
+  },
+
+  "study_introduction_7": {
+    "text1": "Fühlen Sie sich in diesem Moment",
+    "text2": "peinlich berührt?",
+    "text3": "Bevor Sie mit dem sprachlichen Teil des Leistungstests fortfahren:",
+    "text4": "Nachdem Sie nun beide Teile des Leistungstests absolviert haben:"
+  },
+  "warnungVAS": "Sie haben mindestens einen Regler nicht verschoben. Möchten Sie Ihre Eingaben so abschicken?",
+  "warnungPANAS": "Sie haben mindestens eine Frage nicht beantwortet. Bitte beantworten Sie alle Fragen.",
+  "stress_scale": {
+    "low": "gar nicht",
+    "high": "sehr",
+    "submit": "Bestätigen"
+  },
+  "panas_scale": {
+    "low": "gar nicht = 0",
+    "high": "sehr = 5"
+  },
+  "home_intro": {
+    "header": "Online Studie des HPI",
+    "text": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
+  },
+  "select_language": {
+    "title": "Sprachauswahl",
+    "part1": "Super! Du hast nun folgende Optionen: ",
+    "start_tutorial": "Tutorial starten",
+    "skip_tutorial": "Direkt zum Stress Test",
+    "before_starting" : "Bitte wählen Sie zunächst Ihre bevorzugte Sprache aus:"
+  },
+  "mediaTesting":{
+    "allowAccess": "Zugriff Erlauben",
+    "videoYes" : "Ja ",
+    "videoNo": "Nein",
+    "start_record": "Beginnen",
+    "stop_record" : "Stop",
+    "reading_header": "Vorlesen: ",
+    "continue": "Weiter",
+    "play": "Video Abspielen",
+    "header": {
+      "header_0": "Video - Analyse",
+      "header_1": " Kamera-Zugriff erlauben.",
+      "header_2": "Kamera: Das Kameramodul wird vorbereitet.",
+      "header_3": " Aktiv",
+      "header_4": " Kamera-Einstellungen überprüfen",
+      "header_5": "  Bereit zur Aufnahme"
+    },
+
+    "question_01":"Funktionieren die Ton- und Videoaufnahme?",
+    "question_02":"Ist Ihr Gesicht klar erkennbar?",
+    "answerQuestions": "Bitte geben Sie eine Antwort auf die gestellten Fragen!",
+    "yes": "Ja",
+    "no": "Nein",
+    "alert": "Video und Ton müssen funktionieren. Sie müssen das Kalibrierungs-Video erneut aufnehmen.",
+    "text0": "Für die Analyse Ihrer individuellen Belastbarkeit wird Ihr Verhalten gefilmt.",
+    "text1": "Ihre Gesichts- und Augenbewegungen sowie Ihre Stimme werden dabei durch einen neu entwickelten Algorithmus analysiert.",
+    "text2": "Für die Kalibrierung und Testung Ihres Smartphones ist es notwendig, ein kurzes Test-Video aufzunehmen.",
+    "text3": "Achten Sie darauf, dass Ihr Gesicht vollständig sichtbar ist und lesen Sie folgenden Text vor:",
+    "reading_text": "Diese Aufnahme kalibriert den Algorithmus!",
+
+    "question": "Sehen Sie Ihr Gesicht?",
+    "iOS_media_request": "Um an der Studie teilzunehmen, muss auf Kamera und Mikrofon ihres Gerätes zugegriffen werden.",
+    "iOS_media_accept": "Kamera wurde eingestellt und ist für den Einsatz bereit.",
+    "videoTest": "Webcam-Test",
+    "available": "Ton und Video funktionieren, Gesicht erkennbar",
+    "unavailable": "Ton und/oder Video funktioniert nicht",
+
+    "kalibrating_header": "Kamera - Kalibrierung",
+    "kalibierung_text0": "Für die Kalibrierung und Testung Ihres Smartphones ist es notwendig, ein kurzes Test-Video aufzunehmen.",
+    "kalibierung_text1": "Achten Sie darauf, dass Ihr Gesicht vollständig sichtbar ist und lesen Sie folgenden Text vor: "
+  },
+  "example": {
+    "header": "Kognitiver Leistungstest",
+    "text0": "Um Ihre kognitive Leistungsfähigkeit einzuschätzen, stellen wir Ihnen einfache mathematische Aufgaben.",
+    "text1": "Versuchen Sie, die Aufgaben so schnell wie möglich zu lösen.",
+    "text2": "Die Zeit läuft ab."
+  },
+
+  "mathTaskIntroduction": {
+    "version": "Version A"
+  },
+  "mathTaskTutorial": {
+    "video_analysis": "Ihre Smartphone Kamera wird während dem <b>gesamten</b> Stress-Test aktiviert sein.</br> Diese Studie beinhaltet die anonyme <b>Verarbeitung und Analyse </b>Ihrer Videodaten, um Ihr akutes <b>Stress-niveau</b> zu messen.",
+    "user_feedback": "Der Feedback-Graph zeigt Ihren <b>aktuellen Punktestand </b>und vergleicht diesen, während dem gemsanten Mathe-Test, mit dem erzielten Punktestand Ihrere <b>Referenzgruppe</b>. Ihr Punktestand wird ständig auf Basis ihrer Leistung neu errechnet und wird in Prozent dargestellt.",
+    "timer": "Die Zeitleiste stellt Ihre <b>noch zur verfügung stehende Zeit </b>für für die laufende Frage dar.</b>.\n Versuchen Sie die Matheaufgabe <b>innerhalb</b> der zur verfügung stehenden Zeit zu lösen. Die zur verfügung stehende Gesamtzeit wird nicht angezeigt. Bitte beantwroten Sie <b>alle</b> Fragen.",
+    "task": "Die Aufgaben die Ihnen gestellt werden beinhalten alle vier Grundrechenarten.",
+    "input_section": "Wenn Ihnen die Lösung der aktuellen Matheaufgabe bekannt ist, geben Sie diese so schnell wie möglich ein. Sie können Ihre Eingabe nicht widerrufen."
+  },
+  "mathTask": {
+    "header": "Wichtig:",
+    "missing_interaction": "Bitte beantworten Sie die Aufgaben. Ihre aktive Teilnahme ist wichtig für die Aussagekraft des Tests."
+  },
+  "stepper":{
+    "button_finish": "Fertig",
+    "button_next": "Weiter",
+    "button_back" : "Zurück",
+    "introduction": {
+      "intro": "Info",
+      "consent": "Zustimmung",
+      "panas": "Stimmung",
+      "vas": "Stimmung",
+      "calibration": "Kamera-Test"
+    },
+    "mathTaskTutorial": {
+      "transition": "Info",
+      "vas": "Stimmung",
+      "intro": "Aufgabe",
+      "comparison": "Ranking",
+      "countdown": "Mathe-Test"
+    },
+    "mathTaskResult": {
+      "mathTaskResult": "Ergebnis"
+    },
+    "speechTaskTutorial": {
+      "transition": "Info",
+      "vas": "Stimmung",
+      "intro": "Sprach-Test"
+    },
+    "endPage": {
+      "vas": "Stimmung",
+      "panas": "Stimmung",
+      "explanation": "Erklärung",
+      "questionnaire": "Fragebogen"
+    }
+  },
+  "number_input": {
+    "start_test": "Test starten"
+  },
+  "feedback_graph": {
+    "label": "Richtige Antworten in %",
+    "you": "Sie",
+    "average": "Durchsch."
+  },
+  "task_frame": {
+    "correct": "Richtige Antwort!",
+    "wrong": "Falsche Antwort!",
+    "slow": "Zu langsam!",
+    "missingInteraction": "Bitte machen Sie weiter!"
+
+  },
+  "mathTaskResult": {
+    "well_done": "Feedback zum Stress Test",
+    "feedback": "Sie haben den ersten Teil der Studie abgeschlossen.",
+    "proceed": "Klicken Sie auf Weiter, um mit dem Stress Test fortzufahren.",
+    "continue": "Weiter"
+  },
+  "transition": {
+    "header": "Abschluss Teil 1",
+    "text_0": "Sie haben nun den ersten Teil dieses Testes abgeschlossen. Bitte strengen Sie sich bei der nächsten Aufgabe mehr an. Ihre Ergebnisse können sonst nicht ausgewertet und analysiert werden.",
+    "text_1": "Klicken Sie auf \"weiter\", um mit dem sprachlichen Teil fortzufahren.",
+    "text_2": "Klicken Sie auf \"weiter\", um mit dem mathematischen Teil fortzufahren."
+  },
+  "speechTaskTutorial": {
+    "results": {
+      "heading": "Sie haben den mathematischen Teil des Leistungstests abgeschlossen.",
+      "result_1_1": "Ihr persönliches Ergebnis:  ",
+      "result_1_2": "richtige Antworten.",
+      "result_2_1": "Sie liegen damit momentan ",
+      "result_2_below": "unter dem Durchschnitt.",
+      "result_2_above": "über dem Durchschnitt."
+
+    },
+    "mood": {
+      "heading": "Momentane Stimmung",
+      "text_1": "Bevor Sie mit dem zweiten Teil des Leistungstests fortfahren: ",
+      "text_2": "Wie sehr fühlen Sie sich im Moment gestresst?"
+    },
+    "task": {
+      "heading": "Sprachlicher Leistungstest",
+      "text_0": "Für die Einschätzung Ihrer sprachlichen Fähigkeiten stellen wir Ihnen typische Fragen aus einem Bewerbungsinterview.",
+      "text_1": {
+        "text_0": "Pro Frage haben Sie ",
+        "text_1": "10 Sekunden ",
+        "text_2": "Zeit, sich eine ",
+        "text_3": "strukturierte",
+        "text_4": " und ",
+        "text_5": "überzeugende",
+        "text_6": " Antwort zu überlegen."
+      },
+      "text_2": {
+        "text_0": "Anschließend haben Sie exakt ",
+        "text_1": "20 Sekunden",
+        "text_2": " Zeit, die Frage zu beantworten."
+      },
+      "text_3": "Ihre Präsentation wird live analysiert und Ihre sprachliche Fähigkeit verglichen.",
+      "text_4": "Zum Schluss erhalten Sie ein individuelles Feedback."
+    }
+  },
+  "genderAndAge": {
+    "calculate": "Berechnen",
+    "continue": "Weiter",
+    "welcome": "Herzlich Willkommen zu der Studie Potsdam Digital Stress Test. Der erste Schritt dieser Studie umfasst Konfigurationen und Anpassungen an den Probanden. Bitte befolgen Sie dafür die weiteren Anweisungen.",
+    "introduction_header": "Ergebnisse Ihrer Vergleichsgruppe",
+    "introduction_text": "Anhand von Alter und Geschlecht berechnen wir die durchschnittlichen Testergebnisse Ihrer Vergleichsgruppe:",
+    "adjustment": "Ihre Vergleichsgruppe hat durchschnittlich 75% der Aufgaben richtig beantworten können.",
+    "formControll": {
+      "gender": "Geschlecht",
+      "male": "männlich",
+      "female": "weiblich",
+      "others": "divers"
+    },
+  "age": "Alter"
+  },
+
+  "speechTask": {
+    "header": {
+      "start": "Test starten",
+      "state_prepare":"Bereiten Sie sich vor!",
+      "state_run": "Präsentieren Sie jetzt!",
+      "result": "Ergebnisse",
+      "calibration": "Kalibrierung des Testes!"
+    },
+    "question_0": {
+      "header": " Frage 1 (Kritikfähigkeit)",
+      "question": "Bereiten Sie eine Antwort vor: Beschreiben Sie eine Situation, in der eine Ihrer Ideen kritisiert wurde."
+    },
+    "question_1": {
+      "header": " Frage 2 (Kritische Reflektion)",
+      "question": "Bereiten Sie eine Antwort vor: Was sind Ihre größten Schwächen?"
+    },
+    "question_2": {
+      "header": " Frage 3 (Verrat)",
+      "question": "Bereiten Sie eine Antwort vor: Was bedeutet Verrat? Haben Sie schon mal eine Person oder Idee verraten?"
+    },
+    "calibration": {
+      "task": "Sie können nun zur Kalibrierung etwas über Ihre Fähigkeiten reden."
+    },
+    "feedback_0": "Bitte antworten Sie jetzt. Achten Sie darauf, die komplette Zeit zu nutzen.",
+    "analysis": {
+      "breaks": "Pausen:",
+      "mean": "Durchschn. Lautstärke:",
+      "speakingRatio": "Gesprächs- anteil:",
+      "volumeHigh": "Max. Lautstärke:",
+      "header": "Übersicht Ihrer Leistungen im Sprachtest: ",
+      "questionLoudest": "Lauteste Antwort bei ",
+      "questionQuietest": "Leiseste Antwort bei ",
+      "question_1": "Frage 1",
+      "question_2": "Frage 2",
+      "question_3": "Frage 3"
+    }
+
+  },
+  "end": {
+    "mood": {
+      "heading": "Sie haben jetzt beide Tests absolviert.",
+      "text_0": "",
+      "question": "Wie sehr fühlen Sie sich im Moment gestresst?"
+    },
+    "explanation": {
+      "heading": "Erklärung",
+      "text_0": "Bevor Sie die Studie mit einem kurzen Fragebogen beenden, möchten wir Ihnen den eigentlichen Inhalt etwas genauer erklären: ",
+      "text_1": "Das Ziel der Studie ist ausschließlich, bewusst Stress zu erzeugen und Methoden der Stressanalyse zu entwickeln.",
+      "text_2": "Die beiden Tests dienen also nicht zur Einschätzung Ihrer Leistungsfähigkeit oder Belastbarkeit.",
+      "text_3": "Es gab keinen Algorithmus, der Ihre Stimme oder Ihr Gesicht analysiert hat.",
+      "text_4": "Die Schwierigkeit der Mathe-Aufgaben wurde so angepasst, dass Sie möglichst überfordert wurden.",
+      "text_5": "Die Ergebnisse Ihrer \"Vergleichsgruppe\" sind frei erfunden.",
+      "noLogging": "HINWEIS: Dies war eine Präsentations-Variante und diente lediglich dem Ausprobieren. Es wurden KEINE Daten gespeichert. Die Datenschutzerklärung trifft für diese Version nicht zu."
+    },
+    "questionnaire": {
+      "finish": "Daten speichern",
+      "heading": "Zum Abschluss der Studie: Bitte senden Sie ihre Daten ab und füllen Sie anschließend den Fragebogen zu Ihrem persönlichen Eindruck aus!",
+      "no_data_saved": "Ihre Daten wurden nicht gespeichert.",
+      "non_video_data_saved": "Nur Ihre Nicht-Video-Daten wurden gespeichert.",
+      "all_data_saved": "Ihre Daten wurden gespeichert.",
+      "headingAlt": "Wir würden uns freuen, wenn Sie uns mit dem folgenden Fragenbogen ein kurzes Feedback geben würden.",
+      "studyResultId": "Falls Sie Ihre Daten zu einem späteren Zeitpunkt löschen lassen möchten, können Sie uns gerne kontaktieren. Notieren Sie sich hierzu bitte Ihre persönliche Studien-ID: ",
+      "thanking": "Vielen Dank für Ihre Teilnahme!",
+      "soci_survey": "Zum Fragebogen",
+      "contact_us": "Sollten Sie Fragen haben, können Sie uns jederzeit kontaktieren: ",
+      "mail": "mnorden@techfak.uni-bielefeld.de"
+    }
+  },
+
+  "dataProtection": {
+    "header": "Datenschutzerklärung",
+    "shortVersion": {
+      "header": "Kurzfassung",
+      "body": "Generell ist die Nutzung unserer Website anonym möglich. Die Angabe personenbezogener Daten ist rein freiwillig und Sie werden immer darauf hingewiesen, wenn und zu welchem Zweck wir Daten von Ihnen speichern möchten. Personenbezogene Daten sind solche Daten, die ermöglichen, Sie zu identifizieren und/oder Kontakt zu Ihnen aufzunehmen, wie z.B. Ihr Name, Ihre Adresse oder E-Mail-Adresse."
+    },
+    "inDetail": {
+      "first": {
+        "header": "1. Wer wir sind und wie Sie uns kontaktieren können",
+        "body": {
+          "header": "Verantwortlich für die Verarbeitung personenbezogener Daten im Rahmen dieser Website ist die:",
+          "name": "Hasso Plattner Institute für Digital Engineering gGmbH",
+          "street": "Prof.-Dr.-Helmert-Str. 2-3 ",
+          "town": "14482 Potsdam",
+          "phone": "Telefon: +49 (0)331 5509-0",
+          "fax": "Fax: +49 (0)331 5509-129",
+          "mail": "E-Mail: hpi-info(at)hpi.de",
+          "website": "Internet: www.hpi.de",
+          "header2": "Unseren Datenschutzbeauftragten erreichen Sie unter der Anschrift:",
+          "body2": "Datenschutzbeauftragter der Hasso-Plattner-Institut für Digital Engineering gGmbH",
+          "email2": "E-Mail: datenschutz(at)hpi.de."
+        }
+      },
+      "second": {
+        "header": "2. Welche Daten wir (nicht) verarbeiten, wofür, wie lange und auf welcher Rechtsgrundlage",
+        "body": {
+          "header": "2.1. Anonyme Nutzung unserer Website",
+          "text0": "Sie können unsere Website anonym nutzen. Wenn Sie unsere Website besuchen, teilt Ihr Web-Browser unserem Web-Server Ihre IP-Adresse mit, damit eine Kommunikation möglich ist. Über Ihre IP-Adresse können Sie möglicherweise identifiziert werden. In bestimmten Abschnitten dieser Studien-App werden Sie gefilmt. Sie werden vorher darauf hingewiesen und um Einverständnis gebeten. Anhand der Videoaufzeichnungen ist eine Identifizierung während der Durchführung theoretisch möglich. Diese werden jedoch nicht dauerhaft gespeichert, sondern ausschließlich für die Analyse während der Studie genutzt. Nach der Teilnahme an der Studie verbleiben keine personenbezogenen Daten von Ihnen.",
+          "text1": "Jeder Ihrer Zugriffe auf diese Studien-App wird in Server-Log-Dateien mit folgenden Daten gespeichert: Datum und Uhrzeiten des Abrufs der verschiedenen Abschnitte der Studien-App, Ihre freiwilligen Eingaben von Alter und Geschlecht, Ergebnisse der Fragebögen, Ergebnisse der Mathe-Aufgaben, Informationen zu Lautstärken während der Videoaufnahmen, Informationen zu Betriebssystem und Browser. Sie nach der Teilnahme an dieser Studie für uns völlig anonym. Die anonymen Daten werden ausschließlich statistisch ausgewertet.\nEs werden keine personenbezogenenen Daten gespeichert und es ist kein Rückschluss auf Sie möglich. Weder Video- noch Tonaufnahmen werden dauerhaft gespeichert.",
+          "header2": "2.2. Datenverarbeitung bei Nutzung von Dritt-Inhalten und Webfonts",
+          "text0_2": "Unsere Webseite nutzt Angebote von Drittanbietern. Diese sind für die korrekte Darstellung dieser Studien-App mittels Java notwendig und ermöglichen ein angepasstes Design. Dazu nutzen wir: Google (fonts.googleapis.com, *.gstatic.com) und Jquery (*.jquery.com). Über die Datenschutzbestimmungen der Dritt-Anbieter können Sie sich hier informieren: https://www.google.de/intl/de/policies/privacy https://openjsf.org/wp-content/uploads/sites/84/2019/11/OpenJS-Foundation-Privacy-Policy-2019-11-15.pdf. Sie können normalerweise das Laden von Webfonts in Ihrem Browser deaktivieren; dann baut Ihr Browser keine Verbindung auf."
+        }
+      },
+      "third": {
+        "header": "3. Ihre Rechte",
+        "body": {
+          "text0": "Unter den jeweiligen gesetzlichen Voraussetzungen haben Sie hinsichtlich der Sie betreffenden personenbezogenen Daten ein Recht auf Auskunft, auf Berichtigung oder Löschung, auf Einschränkung der Verarbeitung, auf Widerspruch gegen die Verarbeitung und auf Datenübertragbarkeit. Insbesondere haben Sie das Recht, jederzeit der Verarbeitung Ihrer Daten zu Werbezwecken zu widersprechen, ohne dass dafür andere Kosten als die Übermittlungskosten nach den Basistarifen Ihres Anbieters (also z.B. die Kosten einer E-Mail = meist keine) entstehen. Dies gilt beispielsweise, wenn Sie sich zu einer Veranstaltung angemeldet haben und nicht über ähnliche Veranstaltungen informiert werden wollen. Wenn die Datenverarbeitung auf einer Einwilligung beruht, haben Sie das Recht, Ihre Einwilligung jederzeit zu widerrufen, ohne dass die Rechtmäßigkeit der aufgrund der Einwilligung bis zum Widerruf erfolgten Verarbeitung oder die Verarbeitung auf einer anderen Rechtsgrundlage berührt wird. Wenn Sie diese Rechte nutzen wollen, können Sie am einfachsten an datenschutz@hpi.de schreiben oder für Widerruf bzw. Widerspruch bei E-Mails auf den Link zum Abbestellen klicken, den Sie in jeder E-Mail finden. Wenn wir Sie anrufen, können Sie uns dies natürlich auch direkt im Gespräch sagen.\nSie haben zudem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde über die Verarbeitung Ihrer personenbezogenen Daten durch uns zu beschweren, zum Beispiel bei der für uns zuständigen Aufsichtsbehörde: Die Landesbeauftragte für den Datenschutz und für das Recht auf Akteneinsicht, Stahnsdorfer Damm 77, 14532 Kleinmachnow, Telefon: +49 (0)33203 356-0, Telefax: +49 (0)33203 356-49, E-Mail: poststelle(at)lda.brandenburg.de.\nWenn Sie irgendwelche Fragen und Wünsche zum Datenschutz haben, können Sie sich natürlich auch jederzeit einfach an uns wenden: Ihr Kontakt ist datenschutz(at)hpi.de\n"
+        }
+      },
+      "forth": {
+        "header": "4. Ihr Recht auf Widerspruch",
+        "body": {
+          "text0": "Soweit eine Verarbeitung Ihrer personenbezogenen Daten auf Art. 6 Abs. 1 UAbs. 1 lit. e oder f DSGVO beruht, haben Sie das Recht zum Widerspruch gegen die Verarbeitung gemäß Art. 21 DSGVO. Erfolgt Ihr Widerspruch aus Gründen, die sich aus Ihrer besonderen Situation ergeben, verarbeiten wir Ihre personenbezogenen Daten nicht mehr, es sei denn, wir können zwingende schutzwürdige Gründe für die Verarbeitung nachweisen, die Ihre Interessen, Rechte und überwiegen, oder die Verarbeitung dient der Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen. Richtet sich Ihr Widerspruch gegen Direktwerbung einschließlich Profiling, soweit es mit solcher Direktwerbung in Verbindung steht, werden wir Ihre personenbezogenen Daten nicht mehr für diese Zwecke verarbeiten."
+        }
+      }
+
+    },
+    "version": "Stand: 10.08.2020"
+  },
+  "imprint": {
+    "header": "Impressum",
+    "institute": {
+      "header": "Hasso Plattner Institute für Digital Engineering gGmbH",
+      "street": "Prof.-Dr.-Helmert-Str. 2-3 ",
+      "town": "14482 Potsdam",
+      "phone": "Telefon: +49 (0)331 5509-0",
+      "fax": "Fax: +49 (0)331 5509-129",
+      "mail": "E-Mail: hpi-info(at)hpi.de",
+      "website": "Internet: www.hpi.de"
+    },
+    "director": {
+      "header": "Vertretungsberechtigte Geschäftsführer:",
+      "name": "Prof. Dr. Christoph Meinel",
+      "office": "Registergericht: Amtsgericht Potsdam",
+      "number": "Registernummer: HRB 12184",
+      "person": "Persons responsible for content: Prof. Dr. Christoph Meinel"
+    },
+    "Editor":"Redaktion: Hasso Plattner Institut",
+    "Web Design":"Webdesign: Hasso Plattner Institut",
+    "Texts":"Texte: Hasso Plattner Institut",
+
+    "legal": {
+      "header": "Rechtliche Hinweise:",
+      "body": "Das Hasso-Plattner-Institut (HPI) überprüft und aktualisiert regelmäßig die Inhalte seiner Websites. Trotz größtmöglicher Sorgfalt können wir nicht ausschließen, dass einzelne Informationen auf unseren Seiten veraltet oder nicht zutreffend sind. Daher können wir keine Haftung für Aktualität, Genauigkeit und Vollständigkeit der publizierten Informationen übernehmen. Das gleiche gilt für alle Websites, die von den HPI-Seiten über Hyperlinks erreichbar sind. Für alle diese Links gilt: Wir erklären ausdrücklich, dass wir keinen Einfluss auf die Gestaltung und die Inhalte der verlinkten Seite haben. Deshalb distanzieren wir uns hiermit ausdrücklich von allen Inhalten aller verlinkten Seiten und machen uns ihre Inhalte nicht zu Eigen. Diese Erklärung gilt für alle auf unserer Seite angebrachten Links zu fremden Seiten. Für den Inhalt dieser verlinkten Seiten ist das HPI nicht verantwortlich. Weiterhin behält sich das HPI jederzeit Änderungen und Ergänzungen der angezeigten Informationen vor. Inhalt und Struktur der HPI-Website sind durch das Copyright geschützt. Die Weiterverwendung von Informationen und Daten, vor allem die Verwendung von Texten und Illustrationen ist nur nach unserer Zustimmung zulässig."
+    },
+    "version": "Stand: 10.08.2020"
+  },
+  "alertAbortStudy": {
+    "header": "Teilnahme abbrechen",
+    "question": "Wenn Sie nicht einverstanden sind, können Sie die Studie nicht durchführen.",
+    "agree": "Studie abbrechen",
+    "disagree": "Studie durchführen"
+  },
+  "cancelDialog": {
+    "question": "Möchten Sie Ihre Teilnahme wirklich abbrechen?",
+    "cancel_without_data": "Abbrechen und keine Daten speichern",
+    "cancel_no_video": "Abbrechen und Daten ohne Videodaten speichern",
+    "cancel_with_video": "Abbrechen und alle Daten speichern",
+    "no_cancel": "Nicht abbrechen und fortfahren"
+  },
+  "panas": {
+    "proposition": {
+      "header": "Fühlen Sie sich zurzeit",
+      "active": "aktiv",
+      "upset": "verärgert",
+      "hostile" : "feindselig",
+      "inspired": "angeregt",
+      "ashamed": "beschämt" ,
+      "alert": "wach",
+      "nervous": "nervös",
+      "determined": "entschlossen",
+      "attentive": "aufmerksam",
+      "afraid": "ängstlich"
+    },
+    "header": "Momentane Stimmung 2/2",
+    "introText_0": "Die Skala umfasst eine Anzahl von Begriffen, die unterschiedliche Gefühle und Emotionen beschreiben. ",
+    "introText_1": "Lesen Sie jedes Wort und kreuzen Sie jeweils in der dafür vorgesehenen Spalte an, welche Intensitätsbeschreibung Ihre MOMENTANE Gefühlssituation beschreibt.",
+    "labels": {
+      "0": "gar nicht",
+      "1": "ein wenig",
+      "2": "mäßig",
+      "3": "deutlich",
+      "4": "extrem"
+    }
+  },
+  "speechTask_explanation": {
+    "start-button": "Weiter",
+    "header": "Erklärung des folgenden Tests",
+    "start": "Diese Hintergrundfarbe signalisiert die Test-Einführung. Solange Sie diesen Balken sehen, werden Sie nicht aufgenommen und Zeit läuft nicht ab.",
+    "prepare":"Diese Hintergrundfarbe signalisiert Ihnen, dass Sie sich auf die im Bildschirm vorgestellte Frage vorbereiten sollen. Dafür haben Sie genau 10 Sekunden Zeit. Konzentrieren Sie sich!",
+    "run": "Der rote Bildschirm signalisiert, dass Sie nun auf die Frage eine passende Antwort geben sollen. Bitte sprechen Sie dafür in die Kamera. Sie sollen für die gesamten 20 Sekunden präsentieren. Sie werden aufgenommen.",
+    "understood": "Verstanden und weiter"
+  },
+  "audioAnalyzing":{
+    "speak": "Bitte sprechen Sie weiter!"
+  }
+}

@@ -1,0 +1,496 @@
+{
+  "mobile-only": "Please switch to your smartphone to run this study!",
+  "button": {
+    "continue": "Continue",
+    "back": "Back",
+    "start": "Start",
+    "agree": "Agree",
+    "disagree": "Disagree",
+    "cancel": "Cancel",
+    "ready": "Ready!"
+  },
+  "permissions": "Please check if your browser has the permission to access your microphone and camera.",
+  "startPage": {
+    "navbar": "Digital Health Studies",
+    "header": "Welcome!",
+    "text1": "Thank you for participating in our Digital Health Study:",
+    "title": "Behavior Analysis While Performing A Cognitive And Verbal Performance Test",
+    "text2": "With your participation you’re supporting our research towards a better understanding of stress and resilience in daily life.",
+    "footer": "This study was developed in cooperation with the Digital Health Center at Hasso-Plattner-Institute, the University of Potsdam and the University of Bielefeld.",
+    "button": "Let's start!",
+    "language": "EN",
+    "noLogging": "This is a presentation version. Data will not be stored permanently or evaluated."
+  },
+  "study_introduction_0": {
+    "header": "Background",
+    "text0": "We're investigating digital methods for assessing individual resilience in daily life scenarios.",
+    "text1": "In this study we want to compare different versions of a new smartphone-based test.",
+    "text2": "You will be randomly assigned to one of the test versions.",
+    "text3": "NOTE: This version is only made for presentation purpose. NO data will be saved. The explanations in the privacy declaration are made for the official study versions."
+  },
+  "checking_participation":{
+    "question": "Have you already participated in this study?",
+    "yes": "Yes",
+    "no": "No",
+    "feedback": "Please answer the question correctly by selecting the appropriate checkbox."
+  },
+  "study_introduction_1": {
+    "header": "Study Procedure",
+    "text0_1": "You will perform a cognitive and verbal performance test consisting of two different tasks.",
+    "text0_2": "In one of the versions, you will be recorded by your front camera.",
+    "text0_3":  "With the recordings your individual resilience will be analysed.",
+    "text0_4": "Upon finishing the study you will be asked to answer a short (~5 min) questionnaire and you will receive feedback on your personal resilience.",
+    "text0_5": "For the test, make sure that you will not be disturbed and that you are in front of a neutral background.",
+
+    "text2": "Your results of the test performance will be compared to the results achieved by other participants."},
+
+  "study_introduction_2": {
+    "header": "Risks and Inconveniences",
+    "text0_1": "This study includes a psychosocial stress test.",
+    "text0_2": "It will not go beyond the stress perceived in daily life scenarios like school exams.",
+    "text0_3": "In any case, if you feel uncomfortable or overstrained, you can cancel this study at any time by closing the browser.",
+    "text0_4": "Nevertheless, please participate only if you do not have any mental problems."
+  },
+  "study_introduction_3": {
+    "header": "Data Privacy",
+    "text1": "You do not need to provide names or email addresses to participate in this study.",
+    "text1_1":"In all variants of this study, the results of the performance test, the questionnaires and general usage statistics are saved." ,
+    "text2": "If you are also filmed, we will explicitly point this out to you beforehand.",
+    "text3": "All data (including video recordings) are stored on a secure server and deleted after the scientific evaluation (at the latest after 10 years).",
+    "text3_2": "If necessary, you can view your data and have it deleted. You will receive an individual sequence of numbers at the end of the study for this.",
+    "text4": "The results of this study, but no individual data, may be used for scientific publications.",
+    "text5a": "You can cancel this study at any time by clicking the ",
+    "text5b": " button. In this case no data is stored.",
+    "consensus": "Your participation is voluntary. You can cancel the study at any time.",
+    "additional_info": "Download additional information"
+  },
+  "study_introduction_3_5": {
+    "header": "Consent Form",
+    "consensus_0": "I have read and understood background, procedure and the risks of this study.",
+    "consensus_1": "I hereby declare my consent to the processing of my personal data, including data that might contain information on my current mood.",
+    "consensus_2": "I hereby confirm that my participation in this study is voluntary and without being under any circumstances that might influence my decision.",
+    "consensus_3a": "Additionally I have downloaded and read the ",
+    "consensus_3b": "additional information",
+    "consensus_3c": "."
+  },
+  "study_introduction_4": {
+    "header": "Current Mood 1/2",
+    "header2": "Current Mood",
+    "text0_1": "Before you start:",
+    "text0_2": "Please answer the following short questions about your current mood - how you're feeling right now. There is no right or wrong answer.",
+    "text0": "Before you start, please",
+    "text1": "At this moment, do you feel",
+    "text2": "stressed?",
+    "text3": "Before you start the verbal task:",
+    "text4": "After finishing both parts of the performance test:",
+    "text5": " "
+
+  },
+  "study_introduction_5": {
+    "header": "Current Mood 2/3",
+    "text0": "Before you start:",
+    "text1": "At this moment, do you feel",
+    "text2": "frustrated?",
+    "text3": "Before you start the verbal task:",
+    "text4": "After finishing both parts of the performance test:"
+
+  },
+  "study_introduction_6": {
+    "header": "Current Mood 3/3",
+    "text0": "Before you start:",
+    "text1": "At this moment, do you feel",
+    "text2": "overstrained?",
+    "text3": "Before you start the verbal task:",
+    "text4": "After finishing both parts of the performance test:"
+  },
+  "study_introduction_7": {
+    "header": "Current Mood 3/3",
+    "text0": "Before you start:",
+    "text1": "At this moment, do you feel",
+    "text2": "ashamed?",
+    "text3": "Before you start the verbal task:",
+    "text4": "After finishing both parts of the performance test:"
+  },
+
+  "warnungVAS": "You have not moved all sliders. Is this the response you want to submit?",
+  "warnungPANAS": "You have not answered all fields. Please fill in all fields.",
+  "stress_scale": {
+    "low": "not at all",
+    "high": "very much",
+    "submit": "Submit"
+  },
+  "home_intro": {
+    "header": "HPI online study",
+    "text": "Lorem ipsum dolor sit amet, consetetur sadips ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
+  },
+  "select_language": {
+    "title": "Select your language",
+    "part1": "Everything is set! You have now following options: ",
+    "start_tutorial": "Start the tutorial",
+    "skip_tutorial": "Skip to the stress test",
+    "before_starting": "Before starting the stress test, please choose your prefered language:"
+  },
+  "mediaTesting":{
+    "allowAccess": "Allow Access",
+    "videoYes" : "Yes ",
+    "videoNo": "No",
+    "start_record": "Start",
+    "stop_record" : "Stop",
+    "reading_header": "Vorlesen: ",
+    "continue": "Continue",
+    "play": "Play",
+    "header": {
+      "header_0": "Video - Analysis",
+      "header_1": " Allow Camera access.",
+      "header_2": "Camera: The camera module is being prepared.",
+      "header_3": " Active",
+      "header_4": " Check Camera Options",
+      "header_5": "  Ready for recording"
+    },
+
+    "question_01":"Does the audio and video recording work?",
+    "question_02":"Is your face clearly visible?",
+    "answerQuestions": "Please answer the stated questions. ",
+    "yes": "Yes",
+    "no": "No",
+    "alert": "Video and sound have to be recognizable for this study. You will have to record the calibration video once again.",
+    "text0": "In order to analyse your resilience your behavior will be recorded.",
+    "text1": "Your facial movements and your voice will be analysed by a newly developed algorithm.",
+    "text2": "To calibrate and test your smartphone we need you to record a short test video.",
+    "text3": "Please make sure that your whole face is recognizable and read out the following line:",
+    "reading_text": "This sentence is calibrating the algorithm.",
+
+    "question": "Sehen Sie Ihr Gesicht?",
+    "iOS_media_request": "To participate in this study access to microphone and camera is required.",
+    "iOS_media_accept": "Access to video and sound were granted. Ready for usage!",
+
+
+    "videoTest": "Webcam-Test",
+    "available": "Ton und Video funktionieren, Gesicht erkennbar",
+    "unavailable": "Ton und/oder Video funktioniert nicht",
+
+    "kalibrating_header": "Kamera - Kalibrierung",
+    "kalibierung_text0": "In order to analyse your behavior you're face is being filmed.",
+    "kalibierung_text1": "Please make sure that your whole face is recognizable and read out the following line:"
+  },
+  "example": {
+    "header": "Cognitive Performance Task",
+    "text0": "In order to assess your cognitive capabilities we will ask you to solve simple calculation tasks.",
+    "text1": "Try to solve the tasks as quickly as you can.",
+    "text2": "If you take too long, time will run out."
+  },
+  "mathTask": {
+    "header": "Important:",
+    "missing_interaction": "Please try to answer the question. Your active participation is important for the precision of the test."
+  },
+
+
+  "mathTaskIntroduction": {
+      "version": "Version A"
+  },
+  "stress": "Stress",
+  "stepper": {
+    "button_finish": "Finish",
+    "button_next": "Next",
+    "button_back" : "Back",
+    "introduction": {
+      "intro": "Info",
+      "consent": "Consent",
+      "panas": "Mood",
+      "vas": "Mood",
+      "calibration": "Camera Test"
+    },
+    "mathTaskTutorial": {
+      "transition": "Info",
+      "vas": "Mood",
+      "intro": "Task",
+      "comparison": "Ranking",
+      "countdown": "Math Test"
+    },
+    "mathTaskResult": {
+      "mathTaskResult": "Result"
+    },
+    "speechTaskTutorial": {
+      "transition": "Info",
+      "vas": "Mood",
+      "intro": "Speech Test"
+    },
+    "endPage": {
+      "vas": "Mood",
+      "panas": "Mood",
+      "explanation": "Clarification",
+      "questionnaire": "Questionnaire"
+    }
+  },
+  "number_input": {
+    "start_test": "Start test"
+  },
+ "feedback_graph": {
+   "label": "Correct Answers in %",
+   "you": "You",
+   "average": "Avg."
+ },
+  "task_frame": {
+    "correct": "Correct answers!",
+    "wrong": "Wrong answer!",
+    "slow": "Too slow!",
+    "missingInteraction": "Please continue with the test"
+
+  },
+  "mathTaskResult": {
+    "well_done": "Feedback",
+    "feedback": "You have finished the first part of the study. We have prepared a few feedback charts for you to learn more about your performance.",
+    "proceed": "Please proceed to the next task!",
+    "continue": "Continue"
+  },
+  "transition": {
+    "header": "End of Part 1",
+    "text_0": "You've now completed part one of the study. Due to your results we would like you to attempt to focus more. We can only analyse and evaluate serious results.",
+    "text_1": "To begin part 2, the verbal assessment, please press \"next\".",
+    "text_2": "To begin part 2, the mathematical assessment, please press \"next\"."
+  },
+  "speechTaskTutorial": {
+    "results": {
+      "heading": "You have finished the first part of the performance test.",
+      "result_1_1": "Your individual results: ",
+      "result_1_2": "correct answers.",
+      "result_2_1": "At the moment you are",
+      "result_2_below": "below your comparison group.",
+      "result_2_above": "above your comparison group."
+    },
+    "mood": {
+      "heading": "Current Mood",
+      "text_1": "Before you start the verbal part of the performance task:",
+      "text_2": "How stressed do you feel at the current moment?"
+    },
+    "task": {
+      "heading": "Verbal Performance Task",
+      "text_0": "In order to assess your verbal skills you have to answer standard job interview questions.",
+      "text_1": {
+        "text_0": "For each question you are given ",
+        "text_1": "10 seconds ",
+        "text_2": "to prepare a ",
+        "text_3": "structured",
+        "text_4": " and ",
+        "text_5": "convincing",
+        "text_6": " response. "
+      },
+      "text_2": {
+        "text_0": "Then you're given ",
+        "text_1": "20 seconds ",
+        "text_2": "to record your response into the camera."
+      },
+      "text_3": "Your presentation will be analysed and your verbal skills evaluated.",
+      "text_4": "Upon completion you will receive individual feedback pertaining to your resilience."
+    }
+  },
+  "genderAndAge": {
+    "calculate": "Calculate",
+    "continue": "Continue",
+    "welcome": "Welcome to the study Potsdam Digital Stress Test. In the first step of this study you are asked to follow a few tasks to proceed in the configurations.",
+    "introduction_header": "Group Comparisons For Your Test Results",
+    "introduction_text": "In order to compare you to other participants, please enter your age and gender:",
+    "adjustment": "The average rate of correct answers in your group is 75%.",
+    "formControll": {
+      "gender": "Gender",
+      "male": "male",
+      "female": "female",
+      "others": "diverse"
+    },
+    "age": "Age"
+  },
+
+  "speechTask": {
+    "header": {
+      "start": "Start test",
+      "state_prepare":"Prepare!",
+      "state_run": "Present!",
+      "result": "Results",
+      "calibration": "Calibration!"
+    },
+    "question_0": {
+      "header": " Question 1 (Critical faculty)",
+      "question": "Prepare your presentation: Describe a situation when you've been criticised by someone."
+    },
+    "question_1": {
+      "header": " Question 2 (Weaknesses)",
+      "question": "Prepare your presentation: What are your biggest weaknesses?"
+    },
+    "question_2": {
+      "header": " Question 3 (Betrayal)",
+      "question": "Prepare your presentation: What does betrayal mean to you? Have you ever betrayed someone in order to get something?"
+    },
+    "calibration": {
+      "task": "To calibrate you can talk about a preferred topic now."
+    },
+    "feedback_0": "Please answer now. Use the whole time for your presentation.",
+    "analysis": {
+      "breaks": "Breaks:",
+      "mean": "Mean Volume:",
+      "speakingRatio": "Speaking Ratio:",
+      "volumeHigh": "Max. Volume:",
+      "header": "Overview of your performance in the speech test:",
+      "questionLoudest": "Loudest Answer at ",
+      "questionQuietest": "Quietest Answer at ",
+      "question_1": "Question 1",
+      "question_2": "Question 2",
+      "question_3": "Question 3"
+    }
+  },
+  "end": {
+    "mood": {
+      "heading": "You have finished both parts of the performance test",
+      "text_0": "",
+      "question": "How stressed do you feel at the current moment?"
+    },
+    "explanation": {
+      "heading": "Clarification",
+      "text_0": "Before you finish the study with a short questionnaire we would like to explain to you that: ",
+      "text_1": "The purpose of this study is to induce and analyse individual stress responses only.",
+      "text_2": "It is NOT intended to evaluate your cognitive and verbal performance.",
+      "text_3": "Therefore: the difficulty of the calculation tasks willingly increases to make you fail.",
+      "text_4": "The comparison with other participants has been FAKED in order to induce social stress.",
+      "text_5": "The videos have NOT been analysed by an algorithm.",
+      "noLogging": "NOTE: This version was only made for presentation purpose. NO data was saved. The explanations in the privacy declaration are made for the official study versions."
+    },
+    "questionnaire": {
+      "heading": "As a last step, please save your data and afterwards fill in the questionnaire towards your individual experience with this test!",
+      "no_data_saved": "Your data is not saved.",
+      "non_video_data_saved": "Only your non-video-data is saved.",
+      "all_data_saved": "Your data is saved.",
+      "headingAlt": "We would appreciate, if you give us a short feedback in the following questionnaire.",
+      "studyResultId": "If at a later point in time you want your data to be deleted, please contact us. Make a note of your personal study ID for this: ",
+      "thanking": "Thank you for your participation!",
+      "soci_survey": "Redirect to survey",
+      "finish": "Save my data",
+      "contact_us": "If you have any questions, please contact us: ",
+      "mail": "mnorden@techfak.uni-bielefeld.de"
+    }
+  },
+  "dataProtection": {
+    "header": "Data Protection Policy",
+    "shortVersion": {
+      "header": "Short Version",
+      "body": "In general, our website can be used anonymously. The provision of personal data is purely voluntary and you will always be informed if and for what purpose we want to save your data. Personal data is the data that allows us to identify you and/or to contact you. This includes your name, your postal address or email address."
+    },
+    "inDetail": {
+      "first": {
+        "header": "1. Who we are and how you can reach us",
+        "body": {
+          "header": "The responsible party for the processing of personal data on this website is:",
+          "name": "Hasso Plattner Institute for Digital Engineering gGmbH",
+          "street": "Prof.-Dr.-Helmert-Str. 2-3 ",
+          "town": "14482 Potsdam",
+          "phone": "Phone: +49 (0)331 5509-0",
+          "fax": "Fax: +49 (0)331 5509-129",
+          "mail": "Email: hpi-info(at)hpi.de",
+          "website": "Website: www.hpi.de",
+          "header2": "You may contact our data protection officer at:",
+          "body2": "Data Protection Officer, Hasso Plattner Institute for Digital Engineering gGmbH",
+          "email2": "Email: datenschutz(at)hpi.de."
+        }
+      },
+      "second": {
+        "header": "2. Which data we do (not) process, for what purpose, how long, and on what legal basis",
+        "body": {
+          "header": "2.1. Anonymous use of our website",
+          "text0": "You can use our website anonymously. When you visit our website, your web browser will tell our web server your IP address to make communication possible.  It may be possible to identify you via your IP address. In some parts of this study you will be filmed. This happens only if you agree to it and it will be clear when you are being filmed. With this video recordings it may be possible to identify you while you perform this study. The video recordings will NOT be saved permanently but used for the analysis during the study only. Thus, after participating in this study, no identifiable data of you remain. ",
+          "text1": "Each time you access the study app, the following data is stored in the server log files: Date and times, anonymous ID, information on browser and operating system of your device, navigation in the app through click-statistics, questionnaires, math-task inputs, gender and age inputs, individual link to SoSci-Survey questionnaire, information on the sound volume during the video recordings. After participating in this study you stay completely anonymous. No personal information will be saved without your confirmation. Sound and video recordings will NOT be saved permanently.",
+          "header2": "2.2. Data processing when using third party content and web fonts",
+          "text0_2": "Our website uses offers from third parties. These are required to display the web-app contenct with Java and make an adaptable design possible. Therefore we use: Google (fonts.googleapis.com, *.gstatic.com) and Jquery (*.jquery.com). For more information on data-privacy of third party content please visit: https://www.google.de/intl/de/policies/privacy\nhttps://openjsf.org/wp-content/uploads/sites/84/2019/11/OpenJS-Foundation-Privacy-Policy-2019-11-15.pdf\n"
+
+        }
+      },
+      "third": {
+        "header": "3. Your Rights",
+        "body": {
+          "text0":"Under the relevant legal requirements, you have the right to receive information about your data, the right to have such data corrected or deleted, the right to the restriction of processing, the right to object to processing, and the right to data tranferability. In particular, you have the right to object to the processing of your data for advertising purposes at any time without incurring costs other than the transmission costs, according to the rates of your provider (e.g., the costs of an email=usually none). This applies, for example, if you have registered for an event and do not wish  to be informed about similar events.  If the data processing is based on consent, you have the right to revoke your consent at any time without this affecting the legality of the processing being carried out on the basis of consent to revocation or processing on any other legal basis. If you want to exercise these rights, you can simply write to datenschutz(at)hpi.de or click on the unsubscribe link in any email newsletter to unsubscribe. If we call you, you can also communicate this to us directly.\n\nYou also have the right to complain to a data protection supervisory authority about our processing of your personal data, for example to the supervisory authority whom we answer to: Die Landesbeauftragte für den Datenschutz und für das Recht auf Akteneinsicht, Stahnsdorfer Damm 77, 14532 Kleinmachnow, Tel: +49 (0)33203 356-0, Fax: +49 (0)33203 356-49, Email: poststelle(at)lda.brandenburg.de.\n\nIf you have questions or requests regarding data protection, you can contact us at any time. Your contact is: datenschutz(at)hpi.de."
+        }
+      },
+      "forth": {
+        "header": "4. Your right to object to data processing",
+        "body": {
+          "text0": "Insofar as the processing of your personal data is based on Art. 6 para. 1 subpara. 1 letter e or f GDPR, you have the right to object to processing in accordance with Art. 21 GDPR. If your objection is made for reasons arising from your particular situation, we will no longer process your personal data unless we can demonstrate compelling legitimate grounds for the processing that outweigh your interests, rights and freedoms, or for the establishment, exercise of defence against legal claims. If your opposition is directed against direct marketing, including profiling, insofar as it is connected with such direct mail, we will no longer process your personal data for these purposes."
+        }
+      }
+    },
+    "version": "Last Updated: 10.08.2020"
+  },
+  "imprint": {
+    "header": "Imprint",
+    "institute": {
+      "header": "Hasso Plattner Institute for Digital Engineering gGmbH",
+      "street": "Prof.-Dr.-Helmert-Str. 2-3 ",
+      "town": "14482 Potsdam",
+      "phone": "Phone: +49 (0)331 5509-0",
+      "fax": "Fax: +49 (0)331 5509-129",
+      "mail": "Email: hpi-info(at)hpi.de",
+      "website": "Website: www.hpi.de"
+    },
+    "director": {
+      "header": "Authorized Representative Managing Directors",
+      "name": "Prof. Dr. Christoph Meinel",
+      "office": "Registry Office: Potsdam District Court",
+      "number": "Register Number: HRB 12184",
+      "person": "Persons responsible for content: Prof. Dr. Christoph Meinel"
+    },
+    "Editor":"Hasso Plattner Institut",
+    "Web Design":"Hasso Plattner Institut",
+    "Texts":"Hasso Plattner Institut",
+
+    "legal": {
+      "header": "Legal information",
+      "body": "Hasso Plattner Institute (HPI) constantly checks and updates the information on its web pages. Despite the utmost care taken, we cannot rule out that some of the data may since have become outdated. Therefore, we cannot accept liability for the currency, accuracy and completeness of the information displayed. The same applies to all other web pages that can be reached via hyperlink. HPI is not responsible for the content of websites which can be reached via such links. Furthermore, HPI reserves the right to make changes or additions to the information displayed. Content and structure of the HPI website is protected by copyright. The reproduction of information or data, in particular the use of texts, text excerpts or illustrative material, requires our prior approval."
+    },
+    "version": "10.08.2020"
+  },
+  "alertAbortStudy": {
+    "header": "Cancel this study",
+    "question": "If you disagree, you will cancel the study and your session will be deleted.",
+    "agree": "Cancel this study",
+    "disagree": "Continue with study"
+  },
+  "cancelDialog": {
+    "question": "Do you really want to cancel this study?",
+    "cancel_without_data": "Cancel and submit no data",
+    "cancel_no_video": "Cancel and submit data without video data",
+    "cancel_with_video": "Cancel and submit all data",
+    "no_cancel": "Do not cancel and continue"
+  },
+  "panas": {
+    "proposition": {
+      "active": "active",
+      "upset": "upset",
+      "hostile" : "hostile",
+      "inspired": "inspired",
+      "ashamed": "ashamed" ,
+      "alert": "alert",
+      "nervous": "nervous",
+      "determined": "determined",
+      "attentive": "attentive",
+      "afraid": "afraid"
+    },
+    "header": "Current Mood 2/2",
+    "introText_0": "This scale consists of a number of words that describe different feelings and emotions.",
+    "introText_1": "Read each item and then mark the appropriate answer in the space next to that word. Indicate to what extent you feel this way right now, that is, at the present moment.",
+    "labels": {
+      "0": "not at all",
+      "1": "a little",
+      "2": "moderately",
+      "3": "quite a bit",
+      "4": "extremly"
+    }
+  },
+  "speechTask_explanation": {
+    "start-button": "Next",
+    "header": "Short Explanation",
+    "start": "Der gelbe Balken signalisiert die Test-Einführung. Solange Sie diesen Balken sehen, werden Sie nicht aufgenommen und Zeit läuft nicht ab.",
+    "prepare":"This colour will indicate that you should prepare your response for the given question. You will be given 10 seconds.",
+    "run": "The red colour will signal that you should now present your response for the given question. Please speak to the camera. You should present the whole 20 seconds. You will be recorded.",
+    "understood": "Understood"
+  },
+  "audioAnalyzing":{
+    "speak": "Please keep on talking!"
+  }
+}
+

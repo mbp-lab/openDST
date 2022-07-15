@@ -1,0 +1,662 @@
+/*!
+stresstask.css
+ */
+body {
+    background-color: white;
+}
+
+
+.formControl {
+    font-family: 'Catamaran', 'Helvetica', 'Arial', 'sans-serif' !important;
+    line-height: 1.2 !important;
+}
+
+section.videoSection{
+    height: 27vh;
+    width: 100%;
+}
+
+
+section.graphicalFeedback {
+    height: 20vh;
+    width: 100%;
+}
+
+#analysis-table {
+    font-size: small;
+    table-layout: fixed;
+    width: 100%;
+}
+
+#analysis-table td {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+#analysis-table th {
+    border-bottom: 1px solid #ddd;
+}
+
+.leftmostCol {
+    text-align: left;
+    width: 35%;
+}
+
+tr:nth-child(even) {background-color: #f5f5f5;}
+
+.analysisQuestion {
+    font-size: small;
+    text-align: left;
+}
+
+section.taskSection {
+    height: 19vh;
+    width: 100%;
+    border: 1px black;
+}
+
+section.inputSection {
+    height: 34vh;
+    width: 100%;
+    bottom: 0;
+}
+
+
+/* Extra small devices (phones, 600px and down) */
+
+
+.border-frame-red{
+    border: 3px solid red !important;
+    z-index: 1;
+    color: #820106;
+}
+.z-index{
+    z-index: 2;
+    position: absolute;
+    color: #000000;
+    text-align: left;
+    font-size: 20px;
+    width: 100%;
+    padding: 10px 0;
+}
+
+.index-middle-row {
+    height: 45vh;
+}
+
+
+.index-bottom-row {
+    height: 25vh;
+}
+
+
+#index-body {
+    height: 85vh;
+    position: relative;
+    padding-top: 10vh;
+}
+
+.vertical {
+    writing-mode: vertical-rl !important;
+    display:flex !important;
+    justify-content:center !important;
+    align-items:center!important;
+    white-space: nowrap;
+}
+.speechTask-start {
+    left:0;
+    right:0;
+    height: 65vh;
+    background-color: white; ;
+
+}
+
+.speechTask-prepare {
+    background-color: #fdcc52 !important;
+    left:0;
+    right:0;
+    height: 60vh;
+}
+.speechTask-prepare-example {
+    background-color: #fdcc52 !important;
+    left:0;
+    right:0;
+    height: 15vh;
+}
+.speechTask-speak {
+    background-color: #c70000 ;
+    left:0;
+    right:0;
+    height: 60vh;
+    animation-name: color;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
+}
+
+.speechTask-speak-iPhone {
+    background-color: #c70000 ;
+    left:0;
+    right:0;
+    height: 75vh;
+    animation-name: color;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
+}
+
+@keyframes color {
+    0% {background-color: #c70000}
+    50% {background-color: #fcd1d1
+    }
+    100% {background-color: #c70000 }
+}
+
+.speechTask-speak-example {
+    background-color: #c70000 ;
+    left:0;
+    right:0;
+    height: 15vh;
+    animation-name: color;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
+}
+
+.darken-background {
+    background-blend-mode: darken !important;
+}
+
+.countdown-centered-button {
+    position: fixed !important;
+    top: 50% !important;;
+    left: 50% !important;;
+    margin-top: -50px !important;;
+    margin-left: -90px !important;;
+}
+
+.countdown-centered-number {
+    position: fixed !important;
+    top: 50% !important;;
+    left: 50% !important;;
+    margin-top: -110px !important;;
+    margin-left: -40px !important;;
+}
+
+@media screen and (max-width: 350px) {
+
+    .feedbackVAS {
+        font-weight: bold !important;
+        font-size: 12px !important;
+        color: red !important;
+    }
+
+    .speechTask-header-wait {
+        font-size: 20px;
+        font-weight: bold;
+        color: black;
+    }
+
+    .panas-labels {
+        font-weight: bold !important;
+        font-size: 12px !important;
+    }
+    .panas-proposition {
+        font-size: 14px !important;
+    }
+    .panas-header {
+        font-size: 20px !important;
+        background-color: #fdcc52;
+        font-weight: bold;
+        text-decoration: underline;
+    }
+    .panas-subheader {
+        font-size: 16px !important;
+    }
+
+    th.sticky-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: white;
+    }
+
+    .form-label-1 {
+        font-weight: bold !important;
+        font-size: 16px !important;
+        color: black !important;
+        margin: 0;
+    }
+    .form-helper {
+        font-size: 13px !important;
+        color: red !important;
+        text-align: center !important;
+        padding-top: 7px !important;
+        padding-bottom: 7px !important;
+        margin: 0 !important;
+    }
+
+
+    #math-question {
+        height: 100%;
+        font-size: 30px;
+        border: 0;
+        border-radius: 20px;
+
+    }
+    #math-equals {
+        height: 100%;
+        font-size: 30px;
+        border: 0;
+    }
+
+    #math-answer-one-digit {
+        align-self: center;
+        text-align: left;
+        line-height: 100%;
+
+        height: 30px;
+        letter-spacing: 25px;
+        padding-left: 5px;
+        margin-left: 10px;
+        margin-bottom: 1vh !important;
+        border: 0;
+        background-image: linear-gradient(to left, black 70%, rgba(255, 255, 255, 0) 0%);
+        background-position: bottom;
+        background-size: 50px 2px;
+        background-repeat: repeat-x;
+        background-position-x: 35px;
+        width: 44px;
+        font-size: 30px;
+        min-width: 50px;
+    }
+
+    #math-answer-two-digit {
+        align-self: center;
+        text-align: left;
+        height: 30px;
+        top: 5px;
+        letter-spacing: 25px;
+        padding-left: 5px;
+        margin-left: 10px;
+        border: 0;
+        margin-bottom: 1vh !important;
+        line-height: 100%;
+
+        background-image: linear-gradient(to left, black 70%, rgba(255, 255, 255, 0) 0%);
+        background-position: bottom;
+        background-size: 50px 2px;
+        background-repeat: repeat-x;
+        background-position-x: 35px;
+        width: 85px;
+        font-size: 30px;
+        min-width: 50px;
+    }
+
+    .index-body-header {
+        font-family: 'Catamaran', 'Helvetica', 'Arial', 'sans-serif';
+        font-size: 20px !important;
+        background-color: #fdcc52;
+        font-weight: bold !important;
+        text-decoration: underline !important;
+    }
+    .index-body-text1{
+        font-size: 20px ;
+    }
+    .index-body-title{
+        font-size: 19px ;
+        padding-top: 5vh;
+    }
+    .index-body-text2{
+        font-size: 13px ;
+    }
+    .index-body-footer {
+        font-size: 9px ;
+    }
+
+    .index-logo-size {
+        height: 45px;
+    }
+
+    .stepper-header {
+        font-size: 20px;
+        font-weight: bold;
+        text-decoration: underline;
+        background-color: #fdcc52;
+
+    }
+
+    .ul{
+        padding-inline-start: 10px !important;
+    }
+    .stepper-bullet-point {
+        text-align: left;
+        font-size: 16px;
+    }
+    .end-stepper-bullet-point {
+        text-align: left;
+        font-size: 16px;
+    }
+    .question {
+        font-size: 18px ;
+    }
+    .mediaTestingQuestion{
+        font-size: 16px;
+    }
+    .visual-analog-scale {
+        font-size: 16px;
+    }
+    .visual-analog-scale-intro {
+        font-size: 15px;
+    }
+    .free-speech-tutorial-header {
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    .speechTask-countdown-button {
+        background: #fdcc52 !important;
+        color: black !important;
+        font-size: 35px !important;
+    }
+    .speechTask-countdown {
+        font-size: 35px !important;
+        color: black !important;
+    }
+
+    .speechTask-header-record {
+        font-size: 22px !important;;
+        font-weight: bold !important;;
+        color: red !important;
+    }
+
+    .speechTask-question {
+        font-size: 18px !important;;
+    }
+
+    .dot-red     {
+        height: 20px;
+        width: 20px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .dot-white {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+}
+@media screen and (min-width: 351px) {
+
+    .speechTask-countdown-button {
+        background: #fdcc52 !important;
+        color: black !important;
+        font-size: 40px !important;
+    }
+
+    .feedbackVAS {
+        font-weight: bold !important;
+        font-size: 14px !important;
+        color: red !important;
+    }
+    .speechTask-header-record {
+        font-size: 30px !important;;
+        font-weight: bold !important;;
+        color: red !important;
+    }
+
+    .panas-labels {
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    .panas-proposition {
+        font-size: 16px !important;
+    }
+    .panas-header {
+        font-size: 25px !important;
+        background-color: #fdcc52;
+        font-weight: bold;
+        text-decoration: underline;
+    }
+    .panas-subheader {
+        font-size: 18px !important;
+    }
+
+    .panas-table {
+        width:100%;
+    }
+
+    th.sticky-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: white;
+    }
+
+    .form-label-1 {
+        font-weight: bold !important;
+        font-size: 18px !important;
+        color: black !important;
+    }
+
+    .form-helper {
+        font-size: 16px !important;
+        color: red !important;
+        text-align: center !important;
+        padding-top: 7px !important;
+        padding-bottom: 7px !important;
+        margin: 0 !important;
+    }
+
+    #math-question {
+        height: 100%;
+        font-size: 40px;
+        border: 0;
+        border-radius: 20px;
+
+    }
+    #math-equals {
+        height: 100%;
+        font-size: 40px;
+        border: 0;
+    }
+
+    #math-answer-one-digit {
+        align-self: center;
+        text-align: left;
+        height: 40px;
+        letter-spacing: 25px;
+        padding-left: 5px;
+        margin-left: 10px;
+        border: 0;
+
+        background-image: linear-gradient(to left, black 70%, rgba(255, 255, 255, 0) 0%);
+        background-position: bottom;
+        background-size: 50px 2px;
+        background-repeat: repeat-x;
+        background-position-x: 35px;
+        width: 44px;
+        font-size: 40px;
+        min-width: 50px;
+        line-height: 100%;
+    }
+
+    #math-answer-two-digit {
+        align-self: center;
+        text-align: left;
+        height: 40px;
+        letter-spacing: 25px;
+        padding-left: 5px;
+        margin-left: 10px;
+        border: 0;
+        line-height: 100%;
+
+        background-image: linear-gradient(to left, black 70%, rgba(255, 255, 255, 0) 0%);
+        background-position: bottom;
+        background-size: 50px 2px;
+        background-repeat: repeat-x;
+        background-position-x: 35px;
+        width: 85px;
+        font-size: 40px;
+        min-width: 50px;
+    }
+
+    .index-body-header {
+        font-family: 'Catamaran', 'Helvetica', 'Arial', 'sans-serif';
+        font-size: 22px !important;
+        background-color: #fdcc52;
+        font-weight: bold !important;
+        text-decoration: underline !important;
+    }
+    .index-body-text1{
+        font-size: 22px ;
+    }
+    .index-body-title{
+        font-size: 21px ;
+        padding-top: 5vh;
+    }
+    .index-body-text2{
+        font-size: 17px ;
+    }
+
+    .index-body-footer {
+        font-size: 11px ;
+    }
+    .index-logo-size {
+        height: 55px;
+    }
+    .stepper-header {
+        font-size: 23px;
+        font-weight: bold;
+        text-decoration: underline;
+    }
+    .ul{
+        padding-inline-start: 10px !important;
+    }
+    .stepper-bullet-point {
+        text-align: left;
+        font-size: 18px;
+    }
+    .end-stepper-bullet-point {
+        text-align: left;
+        font-size: 18px;
+    }
+    .question {
+        font-size: 21px ;
+    }
+    .speechTask-countdown {
+        font-size: 40px !important;
+        color: black !important;
+
+    }
+
+    .speechTask-header-wait {
+        font-size: 25px;
+        font-weight: bold;
+        color: black;
+    }
+
+    .speechTask-question {
+        font-size: 22px;
+    }
+    .dot-red {
+        padding-top:5px;
+        height: 20px;
+        width: 20px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .dot-white {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .visual-analog-scale {
+        font-size: 18px;
+    }
+    .visual-analog-scale-intro {
+        font-size: 17px;
+    }
+    .free-speech-tutorial-header {
+        font-size: 23px;
+        font-weight: bold;
+
+    }
+}
+
+.question-timer {
+    font-size: 30px;
+}
+
+.countdown {
+    font-size: 150px;
+}
+
+.countdownSpeechTask{
+    font-size: 100px;
+}
+
+.number-button {
+    width: 25vw;
+    outline: none;
+    padding: 0;
+    height: 7vh;
+    border-radius: 20px;
+    bottom: 0;
+    color: white;
+    border:1px solid transparent;
+}
+
+.number-button:focus{
+    outline: none;
+    box-shadow: none;
+}
+
+.number-button:active {
+    transform: scale(1.1);
+}
+
+.time-overflow {
+    font-size: 22px;
+}
+
+.bgDefault{
+    background-color: #343a40;
+}
+
+.math-component {
+    height: 12vh;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+    background-color: white;
+    border-radius: 15px;
+    border: 2px solid black;
+}
+
+.alert-text {
+    font-size: 15px !important;
+    color: black !important;
+}
+.alert-buttons {
+    background: #fdcc52 !important;
+    color: black !important;
+    font-size: 12px !important;
+}
+.alert-buttons-disabled {
+    background: #a5a5a5 !important;
+    color: black !important;
+    font-size: 12px !important;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.mathTaskTutorial {
+    height: 70vh;
+}
+
+.center-horizontal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
