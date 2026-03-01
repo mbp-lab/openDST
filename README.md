@@ -51,6 +51,12 @@ Per default video recording and data logging are disabled in the .env-file. We d
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## For comprehensive guide see:
+
+* **/DOCUMENTATION.md**
+
+
+
 ## Available Scripts
 
 In the project directory, you can run:

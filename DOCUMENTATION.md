@@ -1,6 +1,6 @@
 # OpenDST — Digital Stress Test Documentation
 
-A comprehensive guide for researchers and developers who want to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDST) in their studies. The DST is an open-source React.js web application that induces psychosocial stress online, based on established laboratory stress induction procedures (Trier Social Stress Test). It was developed at Bielefeld University and published alongside a peer-reviewed evaluation study.
+A guide to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDST) in their studies. The DST is an open-source React.js web application that induces psychosocial stress online.
 
 **Publication:** Norden, M., Hofmann, A. G., Meier, M., Balzer, F., Wolf, O. T., Böttinger, E., & Drimalla, H. (2022). Inducing and Recording Acute Stress Responses on a Large Scale With the Digital Stress Test (DST): Development and Evaluation Study. *Journal of Medical Internet Research*, 24(7), e32280. https://doi.org/10.2196/32280
 
@@ -198,6 +198,8 @@ See [Section 4](#4-customization-guide) for detailed customization instructions.
 ### Adding a New Language
 
 The DST with English (`en`) and German (`de`). Translations are stored in `src/locales/{language_code}/translation.json`.
+
+**NOTE** - Please consider contributing by adding language translations.
 
 
 **Step 1: Create the translation file**
