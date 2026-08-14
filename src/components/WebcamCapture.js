@@ -131,12 +131,14 @@ class WebcamCapture extends React.Component {
         }
         //Persisting
         if (process.env.NODE_ENV !== 'development' && process.env.REACT_APP_VIDEO_RECORDING === 'true' && process.env.REACT_APP_LOGGING === 'true') {
-            let index = this.props.markVideoAsUploading();
+            let uploadId = this.props.markVideoAsUploading();
             let fileExtension = this.state.mimeType === 'video/mp4' ? '.mp4' : '.webm';
             jatos.uploadResultFile(blob, this.props.studyResultId + '_' + this.props.studyPage + '_' + this.props.videoCounter + fileExtension)//eslint-disable-line no-undef
-                .then(() => this.props.markVideoAsUploaded(index))
-                .catch((response) => console.log(response))
-                .then(() => this.props.markVideoAsUploaded(index));
+                .then(() => this.props.markVideoAsUploaded(uploadId))
+                .catch((error) => {
+                    console.log(error);
+                    this.props.markVideoAsFailed(uploadId);
+                });
         }
     }
 

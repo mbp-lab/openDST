@@ -75,7 +75,7 @@ export default function CancelDialog(props) {
                         ? <Button
                             onClick={handleOK}
                             className="alert-buttons">OK</Button>
-                        : ((props.areAllVideosUploaded || forceRedirect) && redirectAllowed
+                        : ((props.areAllUploadsSettled || forceRedirect) && redirectAllowed
                                 ? <Redirection handleCancelDialog={props.handleCancelDialog}
                                                cancelValue={cancelValue}
                                                uploadFinalData={props.uploadFinalData}

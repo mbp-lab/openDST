@@ -54,7 +54,7 @@ export default class EndPage extends React.Component{
                     handleCancelDialog={this.props.handleCancelDialog}
                 />
             </Slide>
-            <Slide direction="right" in={this.props.activeSlide === 'explanation' || (this.props.activeSlide === 'questionnaire' && !this.props.areAllVideosUploaded && !this.state.forceLastSlide)} mountOnEnter unmountOnExit>
+            <Slide direction="right" in={this.props.activeSlide === 'explanation' || (this.props.activeSlide === 'questionnaire' && !this.props.areAllUploadsSettled && !this.state.forceLastSlide)} mountOnEnter unmountOnExit>
                 <div>
                     <Card>
                         <div className="row py-2 justify-content-center index-body-header">
@@ -121,7 +121,7 @@ export default class EndPage extends React.Component{
                     </div>
                 </div>
             </Slide>
-            <Slide direction="right" in={this.state.forceLastSlide || (this.props.activeSlide === 'questionnaire' && this.props.areAllVideosUploaded)} mountOnEnter unmountOnExit>
+            <Slide direction="right" in={this.state.forceLastSlide || (this.props.activeSlide === 'questionnaire' && this.props.areAllUploadsSettled)} mountOnEnter unmountOnExit>
                 <div>
                     <div className="row justify-content-center py-2">
                         <div className="col-12">

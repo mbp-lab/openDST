@@ -398,6 +398,7 @@ export default class MathTask extends React.Component {
                                 studyResultId={this.props.studyResultId}
                                 markVideoAsUploading={this.props.markVideoAsUploading}
                                 markVideoAsUploaded={this.props.markVideoAsUploaded}
+                                markVideoAsFailed={this.props.markVideoAsFailed}
                                 videoCounter={this.state.videoCounter}
                                 webcamSize={calculateHeightInPx(27)}
                             />

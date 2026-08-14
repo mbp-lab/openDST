@@ -10,6 +10,7 @@ import EndPage from "./pages/EndPage";
 import StepperWithLabels from "./components/StepperWithLabels";
 import CancelDialog from "./components/CancelDialog.js";
 import { UAParser } from 'ua-parser-js';
+import {hasPendingUploads, registerUpload, settleUpload, UPLOAD_STATUS} from './uploadState';
 
 /**
  * The main component holds most of the data that is collected during the study run. It's the parent component of the
@@ -87,13 +88,11 @@ class Main extends React.Component {
             },
 
             /**
-             * An array of booleans that will indicate whether the video uploads were successful or not. The n-th video
-             * upload corresponds to the element at index n.
-             *
-             * areAllVideosUploaded is derived from uploadedVideos.
+             * Video uploads are tracked by stable ID. Each upload is pending until
+             * it settles as either succeeded or failed.
              */
-            uploadedVideos: [],
-            areAllVideosUploaded: true,
+            areAllUploadsSettled: true,
+            videoUploads: [],
 
             /**
              * cancelDialogIsOpen is passed to the cancelDialog component as a prop and controls if it is open or closed.
@@ -117,9 +116,11 @@ class Main extends React.Component {
         this.handlerCheckBoxForPriorParticipation = this.handlerCheckBoxForPriorParticipation.bind(this)
         this.markVideoAsUploading = this.markVideoAsUploading.bind(this)
         this.markVideoAsUploaded = this.markVideoAsUploaded.bind(this)
+        this.markVideoAsFailed = this.markVideoAsFailed.bind(this)
         this.speechTestAnalysisCallback = this.speechTestAnalysisCallback.bind(this)
         this.endMathTask = this.endMathTask.bind(this)
         this.setStudyTimes = this.setStudyTimes.bind(this)
+        this.nextVideoUploadId = 0;
 
         /**
          * The data object holds various data that is collected during a study run including results from the math- and
@@ -257,35 +258,44 @@ class Main extends React.Component {
     }
 
     /**
-     * This function pushes a new false entry to the this.state.uploadedVideos array indicating that a new video is being uploaded
-     * but not yet successfully so.
-     * @returns {number} the index of the false entry
+     * Registers a video upload and returns its stable ID.
      */
     markVideoAsUploading() {
+        const uploadId = `video-${this.nextVideoUploadId}`;
+        this.nextVideoUploadId += 1;
+
         this.setState(prevState => ({
-            uploadedVideos: [...prevState.uploadedVideos, false]
-        }), () => this.setState(prevState => ({
-                areAllVideosUploaded: prevState.uploadedVideos.reduce((accumulator, currentValue) => accumulator && currentValue, true),
-            }))
-        )
-        return this.state.uploadedVideos.length - 1;
+            videoUploads: registerUpload(prevState.videoUploads, uploadId),
+            areAllUploadsSettled: false
+        }));
+
+        return uploadId;
     }
 
     /**
-     * This function changes a particular entry of the this.state.uploadedVideos array to true, indicating that the particular
-     * video has been successfully uploaded.
-     * It also updates the this.state.areAllVideosUploaded variable.
-     * @param index the index of the entry that will be changed to true
+     * Marks a pending video upload as successfully settled.
+     * @param uploadId the stable ID returned by markVideoAsUploading
      */
-    markVideoAsUploaded(index) {
+    markVideoAsUploaded(uploadId) {
+        this.settleVideoUpload(uploadId, UPLOAD_STATUS.SUCCEEDED);
+    }
+
+    /**
+     * Marks a pending video upload as failed without blocking study completion.
+     * @param uploadId the stable ID returned by markVideoAsUploading
+     */
+    markVideoAsFailed(uploadId) {
+        this.settleVideoUpload(uploadId, UPLOAD_STATUS.FAILED);
+    }
+
+    settleVideoUpload(uploadId, status) {
         this.setState(prevState => {
-            let copy = [...prevState.uploadedVideos];
-            copy[index] = true;
-            return {uploadedVideos: copy};
-        }, () => this.setState(prevState => ({
-            areAllVideosUploaded: prevState.uploadedVideos.reduce((accumulator, currentValue) => accumulator && currentValue, true),
-            }))
-        )
+            const videoUploads = settleUpload(prevState.videoUploads, uploadId, status);
+            return {
+                videoUploads,
+                areAllUploadsSettled: !hasPendingUploads(videoUploads)
+            };
+        });
     }
 
     /**
@@ -554,6 +564,7 @@ class Main extends React.Component {
                         continueFromPanas={this.continueFromPanas}
                         markVideoAsUploading={this.markVideoAsUploading}
                         markVideoAsUploaded={this.markVideoAsUploaded}
+                        markVideoAsFailed={this.markVideoAsFailed}
                         studyResultId={this.data.studyMetaTracker.studyResultId}
                         handleNext={this.handleNext}
                         language={this.data.studyMetaTracker.language}
@@ -586,6 +597,7 @@ class Main extends React.Component {
                     handleCancelDialog={this.handleCancelDialog}
                     cancelDialogIsOpen={this.state.cancelDialogIsOpen}
                     markVideoAsUploading={this.markVideoAsUploading}
+                    markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploaded={this.markVideoAsUploaded}
                     handleNext={this.handleNext}
                 />;
@@ -624,12 +636,13 @@ class Main extends React.Component {
                     endSpeechTask={this.endSpeechTask}
                     updateSpeechTaskFeedback={this.updateSpeechTaskFeedback}
                     studyResultId={this.data.studyMetaTracker.studyResultId}
+                    markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploading={this.markVideoAsUploading}
                     markVideoAsUploaded={this.markVideoAsUploaded}
                     language={this.data.studyMetaTracker.language}
                     handleCancelDialog={this.handleCancelDialog}
                     cancelDialogIsOpen={this.state.cancelDialogIsOpen}
-                    areAllVideosUploaded={this.state.areAllVideosUploaded}
+                    areAllUploadsSettled={this.state.areAllUploadsSettled}
                     speechTestAnalysisCallback={this.speechTestAnalysisCallback}
                     studyID={this.data.studyMetaTracker.studyId}
                 />;
@@ -648,7 +661,7 @@ class Main extends React.Component {
                         handBackStressData={this.handBackStressData}
                         continueFromPanas={this.continueFromPanas}f
                         referenceTime={this.data.studyTimes.reference}
-                        areAllVideosUploaded={this.state.areAllVideosUploaded}
+                        areAllUploadsSettled={this.state.areAllUploadsSettled}
                         studyMetaTracker={this.data.studyMetaTracker}
                         speechTestAnalysis={this.data.speechTestAnalysis}
                         handleCancelDialog={this.handleCancelDialog}
@@ -674,7 +687,7 @@ class Main extends React.Component {
                         handleCancelDialog={this.handleCancelDialog}
                         cancelDialogIsOpen={this.state.cancelDialogIsOpen}
                         studyMetaTracker={this.data.studyMetaTracker}
-                        areAllVideosUploaded={this.state.areAllVideosUploaded}
+                        areAllUploadsSettled={this.state.areAllUploadsSettled}
                         uploadFinalData={this.uploadFinalData}
                     />
                     : <div/>

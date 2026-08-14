@@ -122,6 +122,7 @@ export default class SpeechTaskCalibration extends React.Component {
                                 studyPage='speechTask'
                                 markVideoAsUploading={this.props.markVideoAsUploading}
                                 markVideoAsUploaded={this.props.markVideoAsUploaded}
+                                markVideoAsFailed={this.props.markVideoAsFailed}
                                 studyResultId={this.props.studyResultId}
                                 videoCounter={this.props.videoCounter}
                                 webcamCallback={this.webcamCallback}

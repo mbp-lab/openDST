@@ -300,6 +300,7 @@ class Introduction extends React.Component {
                     handleNext={this.props.handleNext}
                     markVideoAsUploading={this.props.markVideoAsUploading}
                     markVideoAsUploaded={this.props.markVideoAsUploaded}
+                    markVideoAsFailed={this.props.markVideoAsFailed}
                     studyResultId={this.props.studyResultId}
                     handleAbortDialog={this.handleAbortDialog}
                 />
