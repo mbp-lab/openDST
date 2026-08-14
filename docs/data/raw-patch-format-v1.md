@@ -90,8 +90,9 @@ segments[].parts[].timestampsUs
 ```
 
 The manifest is JSON-serializable and deliberately excludes the part byte
-payloads themselves. Upload transport and broader capture metadata are added
-by later pipeline stages without altering this v1 byte contract.
+payloads themselves. The isolated JATOS sink uploads parts before the manifest;
+browser capture integration and broader metadata are added by later pipeline
+stages without altering this v1 byte contract.
 
 ## Postprocessing verification
 
@@ -102,3 +103,14 @@ verified part bytes in manifest segment/part order. Split the result into
 15,552-byte frames and associate each frame with the aligned `timestampsUs`
 entry. A hash, length, order, or timestamp-count mismatch invalidates the
 affected data.
+
+## Provisional upload capacity
+
+Before raw-patch capture is enabled, JATOS result-upload limits and the Nginx
+request limit must allow every compressed part, the manifest, and existing
+study artifacts. `jatos.resultUploads.maxFileSize` must exceed the largest
+gzip part, not merely its 8,382,528-byte uncompressed maximum.
+
+`jatos.resultUploads.limitPerStudyRun` must cover the expected number of
+parts, one manifest, and companion MP4/WebM files. These are provisional
+deployment requirements: actual browser gzip sizes, retry behavior, and

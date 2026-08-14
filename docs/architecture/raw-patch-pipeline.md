@@ -66,3 +66,21 @@ that transform type. Its future descriptor must define a fixed-point
 quantized transform, sampling rule, and boundary policy, and must receive a
 new crop/pipeline version. Face detection, affine extraction, and rotated
 sampling are not part of this stage.
+
+## Bounded JATOS sink
+
+`JatosPatchSink` is the isolated best-effort transport boundary. It accepts
+sealed parts, uses native `CompressionStream("gzip")`, and calls the injected
+JATOS `uploadResultFile` adapter with complete compressed payloads.
+
+The sealed-part state machine is:
+
+```text
+sealed -> queued -> compressing -> uploading/retrying -> succeeded | failed
+```
+
+The upstream segmenter owns one active, unsealed part. The sink accepts at
+most two sealed parts, including a part currently being compressed or
+uploaded. Accepted raw bytes transfer to the sink and are released after
+compression. A third sealed part is an overflow signal for the future capture
+controller, which must stop patch capture as incomplete rather than affect

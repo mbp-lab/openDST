@@ -1,0 +1,95 @@
+import {UPLOAD_STATUS} from '../uploadState';
+import {JatosPatchSink, PatchSinkOverflowError} from './JatosPatchSink';
+
+function deferred() {
+    let resolve;
+    return {
+        promise: new Promise(nextResolve => {
+            resolve = nextResolve;
+        }),
+        resolve
+    };
+}
+
+function sealedPart(partIndex) {
+    return {
+        filename: `RESULT_introduction_1_patch_s000_p${String(partIndex).padStart(3, '0')}.rgb24.gz`,
+        frameCount: 1,
+        byteLength: 3,
+        bytes: new Uint8Array([partIndex, partIndex + 1, partIndex + 2])
+    };
+}
+
+function tracker() {
+    return {
+        registerUpload: jest.fn(),
+        settleUpload: jest.fn()
+    };
+}
+
+describe('JatosPatchSink', () => {
+    test('owns at most one active and one queued part, then finalizes the manifest after parts settle', async () => {
+        const compression = deferred();
+        const uploads = jest.fn(() => Promise.resolve());
+        const uploadTracker = tracker();
+        const sink = new JatosPatchSink({
+            uploadResultFile: uploads,
+            uploadTracker,
+            compress: jest.fn(() => compression.promise),
+            createBlob: chunks => ({chunks}),
+            sleep: jest.fn(() => Promise.resolve())
+        });
+        const first = sealedPart(0);
+        const second = sealedPart(1);
+
+        const firstCompletion = sink.enqueuePart(first);
+        const secondCompletion = sink.enqueuePart(second);
+
+        expect(() => sink.enqueuePart(sealedPart(2))).toThrow(PatchSinkOverflowError);
+        expect(first.bytes).toBeInstanceOf(Uint8Array);
+        expect(second.bytes).toBeInstanceOf(Uint8Array);
+
+        const finalization = sink.finalize({filename: 'RESULT_introduction_1_patch_manifest.json'});
+        expect(uploads).not.toHaveBeenCalled();
+
+        compression.resolve(new Uint8Array([31]));
+
+        await Promise.all([firstCompletion, secondCompletion]);
+        await finalization;
+
+        expect(first.bytes).toBeNull();
+        expect(second.bytes).toBeNull();
+        expect(uploads.mock.calls.map(call => call[1])).toEqual([
+            'RESULT_introduction_1_patch_s000_p000.rgb24.gz',
+            'RESULT_introduction_1_patch_s000_p001.rgb24.gz',
+            'RESULT_introduction_1_patch_manifest.json'
+        ]);
+        expect(uploadTracker.settleUpload.mock.calls.map(call => call[1])).toEqual([
+            UPLOAD_STATUS.SUCCEEDED,
+            UPLOAD_STATUS.SUCCEEDED,
+            UPLOAD_STATUS.SUCCEEDED
+        ]);
+    });
+
+    test('retries a part three times and reports one terminal failure', async () => {
+        const uploads = jest.fn(() => Promise.reject(new Error('unavailable')));
+        const uploadTracker = tracker();
+        const sink = new JatosPatchSink({
+            uploadResultFile: uploads,
+            uploadTracker,
+            compress: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
+            createBlob: chunks => ({chunks}),
+            sleep: jest.fn(() => Promise.resolve())
+        });
+
+        const result = await sink.enqueuePart(sealedPart(0));
+
+        expect(uploads).toHaveBeenCalledTimes(3);
+        expect(uploadTracker.registerUpload).toHaveBeenCalledTimes(1);
+        expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
+            'patch-part-RESULT_introduction_1_patch_s000_p000.rgb24.gz',
+            UPLOAD_STATUS.FAILED
+        );
+        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, attempts: 3});
+    });
+});
