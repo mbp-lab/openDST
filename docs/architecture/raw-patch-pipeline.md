@@ -67,6 +67,22 @@ quantized transform, sampling rule, and boundary policy, and must receive a
 new crop/pipeline version. Face detection, affine extraction, and rotated
 sampling are not part of this stage.
 
+## Browser capture lifecycle
+
+Stage 5 adds disabled-by-default browser integration. `WebcamCapture` starts
+and stops a raw-patch session beside the existing `MediaRecorder` lifecycle;
+it does not alter the participant-facing UI or recorder configuration.
+
+Module map:
+`RawPatchCaptureSession` resolves build-time configuration and adapts JATOS
+plus upload tracking; `RawPatchCaptureController` probes browser APIs and
+owns frame callbacks; the existing processor, segmenter, and JATOS sink retain
+their independent responsibilities.
+
+Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
+RGBX/sRGB copying, and native gzip; then it registers the next callback before
+processing the current frame. Only one copy may be in flight; later callbacks
+
 ## Bounded JATOS sink
 
 `JatosPatchSink` is the isolated best-effort transport boundary. It accepts

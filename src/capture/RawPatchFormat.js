@@ -155,7 +155,7 @@ function manifestPart(part) {
 /**
  * Builds the JSON-serializable v1 manifest from sealed segments and parts.
  */
-export function buildRawPatchManifest({studyResultId, studyPage, videoCounter, segments}) {
+export function buildRawPatchManifest({studyResultId, studyPage, videoCounter, segments, capture}) {
     if (!Array.isArray(segments)) {
         throw new Error('Manifest segments must be an array');
     }
@@ -204,6 +204,7 @@ export function buildRawPatchManifest({studyResultId, studyPage, videoCounter, s
             colorSpace: 'srgb',
             channelOrder: 'RGB'
         },
-        segments: manifestSegments
+        segments: manifestSegments,
+        ...(capture ? {capture} : {})
     };
 }

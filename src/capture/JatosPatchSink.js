@@ -15,22 +15,22 @@ function delay(milliseconds) {
 }
 
 function defaultBlob(chunks, options) {
-    return new Blob(chunks, options);
+    return new window.Blob(chunks, options);
 }
 
 /**
  * Compresses complete RGB24 bytes with the browser's native gzip stream.
  */
 export async function gzipRgb24(bytes) {
-    if (typeof CompressionStream !== 'function') {
+    if (typeof window.CompressionStream !== 'function') {
         throw new Error('Native CompressionStream is unavailable');
     }
-    if (typeof Blob !== 'function' || typeof Response !== 'function') {
+    if (typeof window.Blob !== 'function' || typeof window.Response !== 'function') {
         throw new Error('Native Blob and Response APIs are required for gzip compression');
     }
 
-    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
-    return new Response(stream).blob();
+    const stream = new window.Blob([bytes]).stream().pipeThrough(new window.CompressionStream('gzip'));
+    return new window.Response(stream).blob();
 }
 
 function validateSealedPart(part) {
@@ -114,12 +114,15 @@ export class JatosPatchSink {
         return completion;
     }
 
-    async finalize(manifest) {
+    async finalize(manifestOrBuilder) {
+        this.acceptingParts = false;
+        await this.whenIdle();
+        const manifest = typeof manifestOrBuilder === 'function'
+            ? manifestOrBuilder([...this.partResults])
+            : manifestOrBuilder;
         if (!manifest || typeof manifest.filename !== 'string' || !manifest.filename.endsWith('_patch_manifest.json')) {
             throw new Error('Manifest must include its deterministic filename');
         }
-        this.acceptingParts = false;
-        await this.whenIdle();
 
         const manifestBytes = this.createBlob([JSON.stringify(manifest)], {type: 'application/json'});
         const manifestResult = await this.uploadWithRetry({

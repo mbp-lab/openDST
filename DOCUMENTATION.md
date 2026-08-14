@@ -126,6 +126,8 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_MOBILE_ONLY` | `'true'` / `'false'` | `'true'` | When `'true'`, displays a "please use your smartphone" message on desktop browsers. Participants must use a mobile device. For desktop testing, use browser developer tools to simulate a mobile viewport. |
 | `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables webcam video recording during calibration, math task, and speech task. Videos are uploaded to the JATOS backend. **Requires `REACT_APP_LOGGING` to also be `'true'`.** |
 | `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
+| `REACT_APP_RAW_PATCH_CAPTURE` | `'off'` / `'calibration'` / `'all'` | `'off'` | Experimental deterministic 72×72 raw-patch capture. `'calibration'` captures only the 30-second introduction feedback recording; `'all'` captures every recording session. Keep `'off'` until browser and deployment validation are complete. |
+| `REACT_APP_PATCH_ROI_COORDINATES` | `'camera'` / `'face'` | `'camera'` | Requested raw-patch ROI coordinates. v1 supports only the centered `'camera'` ROI. `'face'` is accepted for rollout configuration but is reported as unsupported until a face provider exists. |
 | `REACT_APP_SURVEY_HOST_PATH` | URL string | `'https://www.soscisurvey.de/resilience2021/'` | Base URL for the post-study survey. Participants are redirected here after completing the DST. The participant ID and JATOS result ID are appended as query parameters. Set to `''` to disable redirect. |
 | `REACT_APP_DEBRIEFING_HOST_PATH` | URL string | `'https://resilience.tf.uni-bielefeld.de/debriefing/'` | URL for the debriefing page shown when a participant cancels the study. Set to `''` to disable. |
 | `REACT_APP_ADDITIONAL_INFORMATION_URL_DE` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (German version). |
@@ -136,6 +138,8 @@ All configuration is done through the `.env` file in the project root. Changes r
 ```env
 PUBLIC_URL=/study_assets/my-dst-study
 REACT_APP_MOBILE_ONLY = 'true'
+REACT_APP_RAW_PATCH_CAPTURE = 'off'
+REACT_APP_PATCH_ROI_COORDINATES = 'camera'
 REACT_APP_VIDEO_RECORDING = 'true'
 REACT_APP_LOGGING = 'true'
 REACT_APP_SURVEY_HOST_PATH = 'https://your-survey-platform.com/your-survey/'
@@ -147,6 +151,8 @@ REACT_APP_ADDITIONAL_INFORMATION_URL_EN = 'https://your-institution.edu/info-en.
 ### Example `.env` for Local Testing (No Data Collection)
 
 ```env
+REACT_APP_RAW_PATCH_CAPTURE = 'off'
+REACT_APP_PATCH_ROI_COORDINATES = 'camera'
 PUBLIC_URL=/study_assets/digital-stress-test-published
 REACT_APP_MOBILE_ONLY = 'false'
 REACT_APP_VIDEO_RECORDING = 'false'

@@ -87,10 +87,16 @@ segments[].parts[].frameCount
 segments[].parts[].byteLength
 segments[].parts[].sha256
 segments[].parts[].timestampsUs
+capture
 ```
 
 The manifest is JSON-serializable and deliberately excludes the part byte
 payloads themselves. The isolated JATOS sink uploads parts before the manifest;
+
+When browser capture is active, `capture` records terminal status, requested
+and applied capture/ROI configuration, the RGBX/sRGB extraction API and
+options, and accepted/skipped callback counts. The manifest is built after all
+part attempts have settled, so its capture status includes terminal part
 browser capture integration and broader metadata are added by later pipeline
 stages without altering this v1 byte contract.
 

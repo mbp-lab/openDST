@@ -117,6 +117,7 @@ class Main extends React.Component {
         this.markVideoAsUploading = this.markVideoAsUploading.bind(this)
         this.markVideoAsUploaded = this.markVideoAsUploaded.bind(this)
         this.markVideoAsFailed = this.markVideoAsFailed.bind(this)
+        this.updateRawPatchCaptureStatus = this.updateRawPatchCaptureStatus.bind(this)
         this.speechTestAnalysisCallback = this.speechTestAnalysisCallback.bind(this)
         this.endMathTask = this.endMathTask.bind(this)
         this.setStudyTimes = this.setStudyTimes.bind(this)
@@ -229,6 +230,7 @@ class Main extends React.Component {
                 language: null,
                 age: null,
                 gender: null,
+                rawPatchCapture: {status: 'disabled'},
                 videosSubmitted: null,
             },
             checkBoxForPriorParticipation: {participated:null},
@@ -260,9 +262,9 @@ class Main extends React.Component {
     /**
      * Registers a video upload and returns its stable ID.
      */
-    markVideoAsUploading() {
-        const uploadId = `video-${this.nextVideoUploadId}`;
-        this.nextVideoUploadId += 1;
+    markVideoAsUploading(providedUploadId) {
+        const uploadId = providedUploadId || `video-${this.nextVideoUploadId}`;
+        if (!providedUploadId) this.nextVideoUploadId += 1;
 
         this.setState(prevState => ({
             videoUploads: registerUpload(prevState.videoUploads, uploadId),
@@ -298,6 +300,10 @@ class Main extends React.Component {
         });
     }
 
+    updateRawPatchCaptureStatus(metadata) {
+        this.data.studyMetaTracker.rawPatchCapture = metadata;
+    }
+
     /**
      * Is passed to the startPage component to save the metadata of the study run
      * @param language the chosen language
@@ -319,6 +325,7 @@ class Main extends React.Component {
                     browser: `${ua.browser.name} ${ua.browser.version}`,
                     language: language,
                     age: null,
+                    rawPatchCapture: {status: 'disabled'},
                     gender: null,
                     videosSubmitted: null,
                 };
@@ -562,6 +569,7 @@ class Main extends React.Component {
                         handBackStressData={this.handBackStressData}
                         referenceTime={this.data.studyTimes.reference}
                         continueFromPanas={this.continueFromPanas}
+                        onRawPatchStatus={this.updateRawPatchCaptureStatus}
                         markVideoAsUploading={this.markVideoAsUploading}
                         markVideoAsUploaded={this.markVideoAsUploaded}
                         markVideoAsFailed={this.markVideoAsFailed}
@@ -596,6 +604,7 @@ class Main extends React.Component {
                     endMathTask={this.endMathTask}
                     handleCancelDialog={this.handleCancelDialog}
                     cancelDialogIsOpen={this.state.cancelDialogIsOpen}
+                    onRawPatchStatus={this.updateRawPatchCaptureStatus}
                     markVideoAsUploading={this.markVideoAsUploading}
                     markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploaded={this.markVideoAsUploaded}
@@ -635,6 +644,7 @@ class Main extends React.Component {
                     startSpeechTask={this.startSpeechTask}
                     endSpeechTask={this.endSpeechTask}
                     updateSpeechTaskFeedback={this.updateSpeechTaskFeedback}
+                    onRawPatchStatus={this.updateRawPatchCaptureStatus}
                     studyResultId={this.data.studyMetaTracker.studyResultId}
                     markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploading={this.markVideoAsUploading}

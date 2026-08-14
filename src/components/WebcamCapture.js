@@ -1,5 +1,6 @@
 import React from 'react';
 import Webcam from "react-webcam";
+import {startRawPatchCaptureSession, stopRawPatchCaptureSession} from '../capture/RawPatchCaptureSession';
 
 // Put variables in global scope to make them available to the browser console.
 const constraints = window.constraints = {
@@ -18,6 +19,7 @@ class WebcamCapture extends React.Component {
         this.recordedChunks = [];
         this.mediaStreamRecorder = null;
         this.webcamRef = React.createRef();
+        this.rawPatchController = null;
 
         this.startRecording = this.startRecording.bind(this);
         this.stopRecording = this.stopRecording.bind(this);
@@ -107,6 +109,7 @@ class WebcamCapture extends React.Component {
     async startRecording() {
         try {
             await this.createMediaRecorder(this.webcamRef.current.stream);
+            this.rawPatchController = startRawPatchCaptureSession({webcam: this.webcamRef.current, props: this.props});
             await this.mediaStreamRecorder.start();
             if (this.props.studyPage === 'introduction') {
                 this.setState({
@@ -143,7 +146,12 @@ class WebcamCapture extends React.Component {
     }
 
     async stopRecording() {
-        await this.mediaStreamRecorder.stop();
+        const patchStop = stopRawPatchCaptureSession(this.rawPatchController);
+        this.rawPatchController = null;
+        if (this.mediaStreamRecorder) {
+            await this.mediaStreamRecorder.stop();
+        }
+        await patchStop;
     }
 
     render() {
