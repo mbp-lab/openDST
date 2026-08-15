@@ -80,23 +80,28 @@ owns frame callbacks; the existing processor, segmenter, and JATOS sink retain
 their independent responsibilities.
 
 Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
-RGBX/sRGB copying, and native gzip; then it registers the next callback before
-processing the current frame. Only one copy may be in flight; later callbacks
+RGBX/sRGB copying, and native `CompressionStream("gzip")`, then registers the next callback before processing the
+current frame. Only one copy may be in flight; later callbacks are counted as
+skipped. It seals deterministic 72 by 72 RGB24 frame parts and hands them to
+the AVI sink when a part fills, the source geometry changes, or recording
+stops.
 
 ## Bounded JATOS sink
 
 `JatosPatchSink` is the isolated best-effort transport boundary. It accepts
-sealed parts, uses native `CompressionStream("gzip")`, and calls the injected
-JATOS `uploadResultFile` adapter with complete compressed payloads.
+sealed RGB24 parts, muxes each as an uncompressed AVI and wraps it in native
+gzip before calling the injected JATOS `uploadResultFile` adapter. It has no
+FFmpeg/Wasm or `SharedArrayBuffer` requirement, but does require native
+`CompressionStream("gzip")`.
 
 The sealed-part state machine is:
 
 ```text
-sealed -> queued -> compressing -> uploading/retrying -> succeeded | failed
+sealed -> queued -> AVI muxing -> gzip -> uploading/retrying -> succeeded | failed
 ```
 
 The upstream segmenter owns one active, unsealed part. The sink accepts at
-most two sealed parts, including a part currently being compressed or
-uploaded. Accepted raw bytes transfer to the sink and are released after
-compression. A third sealed part is an overflow signal for the future capture
-controller, which must stop patch capture as incomplete rather than affect
+most two sealed parts, including a part currently being muxed or uploaded.
+Accepted RGB24 bytes transfer to the sink and are released after muxing and gzip compression. A
+third sealed part is an overflow signal; the capture controller stops patch
+capture as incomplete rather than affect the participant recording. Uploaded files are `.avi.gz`; decompression produces a self-contained AVI, and there is no separate manifest upload.

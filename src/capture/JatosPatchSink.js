@@ -1,4 +1,5 @@
 import {UPLOAD_STATUS} from '../uploadState';
+import {encodeGzipAvi} from './AviPatchVideoEncoder';
 
 export const MAX_PENDING_PATCH_PARTS = 2;
 export const MAX_UPLOAD_ATTEMPTS = 3;
@@ -14,25 +15,6 @@ function delay(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
-function defaultBlob(chunks, options) {
-    return new window.Blob(chunks, options);
-}
-
-/**
- * Compresses complete RGB24 bytes with the browser's native gzip stream.
- */
-export async function gzipRgb24(bytes) {
-    if (typeof window.CompressionStream !== 'function') {
-        throw new Error('Native CompressionStream is unavailable');
-    }
-    if (typeof window.Blob !== 'function' || typeof window.Response !== 'function') {
-        throw new Error('Native Blob and Response APIs are required for gzip compression');
-    }
-
-    const stream = new window.Blob([bytes]).stream().pipeThrough(new window.CompressionStream('gzip'));
-    return new window.Response(stream).blob();
-}
-
 function validateSealedPart(part) {
     if (!part || typeof part !== 'object' || !(part.bytes instanceof Uint8Array)) {
         throw new Error('Sink accepts sealed parts with owned Uint8Array bytes');
@@ -40,8 +22,8 @@ function validateSealedPart(part) {
     if (part.bytes.byteLength !== part.byteLength || !Number.isSafeInteger(part.frameCount) || part.frameCount < 1) {
         throw new Error('Sealed part bytes do not match its metadata');
     }
-    if (typeof part.filename !== 'string' || !part.filename.endsWith('.rgb24.gz')) {
-        throw new Error('Sealed part must have a deterministic gzip filename');
+    if (typeof part.filename !== 'string' || !part.filename.endsWith('.avi.gz')) {
+        throw new Error('Sealed part must have a deterministic gzip-compressed AVI filename');
     }
 }
 
@@ -53,14 +35,13 @@ function defaultUploadTracker() {
 }
 
 /**
- * Bounded, best-effort transport for sealed raw-patch parts and their manifest.
+ * Bounded, best-effort transport for sealed raw-patch parts as gzip-compressed AVI videos.
  */
 export class JatosPatchSink {
     constructor({
         uploadResultFile,
         uploadTracker = defaultUploadTracker(),
-        compress = gzipRgb24,
-        createBlob = defaultBlob,
+        encode = encodeGzipAvi,
         sleep = delay,
         maxPendingParts = MAX_PENDING_PATCH_PARTS,
         maxAttempts = MAX_UPLOAD_ATTEMPTS,
@@ -72,8 +53,8 @@ export class JatosPatchSink {
         if (!uploadTracker || typeof uploadTracker.registerUpload !== 'function' || typeof uploadTracker.settleUpload !== 'function') {
             throw new Error('Upload tracker must provide registerUpload and settleUpload');
         }
-        if (typeof compress !== 'function' || typeof createBlob !== 'function' || typeof sleep !== 'function') {
-            throw new Error('Sink dependencies must be functions');
+        if (typeof encode !== 'function' || typeof sleep !== 'function') {
+            throw new Error('Sink encoder and sleep dependencies must be functions');
         }
         if (!Number.isSafeInteger(maxPendingParts) || maxPendingParts < 1 || maxPendingParts > MAX_PENDING_PATCH_PARTS) {
             throw new Error(`Max pending parts must be between 1 and ${MAX_PENDING_PATCH_PARTS}`);
@@ -84,8 +65,7 @@ export class JatosPatchSink {
 
         this.uploadResultFile = uploadResultFile;
         this.uploadTracker = uploadTracker;
-        this.compress = compress;
-        this.createBlob = createBlob;
+        this.encode = encode;
         this.sleep = sleep;
         this.maxPendingParts = maxPendingParts;
         this.maxAttempts = maxAttempts;
@@ -114,27 +94,10 @@ export class JatosPatchSink {
         return completion;
     }
 
-    async finalize(manifestOrBuilder) {
+    async finalize() {
         this.acceptingParts = false;
         await this.whenIdle();
-        const manifest = typeof manifestOrBuilder === 'function'
-            ? manifestOrBuilder([...this.partResults])
-            : manifestOrBuilder;
-        if (!manifest || typeof manifest.filename !== 'string' || !manifest.filename.endsWith('_patch_manifest.json')) {
-            throw new Error('Manifest must include its deterministic filename');
-        }
-
-        const manifestBytes = this.createBlob([JSON.stringify(manifest)], {type: 'application/json'});
-        const manifestResult = await this.uploadWithRetry({
-            payload: manifestBytes,
-            filename: manifest.filename,
-            uploadId: `patch-manifest-${manifest.filename}`
-        });
-
-        return {
-            parts: [...this.partResults],
-            manifest: manifestResult
-        };
+        return {parts: [...this.partResults]};
     }
 
     async whenIdle() {
@@ -169,9 +132,9 @@ export class JatosPatchSink {
         this.uploadTracker.registerUpload(uploadId);
 
         try {
-            const compressed = await this.compress(part.bytes);
+            const encoded = await this.encode(part);
             part.bytes = null;
-            return await this.uploadWithRetry({payload: compressed, filename: part.filename, uploadId, alreadyRegistered: true});
+            return await this.uploadWithRetry({payload: encoded, filename: part.filename, uploadId, alreadyRegistered: true});
         } catch (error) {
             part.bytes = null;
             this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.FAILED);

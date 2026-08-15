@@ -1,7 +1,7 @@
 import {CameraRoiProvider} from './RoiProvider';
 import {RawPatchProcessor} from './RawPatchProcessor';
 import {RawPatchSegmenter} from './RawPatchPartAccumulator';
-import {buildRawPatchManifest} from './RawPatchFormat';
+import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE} from './AviPatchVideoFormat';
 import {JatosPatchSink} from './JatosPatchSink';
 
 export const RAW_PATCH_CAPTURE_MODES = ['off', 'calibration', 'all'];
@@ -57,7 +57,7 @@ export async function probeRawPatchCapability(video) {
         return {supported: false, reason: 'VideoFrame is unavailable'};
     }
     if (typeof window.CompressionStream !== 'function') {
-        return {supported: false, reason: 'CompressionStream is unavailable'};
+        return {supported: false, reason: 'Native CompressionStream is unavailable'};
     }
 
     let frame;
@@ -168,7 +168,6 @@ export class RawPatchCaptureController {
             const rgb24 = this.processor.process({...dimensions, rgbx, roi});
             const sealedParts = this.segmenter.appendFrame({
                 rgb24,
-                timestampUs: sourceTimestampUs,
                 sourceWidth: dimensions.width,
                 sourceHeight: dimensions.height,
                 roi
@@ -224,21 +223,12 @@ export class RawPatchCaptureController {
             const finalize = async () => {
                 const finalParts = this.segmenter.finish();
                 this.enqueueSealedParts(finalParts);
-                const result = await this.sink.finalize(partResults => {
-                    const partFailure = partResults.some(part => part.status !== 'succeeded');
-                    if (partFailure) {
-                        this.incompleteReason = 'One or more raw patch part uploads failed';
-                    }
-                    const manifest = buildRawPatchManifest({
-                        studyResultId: this.studyResultId,
-                        studyPage: this.studyPage,
-                        videoCounter: this.videoCounter,
-                        segments: this.segmenter.getSegments(),
-                        capture: this.captureMetadata(partFailure ? RAW_PATCH_STATUS.INCOMPLETE : RAW_PATCH_STATUS.COMPLETE)
-                    });
-                    return manifest;
-                });
-                const finalStatus = this.status === RAW_PATCH_STATUS.INCOMPLETE || result.manifest.status !== 'succeeded'
+                const result = await this.sink.finalize();
+                const partFailure = result.parts.some(part => part.status !== 'succeeded');
+                if (partFailure) {
+                    this.incompleteReason = 'One or more patch-video uploads failed';
+                }
+                const finalStatus = this.status === RAW_PATCH_STATUS.INCOMPLETE || partFailure
                     ? RAW_PATCH_STATUS.INCOMPLETE
                     : RAW_PATCH_STATUS.COMPLETE;
                 this.setStatus(finalStatus, this.incompleteReason);
@@ -265,6 +255,12 @@ export class RawPatchCaptureController {
     captureMetadata(status) {
         return {
             status,
+            formatVersion: PATCH_VIDEO_FORMAT_VERSION,
+            container: 'avi.gz',
+            transportEncoding: 'gzip',
+            videoCodec: 'DIB',
+            pixelFormat: 'bgr24',
+            frameRate: PATCH_VIDEO_FRAME_RATE,
             requestedCaptureMode: this.configuration.requestedMode,
             appliedCaptureMode: this.configuration.mode,
             requestedRoiCoordinates: this.configuration.requestedRoiCoordinates,

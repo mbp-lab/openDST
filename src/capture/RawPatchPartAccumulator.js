@@ -1,18 +1,15 @@
 import {RGB24_FRAME_BYTES} from './RawPatchProcessor';
 import {validateRoiDescriptor} from './RoiProvider';
-import {createPartFilename, sha256Hex} from './RawPatchFormat';
+import {createPatchVideoFilename} from './AviPatchVideoFormat';
 
 export const MAX_FRAMES_PER_PART = 539;
 
-function validateFrame(rgb24, timestampUs) {
+function validateFrame(rgb24) {
     if (!(rgb24 instanceof Uint8Array) && !(rgb24 instanceof Uint8ClampedArray)) {
         throw new Error('RGB24 frame must be a Uint8Array or Uint8ClampedArray');
     }
     if (rgb24.byteLength !== RGB24_FRAME_BYTES) {
         throw new Error(`RGB24 frame must contain exactly ${RGB24_FRAME_BYTES} bytes`);
-    }
-    if (!Number.isSafeInteger(timestampUs) || timestampUs < 0) {
-        throw new Error('Frame timestamp must be a non-negative integer in microseconds');
     }
 }
 
@@ -33,16 +30,14 @@ export class RawPatchPartAccumulator {
         this.partIndex = partIndex;
         this.maxFrames = maxFrames;
         this.frames = [];
-        this.timestampsUs = [];
     }
 
-    appendFrame({rgb24, timestampUs}) {
+    appendFrame({rgb24}) {
         if (this.frames.length >= this.maxFrames) {
             throw new Error('Cannot append to a full raw patch part');
         }
-        validateFrame(rgb24, timestampUs);
+        validateFrame(rgb24);
         this.frames.push(new Uint8Array(rgb24));
-        this.timestampsUs.push(timestampUs);
     }
 
     get isFull() {
@@ -63,8 +58,6 @@ export class RawPatchPartAccumulator {
             filename: this.filename,
             frameCount: this.frames.length,
             byteLength: bytes.byteLength,
-            sha256: sha256Hex(bytes),
-            timestampsUs: [...this.timestampsUs],
             bytes
         };
     }
@@ -84,7 +77,7 @@ export class RawPatchSegmenter {
         this.currentPart = null;
     }
 
-    appendFrame({rgb24, timestampUs, sourceWidth, sourceHeight, roi}) {
+    appendFrame({rgb24, sourceWidth, sourceHeight, roi}) {
         if (!Number.isSafeInteger(sourceWidth) || sourceWidth < 1 || !Number.isSafeInteger(sourceHeight) || sourceHeight < 1) {
             throw new Error('Source dimensions must be positive integers');
         }
@@ -118,11 +111,11 @@ export class RawPatchSegmenter {
                 segmentIndex: segment.segmentIndex,
                 partIndex,
                 maxFrames: this.maxFramesPerPart,
-                filename: createPartFilename({...this.fileIdentity, segmentIndex: segment.segmentIndex, partIndex})
+                filename: createPatchVideoFilename({...this.fileIdentity, segmentIndex: segment.segmentIndex, partIndex})
             });
         }
 
-        this.currentPart.appendFrame({rgb24, timestampUs});
+        this.currentPart.appendFrame({rgb24});
         if (this.currentPart.isFull) {
             sealedParts.push(this.sealCurrentPart());
         }
