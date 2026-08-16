@@ -70,10 +70,9 @@ export class JatosPatchSink {
         this.maxPendingParts = maxPendingParts;
         this.maxAttempts = maxAttempts;
         this.retryDelayMs = retryDelayMs;
-        this.queue = [];
+        this.tail = Promise.resolve();
         this.pendingPartCount = 0;
         this.partResults = [];
-        this.worker = null;
         this.acceptingParts = true;
     }
 
@@ -87,44 +86,18 @@ export class JatosPatchSink {
         }
 
         this.pendingPartCount += 1;
-        const completion = new Promise(resolve => {
-            this.queue.push({part, resolve});
+        const completion = this.tail.then(() => this.uploadPart(part));
+        this.tail = completion.then(result => {
+            this.partResults.push(result);
+            this.pendingPartCount -= 1;
         });
-        this.startWorker();
         return completion;
     }
 
     async finalize() {
         this.acceptingParts = false;
-        await this.whenIdle();
+        await this.tail;
         return {parts: [...this.partResults]};
-    }
-
-    async whenIdle() {
-        while (this.worker) {
-            await this.worker;
-        }
-    }
-
-    startWorker() {
-        if (!this.worker) {
-            this.worker = this.drainQueue().finally(() => {
-                this.worker = null;
-                if (this.queue.length > 0) {
-                    this.startWorker();
-                }
-            });
-        }
-    }
-
-    async drainQueue() {
-        while (this.queue.length > 0) {
-            const task = this.queue.shift();
-            const result = await this.uploadPart(task.part);
-            this.partResults.push(result);
-            this.pendingPartCount -= 1;
-            task.resolve(result);
-        }
     }
 
     async uploadPart(part) {
@@ -134,7 +107,7 @@ export class JatosPatchSink {
         try {
             const encoded = await this.encode(part);
             part.bytes = null;
-            return await this.uploadWithRetry({payload: encoded, filename: part.filename, uploadId, alreadyRegistered: true});
+            return await this.uploadWithRetry({payload: encoded, filename: part.filename, uploadId});
         } catch (error) {
             part.bytes = null;
             this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.FAILED);
@@ -142,11 +115,7 @@ export class JatosPatchSink {
         }
     }
 
-    async uploadWithRetry({payload, filename, uploadId, alreadyRegistered = false}) {
-        if (!alreadyRegistered) {
-            this.uploadTracker.registerUpload(uploadId);
-        }
-
+    async uploadWithRetry({payload, filename, uploadId}) {
         let error;
         for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
             try {

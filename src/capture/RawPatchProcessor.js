@@ -1,9 +1,9 @@
-import {PATCH_SIZE, validateRoiDescriptor} from './RoiProvider';
+import {PATCH_SIZE, validateFaceRoiDescriptor} from './FaceRoiProvider';
 import {AreaRgbxDownsampler} from './AreaRgbxDownsampler';
 
 export const RGBX_BYTES_PER_PIXEL = 4;
-export const RGB24_BYTES_PER_PIXEL = 3;
-export const RGB24_FRAME_BYTES = PATCH_SIZE * PATCH_SIZE * RGB24_BYTES_PER_PIXEL;
+export const BGR24_BYTES_PER_PIXEL = 3;
+export const BGR24_FRAME_BYTES = PATCH_SIZE * PATCH_SIZE * BGR24_BYTES_PER_PIXEL;
 
 function validateSource(rgbx, width, height) {
     if (!(rgbx instanceof Uint8Array) && !(rgbx instanceof Uint8ClampedArray)) {
@@ -24,7 +24,7 @@ function validateRoiBounds(roi, width, height) {
 }
 
 /**
- * Resolves an already-selected source crop into deterministic 72 by 72 RGB24.
+ * Resolves an already-selected source crop into deterministic 72 by 72 BGR24.
  */
 export class RawPatchProcessor {
     constructor() {
@@ -33,7 +33,7 @@ export class RawPatchProcessor {
 
     process({rgbx, width, height, roi}) {
         validateSource(rgbx, width, height);
-        validateRoiDescriptor(roi);
+        validateFaceRoiDescriptor(roi);
         validateRoiBounds(roi, width, height);
 
         return this.areaDownsampler.downsample({rgbx, width, roi});

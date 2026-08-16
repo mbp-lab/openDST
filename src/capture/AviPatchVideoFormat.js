@@ -1,4 +1,4 @@
-export const PATCH_VIDEO_FORMAT_VERSION = 'patch-video-avi-gzip-rgb24-v1';
+export const PATCH_VIDEO_FORMAT_VERSION = 'patch-video-avi-gzip-bgr24-v1';
 export const PATCH_VIDEO_FRAME_RATE = 30;
 
 function requirePositiveInteger(value, fieldName) {

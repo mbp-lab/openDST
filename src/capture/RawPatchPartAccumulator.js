@@ -1,15 +1,15 @@
-import {RGB24_FRAME_BYTES} from './RawPatchProcessor';
-import {validateRoiDescriptor} from './RoiProvider';
+import {BGR24_FRAME_BYTES} from './RawPatchProcessor';
+import {validateFaceRoiDescriptor} from './FaceRoiProvider';
 import {createPatchVideoFilename} from './AviPatchVideoFormat';
 
 export const MAX_FRAMES_PER_PART = 539;
 
-function validateFrame(rgb24) {
-    if (!(rgb24 instanceof Uint8Array) && !(rgb24 instanceof Uint8ClampedArray)) {
-        throw new Error('RGB24 frame must be a Uint8Array or Uint8ClampedArray');
+function validateFrame(bgr24) {
+    if (!(bgr24 instanceof Uint8Array) && !(bgr24 instanceof Uint8ClampedArray)) {
+        throw new Error('BGR24 frame must be a Uint8Array or Uint8ClampedArray');
     }
-    if (rgb24.byteLength !== RGB24_FRAME_BYTES) {
-        throw new Error(`RGB24 frame must contain exactly ${RGB24_FRAME_BYTES} bytes`);
+    if (bgr24.byteLength !== BGR24_FRAME_BYTES) {
+        throw new Error(`BGR24 frame must contain exactly ${BGR24_FRAME_BYTES} bytes`);
     }
 }
 
@@ -23,12 +23,12 @@ export class RawPatchPartAccumulator {
         this.frames = [];
     }
 
-    appendFrame({rgb24}) {
+    appendFrame({bgr24}) {
         if (this.frames.length >= this.maxFrames) {
             throw new Error('Cannot append to a full raw patch part');
         }
-        validateFrame(rgb24);
-        this.frames.push(new Uint8Array(rgb24));
+        validateFrame(bgr24);
+        this.frames.push(new Uint8Array(bgr24));
     }
 
     get isFull() {
@@ -40,8 +40,8 @@ export class RawPatchPartAccumulator {
             return null;
         }
 
-        const bytes = new Uint8Array(this.frames.length * RGB24_FRAME_BYTES);
-        this.frames.forEach((frame, index) => bytes.set(frame, index * RGB24_FRAME_BYTES));
+        const bytes = new Uint8Array(this.frames.length * BGR24_FRAME_BYTES);
+        this.frames.forEach((frame, index) => bytes.set(frame, index * BGR24_FRAME_BYTES));
 
         return {
             segmentIndex: this.segmentIndex,
@@ -64,54 +64,41 @@ export class RawPatchSegmenter {
         }
         this.fileIdentity = {studyResultId, studyPage, videoCounter};
         this.maxFramesPerPart = maxFramesPerPart;
-        this.segments = [];
+        this.sourceDimensions = null;
+        this.segmentIndex = -1;
+        this.nextPartIndex = 0;
         this.currentPart = null;
     }
 
-    appendFrame({rgb24, sourceWidth, sourceHeight, roi}) {
+    appendFrame({bgr24, sourceWidth, sourceHeight, roi}) {
         if (!Number.isSafeInteger(sourceWidth) || sourceWidth < 1 || !Number.isSafeInteger(sourceHeight) || sourceHeight < 1) {
             throw new Error('Source dimensions must be positive integers');
         }
-        validateRoiDescriptor(roi);
+        validateFaceRoiDescriptor(roi);
         if (roi.x + roi.size > sourceWidth || roi.y + roi.size > sourceHeight) {
             throw new Error('ROI extends beyond source dimensions');
         }
 
-        const sealedParts = [];
-        let segment = this.segments[this.segments.length - 1];
-        const startsSegment = !segment || segment.sourceWidth !== sourceWidth || segment.sourceHeight !== sourceHeight;
-
-        if (startsSegment) {
-            const sealed = this.sealCurrentPart();
-            if (sealed) {
-                sealedParts.push(sealed);
-            }
-            segment = {
-                segmentIndex: this.segments.length,
-                sourceWidth,
-                sourceHeight,
-                roi: {...roi},
-                parts: []
-            };
-            this.segments.push(segment);
+        const dimensionsChanged = !this.sourceDimensions || this.sourceDimensions.width !== sourceWidth || this.sourceDimensions.height !== sourceHeight;
+        const previousPart = dimensionsChanged ? this.sealCurrentPart() : null;
+        if (dimensionsChanged) {
+            this.sourceDimensions = {width: sourceWidth, height: sourceHeight};
+            this.segmentIndex += 1;
+            this.nextPartIndex = 0;
         }
-
         if (!this.currentPart) {
-            const partIndex = segment.parts.length;
+            const partIndex = this.nextPartIndex;
             this.currentPart = new RawPatchPartAccumulator({
-                segmentIndex: segment.segmentIndex,
+                segmentIndex: this.segmentIndex,
                 partIndex,
                 maxFrames: this.maxFramesPerPart,
-                filename: createPatchVideoFilename({...this.fileIdentity, segmentIndex: segment.segmentIndex, partIndex})
+                filename: createPatchVideoFilename({...this.fileIdentity, segmentIndex: this.segmentIndex, partIndex})
             });
         }
 
-        this.currentPart.appendFrame({rgb24});
-        if (this.currentPart.isFull) {
-            sealedParts.push(this.sealCurrentPart());
-        }
-
-        return sealedParts;
+        this.currentPart.appendFrame({bgr24});
+        const fullPart = this.currentPart.isFull ? this.sealCurrentPart() : null;
+        return [previousPart, fullPart].filter(Boolean);
     }
 
     finish() {
@@ -119,24 +106,15 @@ export class RawPatchSegmenter {
         return sealed ? [sealed] : [];
     }
 
-    getSegments() {
-        return this.segments.map(segment => ({
-            ...segment,
-            roi: {...segment.roi},
-            parts: [...segment.parts]
-        }));
-    }
-
     sealCurrentPart() {
         if (!this.currentPart) {
             return null;
         }
         const sealed = this.currentPart.seal();
-        const segment = this.segments[this.currentPart.segmentIndex];
-        if (sealed) {
-            segment.parts.push(sealed);
-        }
         this.currentPart = null;
+        if (sealed) {
+            this.nextPartIndex += 1;
+        }
         return sealed;
     }
 }

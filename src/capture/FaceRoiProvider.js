@@ -14,7 +14,7 @@ function requireInteger(value, fieldName, minimum) {
 /**
  * Validates the resolved face ROI descriptor used by RawPatchProcessor.
  */
-export function validateRoiDescriptor(descriptor) {
+export function validateFaceRoiDescriptor(descriptor) {
     if (!descriptor || typeof descriptor !== 'object' || Array.isArray(descriptor)) {
         throw new Error('ROI descriptor must be an object');
     }
@@ -101,7 +101,7 @@ export class FaceRoiProvider {
         const x = this.previous ? this.previous.x + (targetX - this.previous.x) * smoothing : targetX;
         const y = this.previous ? this.previous.y + (targetY - this.previous.y) * smoothing : targetY;
 
-        this.previous = validateRoiDescriptor({
+        this.previous = validateFaceRoiDescriptor({
             coordinateSystem: FACE_COORDINATE_SYSTEM,
             transformType: DYNAMIC_FACE_SQUARE,
             samplingVersion: AREA_AVERAGE_V1,

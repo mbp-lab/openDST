@@ -4,7 +4,7 @@ import {
     FACE_COORDINATE_SYSTEM,
     FaceRoiProvider,
     PATCH_SIZE
-} from './RoiProvider';
+} from './FaceRoiProvider';
 
 function detection(originX, originY, width, height) {
     return {boundingBox: {originX, originY, width, height}};

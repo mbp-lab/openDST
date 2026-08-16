@@ -1,7 +1,7 @@
-import {PATCH_SIZE} from './RoiProvider';
+import {PATCH_SIZE} from './FaceRoiProvider';
 
 const RGBX_BYTES_PER_PIXEL = 4;
-const RGB24_BYTES_PER_PIXEL = 3;
+const BGR24_BYTES_PER_PIXEL = 3;
 
 function buildAxisWeights(sourceSize) {
     return Array.from({length: PATCH_SIZE}, (_, outputIndex) => {
@@ -25,7 +25,7 @@ function buildAxisWeights(sourceSize) {
 }
 
 /**
- * Deterministically area-resamples an integer square RGBX crop to 72 by 72 RGB24.
+ * Deterministically area-resamples an integer square RGBX crop to 72 by 72 BGR24.
  * Axis weights are represented in 1/72-pixel units, which keeps accumulation and
  * half-up rounding entirely integer based.
  */
@@ -41,7 +41,7 @@ export class AreaRgbxDownsampler {
             this.axisWeights = buildAxisWeights(roi.size);
         }
 
-        const output = new Uint8Array(PATCH_SIZE * PATCH_SIZE * RGB24_BYTES_PER_PIXEL);
+        const output = new Uint8Array(PATCH_SIZE * PATCH_SIZE * BGR24_BYTES_PER_PIXEL);
         const totalWeight = roi.size * roi.size;
         const halfWeight = Math.floor(totalWeight / 2);
 
@@ -63,10 +63,10 @@ export class AreaRgbxDownsampler {
                     });
                 });
 
-                const outputOffset = (outputY * PATCH_SIZE + outputX) * RGB24_BYTES_PER_PIXEL;
-                output[outputOffset] = Math.floor((red + halfWeight) / totalWeight);
+                const outputOffset = (outputY * PATCH_SIZE + outputX) * BGR24_BYTES_PER_PIXEL;
+                output[outputOffset] = Math.floor((blue + halfWeight) / totalWeight);
                 output[outputOffset + 1] = Math.floor((green + halfWeight) / totalWeight);
-                output[outputOffset + 2] = Math.floor((blue + halfWeight) / totalWeight);
+                output[outputOffset + 2] = Math.floor((red + halfWeight) / totalWeight);
             }
         }
 

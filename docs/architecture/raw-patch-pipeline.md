@@ -13,13 +13,13 @@ best-effort raw-patch uploads.
 
 ## Deterministic v1 processor
 
-`src/capture/RoiProvider.js` converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs. `src/capture/RawPatchProcessor.js` accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic RGB24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
+`src/capture/FaceRoiProvider.js` converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs. `src/capture/RawPatchProcessor.js` accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic BGR24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
 
 ### Crop arithmetic and byte layout
 
-The processor requires exactly `width * height * 4` RGBX bytes and an ROI inside those dimensions. It emits exactly `72 * 72 * 3 = 15,552` bytes in row-major RGB24 order: every output pixel is `R`, `G`, then `B`; the source X byte is discarded.
+The processor requires exactly `width * height * 4` RGBX bytes and an ROI inside those dimensions. It emits exactly `72 * 72 * 3 = 15,552` bytes in row-major BGR24 order: every output pixel is `B`, `G`, then `R`; the source X byte is discarded.
 
-The face ROI uses `area-average-v1`: each output pixel is the area-weighted RGB average of its source-pixel overlap, using integer half-up rounding. It does not rely on browser resampling, mirrored-coordinate conversion, or cadence correction. Identical RGBX input bytes and the same ROI descriptor therefore produce identical RGB24 output bytes.
+The face ROI uses `area-average-v1`: each output pixel is the area-weighted RGB average of its source-pixel overlap, using integer half-up rounding. It does not rely on browser resampling, mirrored-coordinate conversion, or cadence correction. Identical RGBX input bytes and the same ROI descriptor therefore produce identical BGR24 output bytes.
 
 ### Resolved ROI descriptor
 
@@ -62,17 +62,17 @@ owns frame callbacks; the existing processor, segmenter, and JATOS sink retain
 their independent responsibilities.
 
 Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
-RGBX/sRGB copying, and native `CompressionStream("gzip")`, then registers the next callback before processing the
-current frame. Synchronous MediaPipe detection runs before the
-pixel copy. Only one copy may be in flight; later callbacks are counted as
-skipped. It seals deterministic 72 by 72 RGB24 frame parts and hands them to
-the AVI sink when a part fills, the source geometry changes, or recording
-stops.
+RGBX/sRGB copying, and native `CompressionStream("gzip")`, then enters a
+cancellable sequential frame loop. Each iteration waits for one frame callback,
+runs synchronous MediaPipe detection, copies pixels, and processes the frame
+before requesting the next callback. `presentedFrames` records frames skipped
+between accepted callbacks. Stopping cancels any outstanding callback before
+finalizing sealed parts through the AVI sink.
 
 ## Bounded JATOS sink
 
 `JatosPatchSink` is the isolated best-effort transport boundary. It accepts
-sealed RGB24 parts, muxes each as an uncompressed AVI and wraps it in native
+sealed BGR24 parts, muxes each as an uncompressed AVI and wraps it in native
 gzip before calling the injected JATOS `uploadResultFile` adapter. It has no
 FFmpeg/Wasm or `SharedArrayBuffer` requirement, but does require native
 `CompressionStream("gzip")`.
@@ -85,6 +85,6 @@ sealed -> queued -> AVI muxing -> gzip -> uploading/retrying -> succeeded | fail
 
 The upstream segmenter owns one active, unsealed part. The sink accepts at
 most two sealed parts, including a part currently being muxed or uploaded.
-Accepted RGB24 bytes transfer to the sink and are released after muxing and gzip compression. A
+Accepted BGR24 bytes transfer to the sink and are released after muxing and gzip compression. A
 third sealed part is an overflow signal; the capture controller stops patch
 capture as incomplete rather than affect the participant recording. Uploaded files are `.avi.gz`; decompression produces a self-contained AVI, and there is no separate manifest upload.

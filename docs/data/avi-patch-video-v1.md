@@ -1,10 +1,10 @@
 # AVI patch-video format v1
 
-`patch-video-avi-gzip-rgb24-v1` stores each raw-patch part as a lossless AVI file wrapped in gzip for upload. It replaces the former raw-RGB24 gzip-plus-manifest artifact set.
+`patch-video-avi-gzip-bgr24-v1` stores each raw-patch part as a lossless AVI file wrapped in gzip for upload. It replaces the former raw-BGR24 gzip-plus-manifest artifact set.
 
 Each AVI contains one 72 by 72 video stream at a nominal 30 frames per second.
 Frames are 24-bit uncompressed DIB video: the capture processor emits sRGB
-RGB24 pixels, and the muxer stores the equivalent BGR24 triplets required by
+BGR24 pixels, and the muxer stores the equivalent BGR24 triplets required by
 the DIB AVI convention. A negative bitmap height marks the frame rows as
 top-down, preserving the processor's row order.
 

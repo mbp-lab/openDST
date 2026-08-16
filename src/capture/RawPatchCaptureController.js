@@ -1,4 +1,4 @@
-import {FaceRoiProvider} from './RoiProvider';
+import {FaceRoiProvider} from './FaceRoiProvider';
 import {RawPatchProcessor} from './RawPatchProcessor';
 import {RawPatchSegmenter} from './RawPatchPartAccumulator';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE} from './AviPatchVideoFormat';
@@ -46,19 +46,13 @@ function resolveFaceRoiUpwardOffsetRatio(value) {
 
 export function resolveRawPatchConfiguration(environment = process.env) {
     const requestedMode = environment.REACT_APP_RAW_PATCH_CAPTURE || 'off';
-    const requestedFaceRoiSmoothingWindowMs = environment.REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS;
-    const requestedFaceRoiScale = environment.REACT_APP_FACE_ROI_SCALE;
-    const requestedFaceRoiUpwardOffsetRatio = environment.REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO;
 
     return {
         requestedMode,
         mode: RAW_PATCH_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
-        requestedFaceRoiSmoothingWindowMs,
-        faceRoiSmoothingWindowMs: resolveFaceRoiSmoothingWindowMs(requestedFaceRoiSmoothingWindowMs),
-        requestedFaceRoiScale,
-        faceRoiScale: resolveFaceRoiScale(requestedFaceRoiScale),
-        requestedFaceRoiUpwardOffsetRatio,
-        faceRoiUpwardOffsetRatio: resolveFaceRoiUpwardOffsetRatio(requestedFaceRoiUpwardOffsetRatio)
+        faceRoiSmoothingWindowMs: resolveFaceRoiSmoothingWindowMs(environment.REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS),
+        faceRoiScale: resolveFaceRoiScale(environment.REACT_APP_FACE_ROI_SCALE),
+        faceRoiUpwardOffsetRatio: resolveFaceRoiUpwardOffsetRatio(environment.REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO)
     };
 }
 
@@ -144,12 +138,13 @@ export class RawPatchCaptureController {
         this.status = RAW_PATCH_STATUS.DISABLED;
         this.acceptedFrames = 0;
         this.skippedFrames = 0;
-        this.callbackId = null;
-        this.generation = 0;
-        this.copyInFlight = false;
+        this.frameWait = null;
+        this.captureLoop = null;
+        this.stopped = false;
         this.finalization = null;
         this.incompleteReason = null;
         this.starting = null;
+        this.lastPresentedFrame = null;
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
     }
@@ -162,9 +157,8 @@ export class RawPatchCaptureController {
     }
 
     async startInternal() {
-        const generation = this.generation;
         const capability = await probeRawPatchCapability(this.video);
-        if (generation !== this.generation) {
+        if (this.stopped) {
             return this.status;
         }
         if (!capability.supported) {
@@ -182,46 +176,84 @@ export class RawPatchCaptureController {
             this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
             return this.status;
         }
-        if (generation !== this.generation) {
+        if (this.stopped) {
             this.closeFaceDetector();
             return this.status;
         }
 
         this.setStatus(RAW_PATCH_STATUS.CAPTURING);
-        this.registerCallback();
+        this.captureLoop = this.captureFrames();
         return this.status;
     }
 
     async stop() {
-        this.deactivate();
+        this.stopped = true;
+        this.cancelPendingFrame();
         if (this.starting) {
             await this.starting;
         }
-        this.deactivate();
+        if (this.captureLoop) {
+            await this.captureLoop;
+        }
         if (this.status === RAW_PATCH_STATUS.DISABLED || this.status === RAW_PATCH_STATUS.UNSUPPORTED) {
             this.closeFaceDetector();
             return this.status;
         }
-        return this.finalizeWhenIdle();
+        return this.finalize();
     }
 
-    registerCallback() {
-        const generation = this.generation;
-        this.callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
-            if (generation !== this.generation || this.status !== RAW_PATCH_STATUS.CAPTURING) {
-                return;
+    async captureFrames() {
+        try {
+            while (!this.stopped && this.status === RAW_PATCH_STATUS.CAPTURING) {
+                const metadata = await this.waitForFrame();
+                if (!metadata || this.stopped || this.status !== RAW_PATCH_STATUS.CAPTURING) {
+                    break;
+                }
+                this.recordSkippedFrames(metadata);
+                await this.processFrame(metadata);
             }
-            this.registerCallback();
-            if (this.copyInFlight) {
-                this.skippedFrames += 1;
-                return;
-            }
-            this.copyFrame(metadata, generation);
+        } catch (error) {
+            this.markIncomplete(error.message || 'Raw patch frame processing failed');
+        }
+        if (this.status === RAW_PATCH_STATUS.INCOMPLETE) {
+            await this.finalize();
+        }
+    }
+
+    waitForFrame() {
+        return new Promise(resolve => {
+            const callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
+                if (!this.frameWait || this.frameWait.callbackId !== callbackId) {
+                    return;
+                }
+                this.frameWait = null;
+                resolve(metadata);
+            });
+            this.frameWait = {callbackId, resolve};
         });
     }
 
-    async copyFrame(metadata, generation) {
-        this.copyInFlight = true;
+    cancelPendingFrame() {
+        if (!this.frameWait) {
+            return;
+        }
+        const frameWait = this.frameWait;
+        this.frameWait = null;
+        this.video.cancelVideoFrameCallback(frameWait.callbackId);
+        frameWait.resolve(null);
+    }
+
+    recordSkippedFrames(metadata) {
+        if (!Number.isSafeInteger(metadata.presentedFrames)) {
+            return;
+        }
+        if (this.lastPresentedFrame !== null) {
+            this.skippedFrames += Math.max(0, metadata.presentedFrames - this.lastPresentedFrame - 1);
+        }
+        this.lastPresentedFrame = metadata.presentedFrames;
+    }
+
+    async processFrame(metadata) {
         let frame;
         try {
             const dimensions = sourceDimensions(this.video);
@@ -245,18 +277,17 @@ export class RawPatchCaptureController {
             frame = new window.VideoFrame(this.video, {timestamp: sourceTimestampUs});
             const rgbx = new Uint8Array(dimensions.width * dimensions.height * 4);
             await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
-            if (generation !== this.generation || this.status !== RAW_PATCH_STATUS.CAPTURING) {
+            if (this.stopped || this.status !== RAW_PATCH_STATUS.CAPTURING) {
                 return;
             }
 
-            const rgb24 = this.processor.process({...dimensions, rgbx, roi});
-            const sealedParts = this.segmenter.appendFrame({
-                rgb24,
+            const bgr24 = this.processor.process({...dimensions, rgbx, roi});
+            this.enqueueSealedParts(this.segmenter.appendFrame({
+                bgr24,
                 sourceWidth: dimensions.width,
                 sourceHeight: dimensions.height,
                 roi
-            });
-            this.enqueueSealedParts(sealedParts);
+            }));
             this.acceptedFrames += 1;
         } catch (error) {
             this.markIncomplete(error.message || 'Raw patch frame processing failed');
@@ -264,49 +295,34 @@ export class RawPatchCaptureController {
             if (frame) {
                 frame.close();
             }
-            this.copyInFlight = false;
-            if (this.status === RAW_PATCH_STATUS.INCOMPLETE) {
-                this.finalizeWhenIdle();
-            }
         }
     }
 
     enqueueSealedParts(parts) {
-        parts.forEach(part => {
+        for (const part of parts) {
             try {
                 this.sink.enqueuePart(part);
             } catch (error) {
                 part.bytes = null;
                 this.markIncomplete(error.message || 'Raw patch upload queue overflow');
+                return;
             }
-        });
-    }
-
-    deactivate() {
-        this.generation += 1;
-        if (this.callbackId !== null) {
-            this.video.cancelVideoFrameCallback(this.callbackId);
-            this.callbackId = null;
         }
     }
 
     markIncomplete(reason) {
         if (this.status === RAW_PATCH_STATUS.CAPTURING) {
             this.incompleteReason = reason;
-            this.deactivate();
+            this.stopped = true;
+            this.cancelPendingFrame();
             this.setStatus(RAW_PATCH_STATUS.INCOMPLETE, reason);
         }
     }
 
-    finalizeWhenIdle() {
-        if (this.finalization) {
-            return this.finalization;
-        }
-
-        this.finalization = new Promise(resolve => {
-            const finalize = async () => {
-                const finalParts = this.segmenter.finish();
-                this.enqueueSealedParts(finalParts);
+    finalize() {
+        if (!this.finalization) {
+            this.finalization = (async () => {
+                this.enqueueSealedParts(this.segmenter.finish());
                 const result = await this.sink.finalize();
                 this.closeFaceDetector();
                 const partFailure = result.parts.some(part => part.status !== 'succeeded');
@@ -317,23 +333,9 @@ export class RawPatchCaptureController {
                     ? RAW_PATCH_STATUS.INCOMPLETE
                     : RAW_PATCH_STATUS.COMPLETE;
                 this.setStatus(finalStatus, this.incompleteReason);
-                resolve(finalStatus);
-            };
-
-            if (this.copyInFlight) {
-                const waitForCopy = () => {
-                    if (this.copyInFlight) {
-                        setTimeout(waitForCopy, 0);
-                    } else {
-                        finalize();
-                    }
-                };
-                waitForCopy();
-            } else {
-                finalize();
-            }
-        });
-
+                return finalStatus;
+            })();
+        }
         return this.finalization;
     }
 

@@ -1,5 +1,5 @@
 import {PATCH_VIDEO_FRAME_RATE} from './AviPatchVideoFormat';
-import {RGB24_FRAME_BYTES} from './RawPatchProcessor';
+import {BGR24_FRAME_BYTES} from './RawPatchProcessor';
 
 const PATCH_WIDTH = 72;
 const PATCH_HEIGHT = 72;
@@ -89,15 +89,6 @@ function bitmapHeader(frameByteLength) {
     return bytes;
 }
 
-function bgr24(rgb24) {
-    const bytes = new Uint8Array(rgb24.byteLength);
-    for (let offset = 0; offset < rgb24.byteLength; offset += 3) {
-        bytes[offset] = rgb24[offset + 2];
-        bytes[offset + 1] = rgb24[offset + 1];
-        bytes[offset + 2] = rgb24[offset];
-    }
-    return bytes;
-}
 
 function indexChunk(frameChunks) {
     const entries = new Uint8Array(frameChunks.length * 16);
@@ -118,14 +109,14 @@ function indexChunk(frameChunks) {
 
 function validateInput(bytes, frameCount) {
     if (!(bytes instanceof Uint8Array) || !Number.isSafeInteger(frameCount) || frameCount < 1 ||
-        bytes.byteLength !== frameCount * RGB24_FRAME_BYTES) {
-        throw new Error('AVI encoder requires complete 72x72 RGB24 frames');
+        bytes.byteLength !== frameCount * BGR24_FRAME_BYTES) {
+        throw new Error('AVI encoder requires complete 72x72 BGR24 frames');
     }
 }
 
 /**
  * Builds a standards-compliant, uncompressed 24-bit DIB AVI. The negative
- * bitmap height declares top-down rows, so the input RGB24 frame order remains
+ * bitmap height declares top-down rows, so the input BGR24 frame order remains
  * unchanged while each pixel is stored as the AVI-required BGR24 triplet.
  */
 export function buildUncompressedAvi({bytes, frameCount}) {
@@ -133,15 +124,15 @@ export function buildUncompressedAvi({bytes, frameCount}) {
 
     const frameChunks = [];
     for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-        const start = frameIndex * RGB24_FRAME_BYTES;
-        frameChunks.push(chunk('00db', bgr24(bytes.subarray(start, start + RGB24_FRAME_BYTES))));
+        const start = frameIndex * BGR24_FRAME_BYTES;
+        frameChunks.push(chunk('00db', bytes.subarray(start, start + BGR24_FRAME_BYTES)));
     }
 
     const header = list('hdrl', [
-        chunk('avih', mainHeader(frameCount, RGB24_FRAME_BYTES)),
+        chunk('avih', mainHeader(frameCount, BGR24_FRAME_BYTES)),
         list('strl', [
-            chunk('strh', streamHeader(frameCount, RGB24_FRAME_BYTES)),
-            chunk('strf', bitmapHeader(RGB24_FRAME_BYTES))
+            chunk('strh', streamHeader(frameCount, BGR24_FRAME_BYTES)),
+            chunk('strf', bitmapHeader(BGR24_FRAME_BYTES))
         ])
     ]);
     const movi = list('movi', frameChunks);
@@ -150,16 +141,6 @@ export function buildUncompressedAvi({bytes, frameCount}) {
     return chunk('RIFF', concat([fourCC('AVI '), header, movi, index]));
 }
 
-/**
- * Produces the uncompressed AVI payload before its optional transport encoding.
- */
-export function encodeUncompressedAvi(part) {
-    try {
-        return Promise.resolve(new Blob([buildUncompressedAvi(part)], {type: 'video/avi'}));
-    } catch (error) {
-        return Promise.reject(error);
-    }
-}
 
 /**
  * Muxes a self-contained AVI then wraps it in native gzip for upload. This
