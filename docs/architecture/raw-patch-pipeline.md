@@ -33,11 +33,9 @@ The processor accepts a descriptor with all of these required fields:
 
 ### Face ROI mapping
 
-The face provider uses the MediaPipe short-range BlazeFace detector with the v2 `dynamic-face-square` descriptor. The detected bounding box is expanded by the configured scale (1.5 by default), rounded up to an integer source-pixel size, and shifted vertically by the configured signed ratio (0.15 by default; positive values shift upward and negative values downward). The crop is clamped to the source and smoothed between frames using an exponential moving average with a configurable 100 ms time constant by default. Each update uses elapsed media time, so smoothing remains stable when capture cadence varies. The crop is then reduced to 72 by 72 with
+The face provider uses the MediaPipe short-range BlazeFace detector with the v2 `dynamic-face-square` descriptor. It filters detections at the resolved MediaPipe confidence threshold (0.5 by default) and selects the eligible face with the largest unmodified source-pixel bounding-box area on every detector run. Equal areas are resolved deterministically by confidence, then top-left position, then result index; the provider intentionally does not identify or track a person. The selected box is expanded by the configured scale (1.5 by default), rounded up to an integer source-pixel size, and shifted vertically by the configured signed ratio (0.15 by default; positive values shift upward and negative values downward). The crop is clamped to the source and smoothed between frames using an exponential moving average with a configurable 100 ms time constant by default. Each update uses elapsed media time, so smoothing remains stable when capture cadence varies. Once a face has been selected, no-face detector results retain that last crop indefinitely so every later accepted AVI frame remains a source-image crop. Before the first eligible face, no crop is emitted. The crop is then reduced to 72 by 72 with
 `area-average-v1`: each output pixel is the area-weighted RGB average of its
-source-pixel overlap, using integer half-up rounding. The last crop is held
-for at most 15 missed frames; frames are skipped after that until a face is
-detected again. This remains an axis-aligned crop: affine extraction and
+source-pixel overlap, using integer half-up rounding. This remains an axis-aligned crop: affine extraction and
 rotated sampling are not performed.
 
 ## Vendored MediaPipe assets
@@ -82,4 +80,9 @@ The upstream segmenter owns one active, unsealed part. The sink accepts at
 most two sealed parts, including a part currently being muxed or uploaded.
 Accepted BGR24 bytes transfer to the sink and are released after muxing and gzip compression. A
 third sealed part is an overflow signal; the capture controller stops patch
-capture as incomplete rather than affect the participant recording. Uploaded files are `.avi.gz`; decompression produces a self-contained AVI, and there is no separate manifest upload.
+capture as incomplete rather than affect the participant recording. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes patch capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
+
+
+## Frame timing
+
+Each AVI part has a companion face-event sidecar. The sidecar maps every AVI frame index to source media time and the wall-clock timestamp recorded at the video-frame callback.

@@ -7,12 +7,12 @@ const MEDIAPIPE_WASM_URL =
 const FACE_DETECTOR_MODEL_URL =
     PUBLIC_ASSET_ROOT + '/mediapipe/models/blaze_face_short_range.tflite';
 
-export async function createMediaPipeFaceDetector() {
+export async function createMediaPipeFaceDetector({minDetectionConfidence = 0.5, minSuppressionThreshold = 0.3} = {}) {
     const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
     return FaceDetector.createFromOptions(vision, {
         baseOptions: {modelAssetPath: FACE_DETECTOR_MODEL_URL, delegate: 'CPU'},
         runningMode: 'VIDEO',
-        minDetectionConfidence: 0.5,
-        minSuppressionThreshold: 0.3
+        minDetectionConfidence,
+        minSuppressionThreshold
     });
 }

@@ -19,6 +19,8 @@ const MAX_SOURCE_HEIGHT = 1080;
 export const DEFAULT_FACE_ROI_SMOOTHING_TAU_MS = 100;
 export const DEFAULT_FACE_ROI_SCALE = 1.5;
 export const DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO = 0.15;
+export const DEFAULT_FACE_DETECTION_MIN_CONFIDENCE = 0.5;
+export const DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD = 0.3;
 const MAX_FACE_ROI_SMOOTHING_TAU_MS = 10000;
 const MAX_FACE_ROI_SCALE = 3;
 const MAX_FACE_ROI_VERTICAL_SHIFT_RATIO = 1;
@@ -44,6 +46,12 @@ function resolveFaceRoiVerticalShiftRatio(value) {
         : DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO;
 }
 
+function resolveUnitInterval(value, defaultValue) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : defaultValue;
+}
+
+
 export function resolveRawPatchConfiguration(environment = process.env) {
     const requestedMode = environment.REACT_APP_FACE_CROP_RECORDING_MODE || 'off';
 
@@ -52,7 +60,9 @@ export function resolveRawPatchConfiguration(environment = process.env) {
         mode: RAW_PATCH_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
         faceRoiSmoothingTauMs: resolveFaceRoiSmoothingTauMs(environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS),
         faceRoiScale: resolveFaceRoiScale(environment.REACT_APP_FACE_CROP_SCALE),
-        faceRoiVerticalShiftRatio: resolveFaceRoiVerticalShiftRatio(environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO)
+        faceRoiVerticalShiftRatio: resolveFaceRoiVerticalShiftRatio(environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO),
+        faceDetectionMinConfidence: resolveUnitInterval(environment.REACT_APP_FACE_DETECTION_MIN_CONFIDENCE, DEFAULT_FACE_DETECTION_MIN_CONFIDENCE),
+        faceDetectionMinSuppressionThreshold: resolveUnitInterval(environment.REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD, DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD)
     };
 }
 
@@ -125,15 +135,31 @@ export class RawPatchCaptureController {
         this.faceRoiVerticalShiftRatio = Number.isFinite(configuration.faceRoiVerticalShiftRatio)
             ? configuration.faceRoiVerticalShiftRatio
             : DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO;
+        this.faceDetectionMinConfidence = Number.isFinite(configuration.faceDetectionMinConfidence)
+            ? configuration.faceDetectionMinConfidence
+            : DEFAULT_FACE_DETECTION_MIN_CONFIDENCE;
+        this.faceDetectionMinSuppressionThreshold = Number.isFinite(configuration.faceDetectionMinSuppressionThreshold)
+            ? configuration.faceDetectionMinSuppressionThreshold
+            : DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD;
         this.roiProvider = new FaceRoiProvider({
             smoothingTauMs: this.faceRoiSmoothingTauMs,
             scale: this.faceRoiScale,
-            verticalShiftRatio: this.faceRoiVerticalShiftRatio
+            verticalShiftRatio: this.faceRoiVerticalShiftRatio,
+            minDetectionConfidence: this.faceDetectionMinConfidence
         });
         this.createFaceDetector = createFaceDetector;
         this.faceDetector = null;
         this.processor = new RawPatchProcessor();
-        this.segmenter = new RawPatchSegmenter({studyResultId, studyPage, videoCounter});
+        this.segmenter = new RawPatchSegmenter({
+            studyResultId,
+            studyPage,
+            videoCounter,
+            selectionConfiguration: {
+                minDetectionConfidence: this.faceDetectionMinConfidence,
+                minSuppressionThreshold: this.faceDetectionMinSuppressionThreshold,
+                policy: 'largest-eligible-bounding-box-v1'
+            }
+        });
         this.sink = new JatosPatchSink({uploadResultFile, uploadTracker});
         this.status = RAW_PATCH_STATUS.DISABLED;
         this.acceptedFrames = 0;
@@ -147,6 +173,7 @@ export class RawPatchCaptureController {
         this.lastPresentedFrame = null;
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
+        this.noInitialFaceSkippedFrames = 0;
     }
 
     start() {
@@ -171,7 +198,10 @@ export class RawPatchCaptureController {
         }
 
         try {
-            this.faceDetector = await this.createFaceDetector();
+            this.faceDetector = await this.createFaceDetector({
+                minDetectionConfidence: this.faceDetectionMinConfidence,
+                minSuppressionThreshold: this.faceDetectionMinSuppressionThreshold
+            });
         } catch (error) {
             this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
             return this.status;
@@ -205,12 +235,12 @@ export class RawPatchCaptureController {
     async captureFrames() {
         try {
             while (!this.stopped && this.status === RAW_PATCH_STATUS.CAPTURING) {
-                const metadata = await this.waitForFrame();
-                if (!metadata || this.stopped || this.status !== RAW_PATCH_STATUS.CAPTURING) {
+                const frameEvent = await this.waitForFrame();
+                if (!frameEvent || this.stopped || this.status !== RAW_PATCH_STATUS.CAPTURING) {
                     break;
                 }
-                this.recordSkippedFrames(metadata);
-                await this.processFrame(metadata);
+                this.recordSkippedFrames(frameEvent.metadata);
+                await this.processFrame(frameEvent.metadata, frameEvent.wallClockMs);
             }
         } catch (error) {
             this.markIncomplete(error.message || 'Raw patch frame processing failed');
@@ -227,7 +257,7 @@ export class RawPatchCaptureController {
                     return;
                 }
                 this.frameWait = null;
-                resolve(metadata);
+                resolve({metadata, wallClockMs: Date.now()});
             });
             this.frameWait = {callbackId, resolve};
         });
@@ -253,7 +283,7 @@ export class RawPatchCaptureController {
         this.lastPresentedFrame = metadata.presentedFrames;
     }
 
-    async processFrame(metadata) {
+    async processFrame(metadata, wallClockMs = Date.now()) {
         let frame;
         try {
             const dimensions = sourceDimensions(this.video);
@@ -264,12 +294,14 @@ export class RawPatchCaptureController {
 
             const sourceTimestampUs = timestampUs(metadata);
             const result = this.faceDetector.detectForVideo(this.video, sourceTimestampUs / 1000);
-            const roi = this.roiProvider.getRoi({...dimensions, detections: result.detections, timestampMs: sourceTimestampUs / 1000});
+            const selection = this.roiProvider.getSelection({...dimensions, detections: result.detections, timestampMs: sourceTimestampUs / 1000});
+            const roi = selection.roi;
             if (!roi) {
                 this.faceDetectionMisses += 1;
+                this.noInitialFaceSkippedFrames += 1;
                 return;
             }
-            if (result.detections && result.detections.length > 0) {
+            if (selection.state === 'largest' || selection.state === 'reacquired') {
                 this.faceDetections += 1;
             } else {
                 this.faceDetectionMisses += 1;
@@ -286,7 +318,10 @@ export class RawPatchCaptureController {
                 bgr24,
                 sourceWidth: dimensions.width,
                 sourceHeight: dimensions.height,
-                roi
+                roi,
+                provenance: selection,
+                timestampUs: sourceTimestampUs,
+                wallClockMs
             }));
             this.acceptedFrames += 1;
         } catch (error) {
@@ -356,6 +391,10 @@ export class RawPatchCaptureController {
             faceRoiSmoothingTauMs: this.faceRoiSmoothingTauMs,
             faceRoiScale: this.faceRoiScale,
             faceRoiVerticalShiftRatio: this.faceRoiVerticalShiftRatio,
+            faceDetectionMinConfidence: this.faceDetectionMinConfidence,
+            faceDetectionMinSuppressionThreshold: this.faceDetectionMinSuppressionThreshold,
+            faceSelectionPolicy: 'largest-eligible-bounding-box-v1',
+            noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames,
             extraction: {api: 'VideoFrame.copyTo', format: 'RGBX', colorSpace: 'srgb'},
             acceptedFrames: this.acceptedFrames,
             skippedFrames: this.skippedFrames

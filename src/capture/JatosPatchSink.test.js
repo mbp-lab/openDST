@@ -12,11 +12,15 @@ function deferred() {
 }
 
 function sealedPart(partIndex) {
+    const filename = `RESULT_introduction_1_patch_s000_p${String(partIndex).padStart(3, '0')}.avi.gz`;
+    const faceEventsFilename = filename.replace(/\.avi\.gz$/, '.face-events.json');
     return {
-        filename: `RESULT_introduction_1_patch_s000_p${String(partIndex).padStart(3, '0')}.avi.gz`,
+        filename,
+        faceEventsFilename,
         frameCount: 1,
         byteLength: 3,
-        bytes: new Uint8Array([partIndex, partIndex + 1, partIndex + 2])
+        bytes: new Uint8Array([partIndex, partIndex + 1, partIndex + 2]),
+        faceEvents: {aviFilename: filename, frameCount: 1, frames: []}
     };
 }
 
@@ -60,12 +64,38 @@ describe('JatosPatchSink', () => {
         expect(second.bytes).toBeNull();
         expect(uploads.mock.calls.map(call => call[1])).toEqual([
             'RESULT_introduction_1_patch_s000_p000.avi.gz',
-            'RESULT_introduction_1_patch_s000_p001.avi.gz'
+            'RESULT_introduction_1_patch_s000_p000.face-events.json',
+            'RESULT_introduction_1_patch_s000_p001.avi.gz',
+            'RESULT_introduction_1_patch_s000_p001.face-events.json'
         ]);
         expect(uploadTracker.settleUpload.mock.calls.map(call => call[1])).toEqual([
             UPLOAD_STATUS.SUCCEEDED,
+            UPLOAD_STATUS.SUCCEEDED,
+            UPLOAD_STATUS.SUCCEEDED,
             UPLOAD_STATUS.SUCCEEDED
         ]);
+    });
+
+    test('marks the logical part incomplete when its JSON sidecar fails', async () => {
+        const uploads = jest.fn((payload, filename) => filename.endsWith('.face-events.json')
+            ? Promise.reject(new Error('sidecar unavailable'))
+            : Promise.resolve());
+        const uploadTracker = tracker();
+        const sink = new JatosPatchSink({
+            uploadResultFile: uploads,
+            uploadTracker,
+            encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
+            sleep: jest.fn(() => Promise.resolve())
+        });
+
+        const result = await sink.enqueuePart(sealedPart(0));
+
+        expect(uploads).toHaveBeenCalledTimes(4);
+        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {status: UPLOAD_STATUS.SUCCEEDED}, faceEvents: {attempts: 3}});
+        expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
+            'patch-events-RESULT_introduction_1_patch_s000_p000.face-events.json',
+            UPLOAD_STATUS.FAILED
+        );
     });
 
     test('retries a part three times and reports one terminal failure', async () => {
@@ -81,11 +111,15 @@ describe('JatosPatchSink', () => {
         const result = await sink.enqueuePart(sealedPart(0));
 
         expect(uploads).toHaveBeenCalledTimes(3);
-        expect(uploadTracker.registerUpload).toHaveBeenCalledTimes(1);
+        expect(uploadTracker.registerUpload).toHaveBeenCalledTimes(2);
         expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
             'patch-part-RESULT_introduction_1_patch_s000_p000.avi.gz',
             UPLOAD_STATUS.FAILED
         );
-        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, attempts: 3});
+        expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
+            'patch-events-RESULT_introduction_1_patch_s000_p000.face-events.json',
+            UPLOAD_STATUS.FAILED
+        );
+        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {attempts: 3}});
     });
 });

@@ -38,7 +38,8 @@ UI responsiveness, source dimensions, and the final `rawPatchCapture` status.
 ## Byte, queue, and recorder checks
 
 - Decompress every uploaded part and verify its byte length and SHA-256 against
-  the manifest; concatenate parts in manifest order and verify 15,552 bytes per
+  its matching `.face-events.json` sidecar; verify one provenance entry per AVI
+  frame, both media-time and wall-clock timestamps, and 15,552 bytes per decoded
   frame.
 - Verify the 539-frame boundary creates the next part with the expected
   segment/part indexes and deterministic names.
@@ -46,24 +47,30 @@ UI responsiveness, source dimensions, and the final `rawPatchCapture` status.
   than duplicated or cadence-corrected.
 - Hold two sealed uploads in the sink, then confirm the next sealed part stops
   only patch capture as `incomplete` while MP4/WebM recording continues.
-- Confirm the final part is sealed and all part attempts settle before the
-  manifest upload begins.
+- Confirm each AVI part and its JSON sidecar settle together; force a sidecar
+  failure and verify terminal raw-patch status is `incomplete`.
 - Repeat the normal recording flow with raw patches `off` and compare the
   resulting MP4/WebM recording behavior to the pre-feature baseline.
 
 ## Deployed JATOS and Nginx checks
 
-- Verify one successful compressed part upload and manifest upload.
+- Verify one successful compressed AVI upload and its matching JSON sidecar upload.
 - Force transient failures and confirm exactly three bounded attempts followed
   by one terminal upload state.
-- Force permanent part and manifest failures; verify study continuation and
-  terminal participant metadata.
+- Force permanent AVI-part and JSON-sidecar failures; verify study continuation
+  and terminal participant metadata.
 - Test a retry after an uncertain request with the same deterministic filename;
   record the deployed JATOS version's duplicate-file behavior.
 - Measure the largest gzip part for each target browser and set
   `jatos.resultUploads.maxFileSize` and Nginx `client_max_body_size` above it.
 - Set `jatos.resultUploads.limitPerStudyRun` above the expected raw-patch part
-  count, manifest, and companion MP4/WebM files; verify enforcement at and
+  count, AVI sidecars, and companion MP4/WebM files; verify enforcement at and
   beyond the configured limit.
 - Record actual JATOS/Nginx settings, server version, failure symptoms, and
   mitigation steps in this document before enabling `calibration` or `all`.
+
+## Time-mapping checks
+
+- Confirm that after the first eligible face, extended no-detection intervals
+  continue emitting `held` frames with the retained ROI and matching timestamps.
+- Confirm that no crop is emitted before the first eligible face.

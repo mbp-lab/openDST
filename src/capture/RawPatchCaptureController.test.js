@@ -2,6 +2,8 @@ import {
     DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
     DEFAULT_FACE_ROI_SCALE,
     DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO,
+    DEFAULT_FACE_DETECTION_MIN_CONFIDENCE,
+    DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD,
     RAW_PATCH_STATUS,
     RawPatchCaptureController,
     resolveRawPatchConfiguration
@@ -48,6 +50,20 @@ describe('resolveRawPatchConfiguration', () => {
             .toBe(DEFAULT_FACE_ROI_SMOOTHING_TAU_MS);
     });
 
+    test('resolves bounded detector thresholds and time-based face hold configuration', () => {
+        const configuration = resolveRawPatchConfiguration({
+            REACT_APP_FACE_DETECTION_MIN_CONFIDENCE: '0.65',
+            REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD: '0.4'
+        });
+
+        expect(configuration.faceDetectionMinConfidence).toBe(0.65);
+        expect(configuration.faceDetectionMinSuppressionThreshold).toBe(0.4);
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_DETECTION_MIN_CONFIDENCE: '1.1'}).faceDetectionMinConfidence)
+            .toBe(DEFAULT_FACE_DETECTION_MIN_CONFIDENCE);
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD: '-0.1'}).faceDetectionMinSuppressionThreshold)
+            .toBe(DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD);
+    });
+
     test('cancels the pending frame callback before finalizing a stopped capture', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         const probeFrame = {
@@ -67,18 +83,24 @@ describe('resolveRawPatchConfiguration', () => {
         window.CompressionStream = jest.fn();
 
         try {
+            const createFaceDetector = jest.fn(() => Promise.resolve(detector));
             const controller = new RawPatchCaptureController({
                 video,
                 studyResultId: 'RESULT',
                 studyPage: 'introduction',
                 videoCounter: 1,
-                configuration: resolveRawPatchConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
+                configuration: resolveRawPatchConfiguration({
+                    REACT_APP_FACE_CROP_RECORDING_MODE: 'all',
+                    REACT_APP_FACE_DETECTION_MIN_CONFIDENCE: '0.7',
+                    REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD: '0.2'
+                }),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
                 uploadResultFile: jest.fn(),
-                createFaceDetector: jest.fn(() => Promise.resolve(detector))
+                createFaceDetector
             });
 
             await expect(controller.start()).resolves.toBe(RAW_PATCH_STATUS.CAPTURING);
+            expect(createFaceDetector).toHaveBeenCalledWith({minDetectionConfidence: 0.7, minSuppressionThreshold: 0.2});
             await expect(controller.stop()).resolves.toBe(RAW_PATCH_STATUS.COMPLETE);
 
             expect(video.cancelVideoFrameCallback).toHaveBeenCalledWith(7);
@@ -96,7 +118,7 @@ describe('resolveRawPatchConfiguration', () => {
         const captureFrame = {copyTo: jest.fn(() => copy.promise), close: jest.fn()};
         const detector = {
             close: jest.fn(),
-            detectForVideo: jest.fn(() => ({detections: [{boundingBox: {originX: 0, originY: 0, width: 72, height: 72}}]}))
+            detectForVideo: jest.fn(() => ({detections: [{boundingBox: {originX: 0, originY: 0, width: 72, height: 72}, categories: [{score: 0.9}]}]}))
         };
         let callback;
         let callbackId = 0;
@@ -138,7 +160,7 @@ describe('resolveRawPatchConfiguration', () => {
             expect(controller.acceptedFrames).toBe(1);
             expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(2);
             await expect(controller.stop()).resolves.toBe(RAW_PATCH_STATUS.COMPLETE);
-            expect(uploadResultFile).toHaveBeenCalledTimes(1);
+            expect(uploadResultFile).toHaveBeenCalledTimes(2);
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
         } finally {
             window.VideoFrame = original.VideoFrame;

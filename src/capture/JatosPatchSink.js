@@ -6,7 +6,7 @@ export const MAX_UPLOAD_ATTEMPTS = 3;
 
 export class PatchSinkOverflowError extends Error {
     constructor() {
-        super(`Raw patch sink already owns ${MAX_PENDING_PATCH_PARTS} pending parts`);
+        super('Raw patch sink already owns ' + MAX_PENDING_PATCH_PARTS + ' pending parts');
         this.name = 'PatchSinkOverflowError';
     }
 }
@@ -25,6 +25,10 @@ function validateSealedPart(part) {
     if (typeof part.filename !== 'string' || !part.filename.endsWith('.avi.gz')) {
         throw new Error('Sealed part must have a deterministic gzip-compressed AVI filename');
     }
+    if (typeof part.faceEventsFilename !== 'string' || !part.faceEventsFilename.endsWith('.face-events.json') ||
+        !part.faceEvents || part.faceEvents.aviFilename !== part.filename || part.faceEvents.frameCount !== part.frameCount) {
+        throw new Error('Sealed part must have matching face-event sidecar metadata');
+    }
 }
 
 function defaultUploadTracker() {
@@ -35,7 +39,8 @@ function defaultUploadTracker() {
 }
 
 /**
- * Bounded, best-effort transport for sealed raw-patch parts as gzip-compressed AVI videos.
+ * Bounded, best-effort transport for each gzip-compressed AVI part and its
+ * required plain-JSON face-selection provenance sidecar.
  */
 export class JatosPatchSink {
     constructor({
@@ -57,7 +62,7 @@ export class JatosPatchSink {
             throw new Error('Sink encoder and sleep dependencies must be functions');
         }
         if (!Number.isSafeInteger(maxPendingParts) || maxPendingParts < 1 || maxPendingParts > MAX_PENDING_PATCH_PARTS) {
-            throw new Error(`Max pending parts must be between 1 and ${MAX_PENDING_PATCH_PARTS}`);
+            throw new Error('Max pending parts must be between 1 and ' + MAX_PENDING_PATCH_PARTS);
         }
         if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || !Number.isSafeInteger(retryDelayMs) || retryDelayMs < 0) {
             throw new Error('Retry configuration is invalid');
@@ -101,18 +106,35 @@ export class JatosPatchSink {
     }
 
     async uploadPart(part) {
-        const uploadId = `patch-part-${part.filename}`;
-        this.uploadTracker.registerUpload(uploadId);
+        const aviUploadId = 'patch-part-' + part.filename;
+        const eventsUploadId = 'patch-events-' + part.faceEventsFilename;
+        this.uploadTracker.registerUpload(aviUploadId);
+        this.uploadTracker.registerUpload(eventsUploadId);
 
+        let aviResult;
         try {
             const encoded = await this.encode(part);
             part.bytes = null;
-            return await this.uploadWithRetry({payload: encoded, filename: part.filename, uploadId});
+            aviResult = await this.uploadWithRetry({payload: encoded, filename: part.filename, uploadId: aviUploadId});
         } catch (error) {
             part.bytes = null;
-            this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.FAILED);
-            return {uploadId, filename: part.filename, status: UPLOAD_STATUS.FAILED, attempts: 0, error};
+            this.uploadTracker.settleUpload(aviUploadId, UPLOAD_STATUS.FAILED);
+            aviResult = {uploadId: aviUploadId, filename: part.filename, status: UPLOAD_STATUS.FAILED, attempts: 0, error};
         }
+
+        if (aviResult.status !== UPLOAD_STATUS.SUCCEEDED) {
+            this.uploadTracker.settleUpload(eventsUploadId, UPLOAD_STATUS.FAILED);
+            return {filename: part.filename, faceEventsFilename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, avi: aviResult,
+                faceEvents: {uploadId: eventsUploadId, filename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, attempts: 0}};
+        }
+
+        const faceEventsResult = await this.uploadWithRetry({
+            payload: JSON.stringify(part.faceEvents),
+            filename: part.faceEventsFilename,
+            uploadId: eventsUploadId
+        });
+        const status = faceEventsResult.status === UPLOAD_STATUS.SUCCEEDED ? UPLOAD_STATUS.SUCCEEDED : UPLOAD_STATUS.FAILED;
+        return {filename: part.filename, faceEventsFilename: part.faceEventsFilename, status, avi: aviResult, faceEvents: faceEventsResult};
     }
 
     async uploadWithRetry({payload, filename, uploadId}) {

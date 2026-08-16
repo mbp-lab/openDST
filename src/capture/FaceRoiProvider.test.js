@@ -6,8 +6,8 @@ import {
     PATCH_SIZE
 } from './FaceRoiProvider';
 
-function detection(originX, originY, width, height) {
-    return {boundingBox: {originX, originY, width, height}};
+function detection(originX, originY, width, height, score = 0.9) {
+    return {boundingBox: {originX, originY, width, height}, categories: [{score}]};
 }
 
 describe('FaceRoiProvider', () => {
@@ -28,6 +28,41 @@ describe('FaceRoiProvider', () => {
             size: 180
         });
         expect(roi.size % PATCH_SIZE).not.toBe(0);
+    });
+
+    test('selects the largest eligible face independently of MediaPipe result order', () => {
+        const provider = new FaceRoiProvider({scale: 1, smoothingTauMs: 0, minDetectionConfidence: 0.5});
+        const selection = provider.getSelection({
+            width: 640,
+            height: 480,
+            timestampMs: 0,
+            detections: [
+                detection(300, 100, 80, 80, 0.99),
+                detection(100, 80, 150, 120, 0.51),
+                detection(200, 50, 200, 200, 0.49)
+            ]
+        });
+
+        expect(selection).toMatchObject({
+            state: 'largest',
+            candidateCount: 2,
+            selectedScore: 0.51,
+            selectedBoundingBox: {originX: 100, originY: 80, width: 150, height: 120},
+            tieBreakOccurred: false
+        });
+    });
+
+    test('uses documented tie breakers for equal-size candidates', () => {
+        const provider = new FaceRoiProvider({scale: 1, smoothingTauMs: 0});
+        const selection = provider.getSelection({
+            width: 640,
+            height: 480,
+            timestampMs: 0,
+            detections: [detection(200, 100, 100, 100, 0.7), detection(50, 100, 100, 100, 0.9)]
+        });
+
+        expect(selection.selectedBoundingBox.originX).toBe(50);
+        expect(selection.tieBreakOccurred).toBe(true);
     });
 
     test('applies signed vertical shifts around the detected face', () => {
@@ -69,19 +104,20 @@ describe('FaceRoiProvider', () => {
         expect(roi.y + roi.size).toBeLessThanOrEqual(240);
     });
 
-    test('holds the last crop briefly and then returns null', () => {
-        const provider = new FaceRoiProvider({maxMissedFrames: 2});
-        provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 100, 100)]});
+    test('holds the last crop indefinitely after a face was selected', () => {
+        const provider = new FaceRoiProvider();
+        provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 100, 100)], timestampMs: 0});
 
-        expect(provider.getRoi({width: 640, height: 480, detections: []})).not.toBeNull();
-        expect(provider.getRoi({width: 640, height: 480, detections: []})).not.toBeNull();
-        expect(provider.getRoi({width: 640, height: 480, detections: []})).toBeNull();
+        expect(provider.getSelection({width: 640, height: 480, detections: [], timestampMs: 200})).toMatchObject({state: 'held'});
+        expect(provider.getSelection({width: 640, height: 480, detections: [], timestampMs: 200000})).toMatchObject({state: 'held'});
+        expect(provider.getSelection({width: 640, height: 480, detections: [detection(200, 100, 100, 100)], timestampMs: 200100}))
+            .toMatchObject({state: 'reacquired'});
     });
 
     test('does not return an out-of-bounds held crop after a source resize', () => {
         const provider = new FaceRoiProvider();
-        provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 200, 200)]});
+        provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 200, 200)], timestampMs: 0});
 
-        expect(provider.getRoi({width: 320, height: 240, detections: []})).toBeNull();
+        expect(provider.getRoi({width: 320, height: 240, detections: [], timestampMs: 100})).toBeNull();
     });
 });

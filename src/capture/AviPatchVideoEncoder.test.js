@@ -17,6 +17,10 @@ function chunkOffset(bytes, type) {
     return -1;
 }
 
+function provenance() {
+    return {state: 'largest', candidateCount: 1, selectedScore: 0.9, selectedBoundingBox: {originX: 0, originY: 0, width: 72, height: 72}, tieBreakOccurred: false};
+}
+
 describe('uncompressed AVI patch video', () => {
     test('muxes top-down BGR frames into an indexed AVI container', () => {
         const frames = new Uint8Array(BGR24_FRAME_BYTES * 2);
@@ -80,13 +84,15 @@ describe('uncompressed AVI patch video', () => {
         const frame = new Uint8Array(BGR24_FRAME_BYTES).fill(7);
         let sealedParts = [];
         for (let index = 0; index < MAX_FRAMES_PER_PART; index += 1) {
-            sealedParts = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi: firstRoi});
+            sealedParts = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi: firstRoi, provenance: provenance(), timestampUs: index * 1000, wallClockMs: 1700000000000 + index});
         }
 
-        expect(sealedParts[0]).toMatchObject({frameCount: 539, byteLength: 8382528, filename: 'RESULT_introduction_1_patch_s000_p000.avi.gz'});
+        expect(sealedParts[0]).toMatchObject({frameCount: 539, byteLength: 8382528, filename: 'RESULT_introduction_1_patch_s000_p000.avi.gz', faceEventsFilename: 'RESULT_introduction_1_patch_s000_p000.face-events.json'});
+        expect(sealedParts[0].faceEvents.frames).toHaveLength(MAX_FRAMES_PER_PART);
+        expect(sealedParts[0].faceEvents.frames[0]).toMatchObject({frameIndex: 0, mediaTimeUs: 0, wallClockMs: 1700000000000});
         const secondRoi = firstRoi;
         expect(segmenter.appendFrame({
-            bgr24: new Uint8Array(BGR24_FRAME_BYTES).fill(8), sourceWidth: 73, sourceHeight: 72, roi: secondRoi
+            bgr24: new Uint8Array(BGR24_FRAME_BYTES).fill(8), sourceWidth: 73, sourceHeight: 72, roi: secondRoi, provenance: provenance(), timestampUs: MAX_FRAMES_PER_PART * 1000, wallClockMs: 1700000000000 + MAX_FRAMES_PER_PART
         })).toEqual([]);
         expect(segmenter.finish()[0]).toMatchObject({segmentIndex: 1, partIndex: 0, frameCount: 1});
     });
@@ -106,8 +112,8 @@ describe('uncompressed AVI patch video', () => {
         };
         const frame = new Uint8Array(BGR24_FRAME_BYTES);
 
-        const first = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi})[0];
-        const second = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi})[0];
+        const first = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi, provenance: provenance(), timestampUs: 0, wallClockMs: 1700000000000})[0];
+        const second = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi, provenance: provenance(), timestampUs: 0, wallClockMs: 1700000000000})[0];
 
         expect([first.filename, second.filename]).toEqual([
             'RESULT_introduction_1_patch_s000_p000.avi.gz',
