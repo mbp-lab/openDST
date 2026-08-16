@@ -1,7 +1,7 @@
 # Raw patch release checklist
 
 This checklist is the reproducible release gate for raw-patch capture. Do not
-change `REACT_APP_RAW_PATCH_CAPTURE` from `off` until every applicable item is
+change `REACT_APP_FACE_CROP_RECORDING_MODE` from `off` until every applicable item is
 recorded as passed for the target deployment.
 
 ## Recorded results
@@ -21,7 +21,7 @@ status. Test at least one capable desktop browser plus representative capable
 iOS and Android phones.
 
 - Confirm `off` creates no raw-patch session or files.
-- Confirm `calibration` captures only the 30-second introduction feedback
+- Confirm `calibration` captures only the introduction feedback recording, for its full duration until stopped
   recording; speech-task calibration must remain excluded.
 - Confirm `all` covers every recorder session without changing the existing
   MP4/WebM behavior or participant-facing UI.

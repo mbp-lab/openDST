@@ -1,7 +1,7 @@
 import {
-    DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS,
+    DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
     DEFAULT_FACE_ROI_SCALE,
-    DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO,
+    DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO,
     RAW_PATCH_STATUS,
     RawPatchCaptureController,
     resolveRawPatchConfiguration
@@ -17,35 +17,35 @@ function deferred() {
 }
 
 describe('resolveRawPatchConfiguration', () => {
-    test('uses the default face ROI smoothing window in milliseconds', () => {
-        expect(resolveRawPatchConfiguration({}).faceRoiSmoothingWindowMs).toBe(DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS);
+    test('uses the default face ROI time constant in milliseconds', () => {
+        expect(resolveRawPatchConfiguration({}).faceRoiSmoothingTauMs).toBe(DEFAULT_FACE_ROI_SMOOTHING_TAU_MS);
     });
 
-    test('accepts a bounded millisecond face ROI smoothing window', () => {
-        expect(resolveRawPatchConfiguration({REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS: '400'}).faceRoiSmoothingWindowMs).toBe(400);
+    test('accepts a bounded face ROI time constant in milliseconds', () => {
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_CROP_SMOOTHING_TAU_MS: '400'}).faceRoiSmoothingTauMs).toBe(400);
     });
 
     test('accepts configurable face ROI scale', () => {
-        expect(resolveRawPatchConfiguration({REACT_APP_FACE_ROI_SCALE: '1.75'}).faceRoiScale).toBe(1.75);
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_CROP_SCALE: '1.75'}).faceRoiScale).toBe(1.75);
     });
 
     test('falls back to the default for invalid face ROI scale', () => {
-        expect(resolveRawPatchConfiguration({REACT_APP_FACE_ROI_SCALE: '0.5'}).faceRoiScale)
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_CROP_SCALE: '0.5'}).faceRoiScale)
             .toBe(DEFAULT_FACE_ROI_SCALE);
     });
 
-    test('accepts configurable face ROI upward offset ratio', () => {
-        expect(resolveRawPatchConfiguration({REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO: '0.25'}).faceRoiUpwardOffsetRatio).toBe(0.25);
+    test('accepts configurable signed face ROI vertical shift ratio', () => {
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO: '-0.25'}).faceRoiVerticalShiftRatio).toBe(-0.25);
     });
 
-    test('falls back to the default for invalid face ROI upward offset ratio', () => {
-        expect(resolveRawPatchConfiguration({REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO: '1'}).faceRoiUpwardOffsetRatio)
-            .toBe(DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO);
+    test('falls back to the default for invalid face ROI vertical shift ratio', () => {
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO: '1.1'}).faceRoiVerticalShiftRatio)
+            .toBe(DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO);
     });
 
-    test('falls back to the default for invalid face ROI smoothing windows', () => {
-        expect(resolveRawPatchConfiguration({REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS: '-1'}).faceRoiSmoothingWindowMs)
-            .toBe(DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS);
+    test('falls back to the default for invalid face ROI time constants', () => {
+        expect(resolveRawPatchConfiguration({REACT_APP_FACE_CROP_SMOOTHING_TAU_MS: '-1'}).faceRoiSmoothingTauMs)
+            .toBe(DEFAULT_FACE_ROI_SMOOTHING_TAU_MS);
     });
 
     test('cancels the pending frame callback before finalizing a stopped capture', async () => {
@@ -72,7 +72,7 @@ describe('resolveRawPatchConfiguration', () => {
                 studyResultId: 'RESULT',
                 studyPage: 'introduction',
                 videoCounter: 1,
-                configuration: resolveRawPatchConfiguration({REACT_APP_RAW_PATCH_CAPTURE: 'all'}),
+                configuration: resolveRawPatchConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
                 uploadResultFile: jest.fn(),
                 createFaceDetector: jest.fn(() => Promise.resolve(detector))
@@ -122,7 +122,7 @@ describe('resolveRawPatchConfiguration', () => {
                 studyResultId: 'RESULT',
                 studyPage: 'introduction',
                 videoCounter: 1,
-                configuration: resolveRawPatchConfiguration({REACT_APP_RAW_PATCH_CAPTURE: 'all'}),
+                configuration: resolveRawPatchConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
                 uploadResultFile,
                 createFaceDetector: jest.fn(() => Promise.resolve(detector))

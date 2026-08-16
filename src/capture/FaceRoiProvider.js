@@ -48,17 +48,17 @@ export function validateFaceRoiDescriptor(descriptor) {
  * crop sizes are reduced by the deterministic area downsampler.
  */
 export class FaceRoiProvider {
-    constructor({scale = 1.5, upwardOffsetRatio = 0.15, smoothingWindowMs = 167, maxMissedFrames = 15} = {}) {
-        requireInteger(smoothingWindowMs, 'Face ROI smoothing window', 0);
+    constructor({scale = 1.5, verticalShiftRatio = 0.15, smoothingTauMs = 100, maxMissedFrames = 15} = {}) {
+        requireInteger(smoothingTauMs, 'Face ROI time constant', 0);
         if (!Number.isFinite(scale) || scale < 1 || scale > 3) {
             throw new Error('Face ROI scale must be between 1 and 3');
         }
-        if (!Number.isFinite(upwardOffsetRatio) || upwardOffsetRatio < 0 || upwardOffsetRatio > 0.5) {
-            throw new Error('Face ROI upward offset ratio must be between 0 and 0.5');
+        if (!Number.isFinite(verticalShiftRatio) || verticalShiftRatio < -1 || verticalShiftRatio > 1) {
+            throw new Error('Face ROI vertical shift ratio must be between -1 and 1');
         }
         this.scale = scale;
-        this.upwardOffsetRatio = upwardOffsetRatio;
-        this.smoothingWindowMs = smoothingWindowMs;
+        this.verticalShiftRatio = verticalShiftRatio;
+        this.smoothingTauMs = smoothingTauMs;
         this.maxMissedFrames = maxMissedFrames;
         this.previous = null;
         this.previousDetectionTimestampMs = null;
@@ -66,11 +66,11 @@ export class FaceRoiProvider {
     }
 
     smoothingCoefficient(timestampMs) {
-        if (!this.previous || !Number.isFinite(timestampMs) || !Number.isFinite(this.previousDetectionTimestampMs) || this.smoothingWindowMs === 0) {
+        if (!this.previous || !Number.isFinite(timestampMs) || !Number.isFinite(this.previousDetectionTimestampMs) || this.smoothingTauMs === 0) {
             return 1;
         }
         const elapsedMs = Math.max(0, timestampMs - this.previousDetectionTimestampMs);
-        return 1 - Math.exp((-2 * elapsedMs) / this.smoothingWindowMs);
+        return 1 - Math.exp(-elapsedMs / this.smoothingTauMs);
     }
 
     getRoi({width, height, detections, timestampMs}) {
@@ -97,7 +97,7 @@ export class FaceRoiProvider {
         const smoothedSize = this.previous ? this.previous.size + (targetSize - this.previous.size) * smoothing : targetSize;
         const size = Math.max(PATCH_SIZE, Math.min(maximumSize, Math.round(smoothedSize)));
         const targetX = Math.max(0, Math.min(width - size, box.originX + box.width / 2 - size / 2));
-        const targetY = Math.max(0, Math.min(height - size, box.originY + box.height / 2 - size / 2 - size * this.upwardOffsetRatio));
+        const targetY = Math.max(0, Math.min(height - size, box.originY + box.height / 2 - size / 2 - size * this.verticalShiftRatio));
         const x = this.previous ? this.previous.x + (targetX - this.previous.x) * smoothing : targetX;
         const y = this.previous ? this.previous.y + (targetY - this.previous.y) * smoothing : targetY;
 

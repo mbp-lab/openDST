@@ -12,7 +12,7 @@ function detection(originX, originY, width, height) {
 
 describe('FaceRoiProvider', () => {
     test('creates a padded, bounded MediaPipe face crop in source pixels', () => {
-        const provider = new FaceRoiProvider({smoothingWindowMs: 0});
+        const provider = new FaceRoiProvider({smoothingTauMs: 0});
         const roi = provider.getRoi({
             width: 640,
             height: 480,
@@ -30,32 +30,33 @@ describe('FaceRoiProvider', () => {
         expect(roi.size % PATCH_SIZE).not.toBe(0);
     });
 
-    test('adds a configurable upward offset above the detected face', () => {
-        const centered = new FaceRoiProvider({scale: 1, upwardOffsetRatio: 0, smoothingWindowMs: 0});
-        const upwardOffset = new FaceRoiProvider({scale: 1, upwardOffsetRatio: 0.2, smoothingWindowMs: 0});
+    test('applies signed vertical shifts around the detected face', () => {
+        const centered = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
+        const upwardShift = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0.2, smoothingTauMs: 0});
         const frame = {width: 640, height: 480, detections: [detection(200, 100, 100, 100)]};
 
-        expect(upwardOffset.getRoi(frame).y).toBe(centered.getRoi(frame).y - 20);
+        expect(upwardShift.getRoi(frame).y).toBe(centered.getRoi(frame).y - 20);
+        const downwardShift = new FaceRoiProvider({scale: 1, verticalShiftRatio: -0.2, smoothingTauMs: 0});
+        expect(downwardShift.getRoi(frame).y).toBe(centered.getRoi(frame).y + 20);
     });
 
-    test('uses elapsed time to smooth crop size between detections', () => {
-        const provider = new FaceRoiProvider({scale: 1, smoothingWindowMs: 1000});
+    test('uses tau as the EMA time constant', () => {
+        const provider = new FaceRoiProvider({scale: 1, smoothingTauMs: 100});
         provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 100, 100)], timestampMs: 0});
         const roi = provider.getRoi({width: 640, height: 480, detections: [detection(150, 50, 200, 200)], timestampMs: 100});
 
-        expect(roi.size).toBeGreaterThan(100);
-        expect(roi.size).toBeLessThan(200);
+        expect(roi.size).toBe(163);
     });
 
     test('scales the crop relative to the detected face', () => {
-        const provider = new FaceRoiProvider({scale: 2, smoothingWindowMs: 0});
+        const provider = new FaceRoiProvider({scale: 2, smoothingTauMs: 0});
         const roi = provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 100, 100)]});
 
         expect(roi.size).toBe(200);
     });
 
     test('clamps crops at the image boundary', () => {
-        const provider = new FaceRoiProvider({scale: 2, smoothingWindowMs: 0});
+        const provider = new FaceRoiProvider({scale: 2, smoothingTauMs: 0});
         const roi = provider.getRoi({
             width: 320,
             height: 240,

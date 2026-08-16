@@ -126,12 +126,10 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_MOBILE_ONLY` | `'true'` / `'false'` | `'true'` | When `'true'`, displays a "please use your smartphone" message on desktop browsers. Participants must use a mobile device. For desktop testing, use browser developer tools to simulate a mobile viewport. |
 | `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables webcam video recording during calibration, math task, and speech task. Videos are uploaded to the JATOS backend. **Requires `REACT_APP_LOGGING` to also be `'true'`.** |
 | `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
-| `REACT_APP_RAW_PATCH_CAPTURE` | `'off'` / `'calibration'` / `'all'` | `'off'` | Experimental deterministic 72×72 raw-patch capture. `'calibration'` captures only the 30-second introduction feedback recording; `'all'` captures every recording session. Keep `'off'` until browser and deployment validation are complete. |
-| `REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS` | Integer milliseconds (`0`–`10000`) | `167` | Effective time window for face-crop exponential smoothing. `0` disables smoothing; larger values are steadier but respond more slowly. |
-| `REACT_APP_FACE_ROI_SCALE` | Decimal multiplier (`1`–`3`) | `1.5` | Square crop size relative to the largest detected-face dimension. Increase it to retain more head and surroundings. |
-| `REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO` | Decimal fraction (`0`–`0.5`) | `0.15` | Moves the square crop upward by this fraction of its size, preserving more of the upper head. Set `0` to center the crop on the detected box. |
-| `REACT_APP_MEDIAPIPE_WASM_URL` | URL | same-origin vendored Wasm path | Optional MediaPipe Tasks Vision Wasm asset base URL. The build places the default at `/mediapipe/tasks-vision-0.10.3/wasm`; override only for a controlled alternate deployment path. |
-| `REACT_APP_MEDIAPIPE_FACE_MODEL_URL` | URL | same-origin vendored BlazeFace model | Optional MediaPipe BlazeFace short-range model URL. The build places the default at `/mediapipe/models/blaze_face_short_range.tflite`; override only for a controlled alternate deployment path. |
+| `REACT_APP_FACE_CROP_RECORDING_MODE` | `off` / `calibration` / `all` | `off` | `off` disables deterministic 72×72 face-crop recording. `calibration` captures only the introduction feedback recording and runs until that recording is stopped; `all` captures every recording session. |
+| `REACT_APP_FACE_CROP_SMOOTHING_TAU_MS` | Integer milliseconds (`0`–`10000`) | `100` | Time constant (τ) of the face-crop exponential moving average. `0` disables smoothing; after one τ the crop completes 63.2% of a position change. |
+| `REACT_APP_FACE_CROP_SCALE` | Decimal multiplier (`1`–`3`) | `1.5` | Square crop side length as a multiplier of the largest dimension of the MediaPipe detected face-box proposal. Increase it to retain more head and surroundings. |
+| `REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO` | Signed decimal fraction (`-1`–`1`) | `0.15` | Shifts the proposal-derived square crop vertically by this fraction of its side length: positive values move it upward, negative values downward, and `0` centers it on the detected face-box proposal. |
 | `REACT_APP_SURVEY_HOST_PATH` | URL string | `'https://www.soscisurvey.de/resilience2021/'` | Base URL for the post-study survey. Participants are redirected here after completing the DST. The participant ID and JATOS result ID are appended as query parameters. Set to `''` to disable redirect. |
 | `REACT_APP_DEBRIEFING_HOST_PATH` | URL string | `'https://resilience.tf.uni-bielefeld.de/debriefing/'` | URL for the debriefing page shown when a participant cancels the study. Set to `''` to disable. |
 | `REACT_APP_ADDITIONAL_INFORMATION_URL_DE` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (German version). |
@@ -142,7 +140,7 @@ All configuration is done through the `.env` file in the project root. Changes r
 ```env
 PUBLIC_URL=/study_assets/my-dst-study
 REACT_APP_MOBILE_ONLY = 'true'
-REACT_APP_RAW_PATCH_CAPTURE = 'off'
+REACT_APP_FACE_CROP_RECORDING_MODE = 'off'
 REACT_APP_VIDEO_RECORDING = 'true'
 REACT_APP_LOGGING = 'true'
 REACT_APP_SURVEY_HOST_PATH = 'https://your-survey-platform.com/your-survey/'
@@ -154,7 +152,7 @@ REACT_APP_ADDITIONAL_INFORMATION_URL_EN = 'https://your-institution.edu/info-en.
 ### Example `.env` for Local Testing (No Data Collection)
 
 ```env
-REACT_APP_RAW_PATCH_CAPTURE = 'off'
+REACT_APP_FACE_CROP_RECORDING_MODE = 'off'
 PUBLIC_URL=/study_assets/digital-stress-test-published
 REACT_APP_MOBILE_ONLY = 'false'
 REACT_APP_VIDEO_RECORDING = 'false'

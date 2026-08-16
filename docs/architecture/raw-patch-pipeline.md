@@ -33,12 +33,7 @@ The processor accepts a descriptor with all of these required fields:
 
 ### Face ROI mapping
 
-The face provider uses MediaPipe's short-range BlazeFace detector and a v2
-`dynamic-face-square` descriptor. The detected bounding box is expanded by
-the configured scale (1.5 by default), rounded up to an integer source-pixel size, shifted upward by 15% of its
-size for upper-head room, clamped to the source, and smoothed between frames using an exponential moving average with a configurable
-167 ms effective window by default. Each update uses the elapsed media time, so
-smoothing remains stable when capture cadence varies. The crop is then reduced to 72 by 72 with
+The face provider uses the MediaPipe short-range BlazeFace detector with the v2 `dynamic-face-square` descriptor. The detected bounding box is expanded by the configured scale (1.5 by default), rounded up to an integer source-pixel size, and shifted vertically by the configured signed ratio (0.15 by default; positive values shift upward and negative values downward). The crop is clamped to the source and smoothed between frames using an exponential moving average with a configurable 100 ms time constant by default. Each update uses elapsed media time, so smoothing remains stable when capture cadence varies. The crop is then reduced to 72 by 72 with
 `area-average-v1`: each output pixel is the area-weighted RGB average of its
 source-pixel overlap, using integer half-up rounding. The last crop is held
 for at most 15 missed frames; frames are skipped after that until a face is

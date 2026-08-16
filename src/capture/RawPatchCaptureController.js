@@ -16,18 +16,18 @@ export const RAW_PATCH_STATUS = {
 
 const MAX_SOURCE_WIDTH = 1920;
 const MAX_SOURCE_HEIGHT = 1080;
-export const DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS = 167;
+export const DEFAULT_FACE_ROI_SMOOTHING_TAU_MS = 100;
 export const DEFAULT_FACE_ROI_SCALE = 1.5;
-export const DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO = 0.15;
-const MAX_FACE_ROI_SMOOTHING_WINDOW_MS = 10000;
+export const DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO = 0.15;
+const MAX_FACE_ROI_SMOOTHING_TAU_MS = 10000;
 const MAX_FACE_ROI_SCALE = 3;
-const MAX_FACE_ROI_UPWARD_OFFSET_RATIO = 0.5;
+const MAX_FACE_ROI_VERTICAL_SHIFT_RATIO = 1;
 
-function resolveFaceRoiSmoothingWindowMs(value) {
+function resolveFaceRoiSmoothingTauMs(value) {
     const parsed = Number(value);
-    return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= MAX_FACE_ROI_SMOOTHING_WINDOW_MS
+    return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= MAX_FACE_ROI_SMOOTHING_TAU_MS
         ? parsed
-        : DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS;
+        : DEFAULT_FACE_ROI_SMOOTHING_TAU_MS;
 }
 
 function resolveFaceRoiScale(value) {
@@ -37,22 +37,22 @@ function resolveFaceRoiScale(value) {
         : DEFAULT_FACE_ROI_SCALE;
 }
 
-function resolveFaceRoiUpwardOffsetRatio(value) {
+function resolveFaceRoiVerticalShiftRatio(value) {
     const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 && parsed <= MAX_FACE_ROI_UPWARD_OFFSET_RATIO
+    return Number.isFinite(parsed) && parsed >= -MAX_FACE_ROI_VERTICAL_SHIFT_RATIO && parsed <= MAX_FACE_ROI_VERTICAL_SHIFT_RATIO
         ? parsed
-        : DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO;
+        : DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO;
 }
 
 export function resolveRawPatchConfiguration(environment = process.env) {
-    const requestedMode = environment.REACT_APP_RAW_PATCH_CAPTURE || 'off';
+    const requestedMode = environment.REACT_APP_FACE_CROP_RECORDING_MODE || 'off';
 
     return {
         requestedMode,
         mode: RAW_PATCH_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
-        faceRoiSmoothingWindowMs: resolveFaceRoiSmoothingWindowMs(environment.REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS),
-        faceRoiScale: resolveFaceRoiScale(environment.REACT_APP_FACE_ROI_SCALE),
-        faceRoiUpwardOffsetRatio: resolveFaceRoiUpwardOffsetRatio(environment.REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO)
+        faceRoiSmoothingTauMs: resolveFaceRoiSmoothingTauMs(environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS),
+        faceRoiScale: resolveFaceRoiScale(environment.REACT_APP_FACE_CROP_SCALE),
+        faceRoiVerticalShiftRatio: resolveFaceRoiVerticalShiftRatio(environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO)
     };
 }
 
@@ -116,19 +116,19 @@ export class RawPatchCaptureController {
         this.uploadTracker = uploadTracker;
         this.uploadResultFile = uploadResultFile;
         this.onStatus = onStatus || (() => {});
-        this.faceRoiSmoothingWindowMs = Number.isSafeInteger(configuration.faceRoiSmoothingWindowMs)
-            ? configuration.faceRoiSmoothingWindowMs
-            : DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS;
+        this.faceRoiSmoothingTauMs = Number.isSafeInteger(configuration.faceRoiSmoothingTauMs)
+            ? configuration.faceRoiSmoothingTauMs
+            : DEFAULT_FACE_ROI_SMOOTHING_TAU_MS;
         this.faceRoiScale = Number.isFinite(configuration.faceRoiScale)
             ? configuration.faceRoiScale
             : DEFAULT_FACE_ROI_SCALE;
-        this.faceRoiUpwardOffsetRatio = Number.isFinite(configuration.faceRoiUpwardOffsetRatio)
-            ? configuration.faceRoiUpwardOffsetRatio
-            : DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO;
+        this.faceRoiVerticalShiftRatio = Number.isFinite(configuration.faceRoiVerticalShiftRatio)
+            ? configuration.faceRoiVerticalShiftRatio
+            : DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO;
         this.roiProvider = new FaceRoiProvider({
-            smoothingWindowMs: this.faceRoiSmoothingWindowMs,
+            smoothingTauMs: this.faceRoiSmoothingTauMs,
             scale: this.faceRoiScale,
-            upwardOffsetRatio: this.faceRoiUpwardOffsetRatio
+            verticalShiftRatio: this.faceRoiVerticalShiftRatio
         });
         this.createFaceDetector = createFaceDetector;
         this.faceDetector = null;
@@ -353,9 +353,9 @@ export class RawPatchCaptureController {
             roiProvider: 'mediapipe-face-detector',
             faceDetections: this.faceDetections,
             faceDetectionMisses: this.faceDetectionMisses,
-            faceRoiSmoothingWindowMs: this.faceRoiSmoothingWindowMs,
+            faceRoiSmoothingTauMs: this.faceRoiSmoothingTauMs,
             faceRoiScale: this.faceRoiScale,
-            faceRoiUpwardOffsetRatio: this.faceRoiUpwardOffsetRatio,
+            faceRoiVerticalShiftRatio: this.faceRoiVerticalShiftRatio,
             extraction: {api: 'VideoFrame.copyTo', format: 'RGBX', colorSpace: 'srgb'},
             acceptedFrames: this.acceptedFrames,
             skippedFrames: this.skippedFrames
