@@ -1,4 +1,4 @@
-import {CameraRoiProvider, FaceRoiProvider} from './RoiProvider';
+import {FaceRoiProvider} from './RoiProvider';
 import {RawPatchProcessor} from './RawPatchProcessor';
 import {RawPatchSegmenter} from './RawPatchPartAccumulator';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE} from './AviPatchVideoFormat';
@@ -6,7 +6,6 @@ import {JatosPatchSink} from './JatosPatchSink';
 import {createMediaPipeFaceDetector} from './MediaPipeFaceDetector';
 
 export const RAW_PATCH_CAPTURE_MODES = ['off', 'calibration', 'all'];
-export const RAW_PATCH_ROI_COORDINATES = ['camera', 'face'];
 export const RAW_PATCH_STATUS = {
     DISABLED: 'disabled',
     UNSUPPORTED: 'unsupported',
@@ -47,7 +46,6 @@ function resolveFaceRoiUpwardOffsetRatio(value) {
 
 export function resolveRawPatchConfiguration(environment = process.env) {
     const requestedMode = environment.REACT_APP_RAW_PATCH_CAPTURE || 'off';
-    const requestedRoiCoordinates = environment.REACT_APP_PATCH_ROI_COORDINATES || 'camera';
     const requestedFaceRoiSmoothingWindowMs = environment.REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS;
     const requestedFaceRoiScale = environment.REACT_APP_FACE_ROI_SCALE;
     const requestedFaceRoiUpwardOffsetRatio = environment.REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO;
@@ -55,8 +53,6 @@ export function resolveRawPatchConfiguration(environment = process.env) {
     return {
         requestedMode,
         mode: RAW_PATCH_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
-        requestedRoiCoordinates,
-        roiCoordinates: RAW_PATCH_ROI_COORDINATES.includes(requestedRoiCoordinates) ? requestedRoiCoordinates : 'camera',
         requestedFaceRoiSmoothingWindowMs,
         faceRoiSmoothingWindowMs: resolveFaceRoiSmoothingWindowMs(requestedFaceRoiSmoothingWindowMs),
         requestedFaceRoiScale,
@@ -135,13 +131,11 @@ export class RawPatchCaptureController {
         this.faceRoiUpwardOffsetRatio = Number.isFinite(configuration.faceRoiUpwardOffsetRatio)
             ? configuration.faceRoiUpwardOffsetRatio
             : DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO;
-        this.roiProvider = configuration.roiCoordinates === 'face'
-            ? new FaceRoiProvider({
-                smoothingWindowMs: this.faceRoiSmoothingWindowMs,
-                scale: this.faceRoiScale,
-                upwardOffsetRatio: this.faceRoiUpwardOffsetRatio
-            })
-            : new CameraRoiProvider();
+        this.roiProvider = new FaceRoiProvider({
+            smoothingWindowMs: this.faceRoiSmoothingWindowMs,
+            scale: this.faceRoiScale,
+            upwardOffsetRatio: this.faceRoiUpwardOffsetRatio
+        });
         this.createFaceDetector = createFaceDetector;
         this.faceDetector = null;
         this.processor = new RawPatchProcessor();
@@ -182,17 +176,15 @@ export class RawPatchCaptureController {
             return this.status;
         }
 
-        if (this.configuration.roiCoordinates === 'face') {
-            try {
-                this.faceDetector = await this.createFaceDetector();
-            } catch (error) {
-                this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
-                return this.status;
-            }
-            if (generation !== this.generation) {
-                this.closeFaceDetector();
-                return this.status;
-            }
+        try {
+            this.faceDetector = await this.createFaceDetector();
+        } catch (error) {
+            this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
+            return this.status;
+        }
+        if (generation !== this.generation) {
+            this.closeFaceDetector();
+            return this.status;
         }
 
         this.setStatus(RAW_PATCH_STATUS.CAPTURING);
@@ -239,21 +231,16 @@ export class RawPatchCaptureController {
             }
 
             const sourceTimestampUs = timestampUs(metadata);
-            let roi;
-            if (this.faceDetector) {
-                const result = this.faceDetector.detectForVideo(this.video, sourceTimestampUs / 1000);
-                roi = this.roiProvider.getRoi({...dimensions, detections: result.detections, timestampMs: sourceTimestampUs / 1000});
-                if (!roi) {
-                    this.faceDetectionMisses += 1;
-                    return;
-                }
-                if (result.detections && result.detections.length > 0) {
-                    this.faceDetections += 1;
-                } else {
-                    this.faceDetectionMisses += 1;
-                }
+            const result = this.faceDetector.detectForVideo(this.video, sourceTimestampUs / 1000);
+            const roi = this.roiProvider.getRoi({...dimensions, detections: result.detections, timestampMs: sourceTimestampUs / 1000});
+            if (!roi) {
+                this.faceDetectionMisses += 1;
+                return;
+            }
+            if (result.detections && result.detections.length > 0) {
+                this.faceDetections += 1;
             } else {
-                roi = this.roiProvider.getRoi(dimensions);
+                this.faceDetectionMisses += 1;
             }
             frame = new window.VideoFrame(this.video, {timestamp: sourceTimestampUs});
             const rgbx = new Uint8Array(dimensions.width * dimensions.height * 4);
@@ -267,8 +254,7 @@ export class RawPatchCaptureController {
                 rgb24,
                 sourceWidth: dimensions.width,
                 sourceHeight: dimensions.height,
-                roi,
-                dynamicRoi: this.configuration.roiCoordinates === 'face'
+                roi
             });
             this.enqueueSealedParts(sealedParts);
             this.acceptedFrames += 1;
@@ -362,9 +348,7 @@ export class RawPatchCaptureController {
             frameRate: PATCH_VIDEO_FRAME_RATE,
             requestedCaptureMode: this.configuration.requestedMode,
             appliedCaptureMode: this.configuration.mode,
-            requestedRoiCoordinates: this.configuration.requestedRoiCoordinates,
-            appliedRoiCoordinates: this.configuration.roiCoordinates,
-            roiProvider: this.configuration.roiCoordinates === 'face' ? 'mediapipe-face-detector' : 'centered-camera',
+            roiProvider: 'mediapipe-face-detector',
             faceDetections: this.faceDetections,
             faceDetectionMisses: this.faceDetectionMisses,
             faceRoiSmoothingWindowMs: this.faceRoiSmoothingWindowMs,

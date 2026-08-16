@@ -1,7 +1,7 @@
 import {createPatchVideoFilename, PATCH_VIDEO_FORMAT_VERSION} from './AviPatchVideoFormat';
 import {buildUncompressedAvi, encodeGzipAvi} from './AviPatchVideoEncoder';
 import {RGB24_FRAME_BYTES} from './RawPatchProcessor';
-import {CameraRoiProvider} from './RoiProvider';
+import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION} from './RoiProvider';
 import {MAX_FRAMES_PER_PART, RawPatchSegmenter} from './RawPatchPartAccumulator';
 
 function textAt(bytes, offset, length = 4) {
@@ -67,9 +67,16 @@ describe('uncompressed AVI patch video', () => {
         })).toBe('RESULT_introduction_1_patch_s000_p000.avi.gz');
         expect(PATCH_VIDEO_FORMAT_VERSION).toBe('patch-video-avi-gzip-rgb24-v1');
 
-        const provider = new CameraRoiProvider();
         const segmenter = new RawPatchSegmenter({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1});
-        const firstRoi = provider.getRoi({width: 72, height: 72});
+        const firstRoi = {
+            coordinateSystem: FACE_COORDINATE_SYSTEM,
+            transformType: DYNAMIC_FACE_SQUARE,
+            samplingVersion: AREA_AVERAGE_V1,
+            descriptorVersion: FACE_ROI_DESCRIPTOR_VERSION,
+            x: 0,
+            y: 0,
+            size: 72
+        };
         const frame = new Uint8Array(RGB24_FRAME_BYTES).fill(7);
         let sealedParts = [];
         for (let index = 0; index < MAX_FRAMES_PER_PART; index += 1) {
@@ -77,7 +84,7 @@ describe('uncompressed AVI patch video', () => {
         }
 
         expect(sealedParts[0]).toMatchObject({frameCount: 539, byteLength: 8382528, filename: 'RESULT_introduction_1_patch_s000_p000.avi.gz'});
-        const secondRoi = provider.getRoi({width: 73, height: 72});
+        const secondRoi = firstRoi;
         expect(segmenter.appendFrame({
             rgb24: new Uint8Array(RGB24_FRAME_BYTES).fill(8), sourceWidth: 73, sourceHeight: 72, roi: secondRoi
         })).toEqual([]);

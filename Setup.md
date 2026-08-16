@@ -127,7 +127,6 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables webcam video recording during calibration, math task, and speech task. Videos are uploaded to the JATOS backend. **Requires `REACT_APP_LOGGING` to also be `'true'`.** |
 | `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
 | `REACT_APP_RAW_PATCH_CAPTURE` | `'off'` / `'calibration'` / `'all'` | `'off'` | Experimental deterministic 72×72 raw-patch capture. `'calibration'` captures only the 30-second introduction feedback recording; `'all'` captures every recording session. Keep `'off'` until browser and deployment validation are complete. |
-| `REACT_APP_PATCH_ROI_COORDINATES` | `'camera'` / `'face'` | `'camera'` | Raw-patch ROI coordinates. `'camera'` uses the centered square; `'face'` dynamically tracks the first MediaPipe-detected face with smoothing and a short missed-detection hold. |
 | `REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS` | Integer milliseconds (`0`–`10000`) | `167` | Effective time window for face-crop exponential smoothing. `0` disables smoothing; larger values are steadier but respond more slowly. |
 | `REACT_APP_FACE_ROI_SCALE` | Decimal multiplier (`1`–`3`) | `1.5` | Square crop size relative to the largest detected-face dimension. Increase it to retain more head and surroundings. |
 | `REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO` | Decimal fraction (`0`–`0.5`) | `0.15` | Moves the square crop upward by this fraction of its size, preserving more of the upper head. Set `0` to center the crop on the detected box. |
@@ -144,7 +143,6 @@ All configuration is done through the `.env` file in the project root. Changes r
 PUBLIC_URL=/study_assets/my-dst-study
 REACT_APP_MOBILE_ONLY = 'true'
 REACT_APP_RAW_PATCH_CAPTURE = 'off'
-REACT_APP_PATCH_ROI_COORDINATES = 'camera'
 REACT_APP_VIDEO_RECORDING = 'true'
 REACT_APP_LOGGING = 'true'
 REACT_APP_SURVEY_HOST_PATH = 'https://your-survey-platform.com/your-survey/'
@@ -157,7 +155,6 @@ REACT_APP_ADDITIONAL_INFORMATION_URL_EN = 'https://your-institution.edu/info-en.
 
 ```env
 REACT_APP_RAW_PATCH_CAPTURE = 'off'
-REACT_APP_PATCH_ROI_COORDINATES = 'camera'
 PUBLIC_URL=/study_assets/digital-stress-test-published
 REACT_APP_MOBILE_ONLY = 'false'
 REACT_APP_VIDEO_RECORDING = 'false'

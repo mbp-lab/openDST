@@ -1,11 +1,7 @@
 export const PATCH_SIZE = 72;
 
-export const AXIS_ALIGNED_SQUARE = 'axis-aligned-square';
-export const CAMERA_COORDINATE_SYSTEM = 'camera';
 export const FACE_COORDINATE_SYSTEM = 'face';
-export const BLOCK_AVERAGE_V1 = 'block-average-v1';
 export const AREA_AVERAGE_V1 = 'area-average-v1';
-export const ROI_DESCRIPTOR_VERSION = 1;
 export const FACE_ROI_DESCRIPTOR_VERSION = 2;
 export const DYNAMIC_FACE_SQUARE = 'dynamic-face-square';
 
@@ -16,29 +12,25 @@ function requireInteger(value, fieldName, minimum) {
 }
 
 /**
- * Validates the v1 resolved ROI descriptor used by RawPatchProcessor.
+ * Validates the resolved face ROI descriptor used by RawPatchProcessor.
  */
 export function validateRoiDescriptor(descriptor) {
     if (!descriptor || typeof descriptor !== 'object' || Array.isArray(descriptor)) {
         throw new Error('ROI descriptor must be an object');
     }
 
-    const isCameraRoi = descriptor.coordinateSystem === CAMERA_COORDINATE_SYSTEM &&
-        descriptor.transformType === AXIS_ALIGNED_SQUARE &&
-        descriptor.samplingVersion === BLOCK_AVERAGE_V1 &&
-        descriptor.descriptorVersion === ROI_DESCRIPTOR_VERSION;
     const isFaceRoi = descriptor.coordinateSystem === FACE_COORDINATE_SYSTEM &&
         descriptor.transformType === DYNAMIC_FACE_SQUARE &&
         descriptor.samplingVersion === AREA_AVERAGE_V1 &&
         descriptor.descriptorVersion === FACE_ROI_DESCRIPTOR_VERSION;
 
-    if (descriptor.coordinateSystem !== CAMERA_COORDINATE_SYSTEM && descriptor.coordinateSystem !== FACE_COORDINATE_SYSTEM) {
+    if (descriptor.coordinateSystem !== FACE_COORDINATE_SYSTEM) {
         throw new Error(`Unsupported ROI coordinate system: ${descriptor.coordinateSystem}`);
     }
-    if (!isCameraRoi && !isFaceRoi) {
+    if (!isFaceRoi) {
         throw new Error(`Unsupported ROI transform type: ${descriptor.transformType}`);
     }
-    if (descriptor.samplingVersion !== BLOCK_AVERAGE_V1 && descriptor.samplingVersion !== AREA_AVERAGE_V1) {
+    if (descriptor.samplingVersion !== AREA_AVERAGE_V1) {
         throw new Error(`Unsupported ROI sampling version: ${descriptor.samplingVersion}`);
     }
     requireInteger(descriptor.x, 'ROI x', 0);
@@ -48,37 +40,6 @@ export function validateRoiDescriptor(descriptor) {
     return descriptor;
 }
 
-/**
- * Contract for resolving a source-frame ROI before deterministic processing.
- */
-export class RoiProvider {
-    getRoi() {
-        throw new Error('RoiProvider implementations must define getRoi');
-    }
-}
-
-/**
- * Produces the fixed, centered camera-horizontal ROI used by the v1 pipeline.
- */
-export class CameraRoiProvider extends RoiProvider {
-    getRoi({width, height}) {
-        requireInteger(width, 'Source width', PATCH_SIZE);
-        requireInteger(height, 'Source height', PATCH_SIZE);
-
-        const blockSize = Math.floor(Math.min(width, height) / PATCH_SIZE);
-        const size = PATCH_SIZE * blockSize;
-
-        return validateRoiDescriptor({
-            coordinateSystem: CAMERA_COORDINATE_SYSTEM,
-            transformType: AXIS_ALIGNED_SQUARE,
-            samplingVersion: BLOCK_AVERAGE_V1,
-            descriptorVersion: ROI_DESCRIPTOR_VERSION,
-            x: Math.floor((width - size) / 2),
-            y: Math.floor((height - size) / 2),
-            size
-        });
-    }
-}
 
 /**
  * Converts MediaPipe face bounding boxes into stable, in-bounds square crops.
@@ -86,9 +47,8 @@ export class CameraRoiProvider extends RoiProvider {
  * to avoid visible jitter. Crop geometry remains in source pixels; arbitrary
  * crop sizes are reduced by the deterministic area downsampler.
  */
-export class FaceRoiProvider extends RoiProvider {
+export class FaceRoiProvider {
     constructor({scale = 1.5, upwardOffsetRatio = 0.15, smoothingWindowMs = 167, maxMissedFrames = 15} = {}) {
-        super();
         requireInteger(smoothingWindowMs, 'Face ROI smoothing window', 0);
         if (!Number.isFinite(scale) || scale < 1 || scale > 3) {
             throw new Error('Face ROI scale must be between 1 and 3');

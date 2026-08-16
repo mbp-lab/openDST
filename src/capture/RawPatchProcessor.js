@@ -1,4 +1,4 @@
-import {AREA_AVERAGE_V1, BLOCK_AVERAGE_V1, PATCH_SIZE, validateRoiDescriptor} from './RoiProvider';
+import {PATCH_SIZE, validateRoiDescriptor} from './RoiProvider';
 import {AreaRgbxDownsampler} from './AreaRgbxDownsampler';
 
 export const RGBX_BYTES_PER_PIXEL = 4;
@@ -36,46 +36,6 @@ export class RawPatchProcessor {
         validateRoiDescriptor(roi);
         validateRoiBounds(roi, width, height);
 
-        if (roi.samplingVersion === AREA_AVERAGE_V1) {
-            return this.areaDownsampler.downsample({rgbx, width, roi});
-        }
-        if (roi.samplingVersion !== BLOCK_AVERAGE_V1) {
-            throw new Error(`Unsupported ROI sampling version: ${roi.samplingVersion}`);
-        }
-
-        return this.downsampleBlockAverage({rgbx, width, roi});
-    }
-
-    downsampleBlockAverage({rgbx, width, roi}) {
-        const blockSize = roi.size / PATCH_SIZE;
-        const blockArea = blockSize * blockSize;
-        const halfArea = Math.floor(blockArea / 2);
-        const rgb24 = new Uint8Array(RGB24_FRAME_BYTES);
-
-        for (let patchY = 0; patchY < PATCH_SIZE; patchY += 1) {
-            for (let patchX = 0; patchX < PATCH_SIZE; patchX += 1) {
-                let red = 0;
-                let green = 0;
-                let blue = 0;
-
-                for (let sourceY = 0; sourceY < blockSize; sourceY += 1) {
-                    const rowOffset = ((roi.y + patchY * blockSize + sourceY) * width + roi.x + patchX * blockSize) * RGBX_BYTES_PER_PIXEL;
-
-                    for (let sourceX = 0; sourceX < blockSize; sourceX += 1) {
-                        const offset = rowOffset + sourceX * RGBX_BYTES_PER_PIXEL;
-                        red += rgbx[offset];
-                        green += rgbx[offset + 1];
-                        blue += rgbx[offset + 2];
-                    }
-                }
-
-                const outputOffset = (patchY * PATCH_SIZE + patchX) * RGB24_BYTES_PER_PIXEL;
-                rgb24[outputOffset] = Math.floor((red + halfArea) / blockArea);
-                rgb24[outputOffset + 1] = Math.floor((green + halfArea) / blockArea);
-                rgb24[outputOffset + 2] = Math.floor((blue + halfArea) / blockArea);
-            }
-        }
-
-        return rgb24;
+        return this.areaDownsampler.downsample({rgbx, width, roi});
     }
 }

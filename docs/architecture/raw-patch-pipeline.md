@@ -13,57 +13,27 @@ best-effort raw-patch uploads.
 
 ## Deterministic v1 processor
 
-`src/capture/RoiProvider.js` defines the resolved ROI contract. Its pure
-`CameraRoiProvider` maps integer decoded-frame dimensions to the largest
-centered square that can be divided into a 72 by 72 grid of equal source blocks.
-
-`src/capture/RawPatchProcessor.js` is also pure. It accepts a tightly packed,
-visible, unmirrored 8-bit sRGB RGBX frame plus a validated resolved ROI and
-returns one deterministic RGB24 patch. It does not select an ROI, use browser
-APIs, compress output, or upload data.
+`src/capture/RoiProvider.js` converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs. `src/capture/RawPatchProcessor.js` accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic RGB24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
 
 ### Crop arithmetic and byte layout
 
-For source dimensions `width` and `height`, the camera provider computes:
+The processor requires exactly `width * height * 4` RGBX bytes and an ROI inside those dimensions. It emits exactly `72 * 72 * 3 = 15,552` bytes in row-major RGB24 order: every output pixel is `R`, `G`, then `B`; the source X byte is discarded.
 
-```text
-N    = floor(min(width, height) / 72)
-size = 72 * N
-x    = floor((width - size) / 2)
-y    = floor((height - size) / 2)
-```
-
-The processor requires exactly `width * height * 4` RGBX bytes and an ROI
-inside those dimensions. It emits exactly `72 * 72 * 3 = 15,552` bytes in
-row-major RGB24 order: every output pixel is `R`, `G`, then `B`; the source
-X byte is discarded.
-
-Camera mode uses `block-average-v1`: each output pixel is derived from its
-matching `N` by `N` source block. For each channel, it applies this exact
-half-up rule:
-
-```text
-floor((sum + floor(N² / 2)) / N²)
-```
-
-Face mode uses `area-average-v1`, described below. Neither path relies on
-browser resampling, mirrored-coordinate conversion, or cadence correction.
-Identical RGBX input bytes and the same ROI descriptor therefore produce
-identical RGB24 output bytes.
+The face ROI uses `area-average-v1`: each output pixel is the area-weighted RGB average of its source-pixel overlap, using integer half-up rounding. It does not rely on browser resampling, mirrored-coordinate conversion, or cadence correction. Identical RGBX input bytes and the same ROI descriptor therefore produce identical RGB24 output bytes.
 
 ### Resolved ROI descriptor
 
 The processor accepts a descriptor with all of these required fields:
 
 ```json
-{"coordinateSystem":"camera","transformType":"axis-aligned-square","samplingVersion":"block-average-v1","descriptorVersion":1,"x":0,"y":0,"size":72}
+{"coordinateSystem":"face","transformType":"dynamic-face-square","samplingVersion":"area-average-v1","descriptorVersion":2,"x":0,"y":0,"size":72}
 ```
 
-`x` and `y` are non-negative integers. `size` is an integer of at least 72.
-The coordinate system, transform type, sampling rule, and descriptor version
-are explicit rather than inferred from the provider.
+`x` and `y` are non-negative integers. `size` is an integer of at least 72. The coordinate system, transform type, sampling rule, and descriptor version are explicit rather than inferred from the provider.
 
-Face mode uses MediaPipe's short-range BlazeFace detector and a v2
+### Face ROI mapping
+
+The face provider uses MediaPipe's short-range BlazeFace detector and a v2
 `dynamic-face-square` descriptor. The detected bounding box is expanded by
 the configured scale (1.5 by default), rounded up to an integer source-pixel size, shifted upward by 15% of its
 size for upper-head room, clamped to the source, and smoothed between frames using an exponential moving average with a configurable
@@ -93,7 +63,7 @@ their independent responsibilities.
 
 Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
 RGBX/sRGB copying, and native `CompressionStream("gzip")`, then registers the next callback before processing the
-current frame. In face mode, synchronous MediaPipe detection runs before the
+current frame. Synchronous MediaPipe detection runs before the
 pixel copy. Only one copy may be in flight; later callbacks are counted as
 skipped. It seals deterministic 72 by 72 RGB24 frame parts and hands them to
 the AVI sink when a part fills, the source geometry changes, or recording

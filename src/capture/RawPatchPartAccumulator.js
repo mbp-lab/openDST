@@ -13,15 +13,6 @@ function validateFrame(rgb24) {
     }
 }
 
-function sameRoi(left, right) {
-    return left.coordinateSystem === right.coordinateSystem &&
-        left.transformType === right.transformType &&
-        left.samplingVersion === right.samplingVersion &&
-        left.descriptorVersion === right.descriptorVersion &&
-        left.x === right.x &&
-        left.y === right.y &&
-        left.size === right.size;
-}
 
 export class RawPatchPartAccumulator {
     constructor({filename, segmentIndex, partIndex, maxFrames}) {
@@ -77,7 +68,7 @@ export class RawPatchSegmenter {
         this.currentPart = null;
     }
 
-    appendFrame({rgb24, sourceWidth, sourceHeight, roi, dynamicRoi = false}) {
+    appendFrame({rgb24, sourceWidth, sourceHeight, roi}) {
         if (!Number.isSafeInteger(sourceWidth) || sourceWidth < 1 || !Number.isSafeInteger(sourceHeight) || sourceHeight < 1) {
             throw new Error('Source dimensions must be positive integers');
         }
@@ -88,8 +79,7 @@ export class RawPatchSegmenter {
 
         const sealedParts = [];
         let segment = this.segments[this.segments.length - 1];
-        const startsSegment = !segment || segment.sourceWidth !== sourceWidth || segment.sourceHeight !== sourceHeight ||
-            (!dynamicRoi && !sameRoi(segment.roi, roi));
+        const startsSegment = !segment || segment.sourceWidth !== sourceWidth || segment.sourceHeight !== sourceHeight;
 
         if (startsSegment) {
             const sealed = this.sealCurrentPart();

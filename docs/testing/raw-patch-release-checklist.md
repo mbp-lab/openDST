@@ -25,8 +25,7 @@ iOS and Android phones.
   recording; speech-task calibration must remain excluded.
 - Confirm `all` covers every recorder session without changing the existing
   MP4/WebM behavior or participant-facing UI.
-- Confirm `face` reports `unsupported`, creates no fallback camera ROI, and
-  does not affect video recording.
+- Confirm MediaPipe initialization failures report `unsupported` and do not affect video recording.
 - Confirm missing `requestVideoFrameCallback`, `VideoFrame` RGBX/sRGB copying,
   or `CompressionStream("gzip")` reports `unsupported` without blocking study
   progress.
