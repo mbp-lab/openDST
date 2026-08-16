@@ -1,4 +1,5 @@
-import {PATCH_SIZE, validateRoiDescriptor} from './RoiProvider';
+import {AREA_AVERAGE_V1, BLOCK_AVERAGE_V1, PATCH_SIZE, validateRoiDescriptor} from './RoiProvider';
+import {AreaRgbxDownsampler} from './AreaRgbxDownsampler';
 
 export const RGBX_BYTES_PER_PIXEL = 4;
 export const RGB24_BYTES_PER_PIXEL = 3;
@@ -23,14 +24,29 @@ function validateRoiBounds(roi, width, height) {
 }
 
 /**
- * Reference v1 processor: deterministic block averaging from RGBX to RGB24.
+ * Resolves an already-selected source crop into deterministic 72 by 72 RGB24.
  */
 export class RawPatchProcessor {
+    constructor() {
+        this.areaDownsampler = new AreaRgbxDownsampler();
+    }
+
     process({rgbx, width, height, roi}) {
         validateSource(rgbx, width, height);
         validateRoiDescriptor(roi);
         validateRoiBounds(roi, width, height);
 
+        if (roi.samplingVersion === AREA_AVERAGE_V1) {
+            return this.areaDownsampler.downsample({rgbx, width, roi});
+        }
+        if (roi.samplingVersion !== BLOCK_AVERAGE_V1) {
+            throw new Error(`Unsupported ROI sampling version: ${roi.samplingVersion}`);
+        }
+
+        return this.downsampleBlockAverage({rgbx, width, roi});
+    }
+
+    downsampleBlockAverage({rgbx, width, roi}) {
         const blockSize = roi.size / PATCH_SIZE;
         const blockArea = blockSize * blockSize;
         const halfArea = Math.floor(blockArea / 2);

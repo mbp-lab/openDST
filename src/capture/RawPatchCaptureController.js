@@ -1,8 +1,9 @@
-import {CameraRoiProvider} from './RoiProvider';
+import {CameraRoiProvider, FaceRoiProvider} from './RoiProvider';
 import {RawPatchProcessor} from './RawPatchProcessor';
 import {RawPatchSegmenter} from './RawPatchPartAccumulator';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE} from './AviPatchVideoFormat';
 import {JatosPatchSink} from './JatosPatchSink';
+import {createMediaPipeFaceDetector} from './MediaPipeFaceDetector';
 
 export const RAW_PATCH_CAPTURE_MODES = ['off', 'calibration', 'all'];
 export const RAW_PATCH_ROI_COORDINATES = ['camera', 'face'];
@@ -16,16 +17,52 @@ export const RAW_PATCH_STATUS = {
 
 const MAX_SOURCE_WIDTH = 1920;
 const MAX_SOURCE_HEIGHT = 1080;
+export const DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS = 167;
+export const DEFAULT_FACE_ROI_SCALE = 1.5;
+export const DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO = 0.15;
+const MAX_FACE_ROI_SMOOTHING_WINDOW_MS = 10000;
+const MAX_FACE_ROI_SCALE = 3;
+const MAX_FACE_ROI_UPWARD_OFFSET_RATIO = 0.5;
+
+function resolveFaceRoiSmoothingWindowMs(value) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= MAX_FACE_ROI_SMOOTHING_WINDOW_MS
+        ? parsed
+        : DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS;
+}
+
+function resolveFaceRoiScale(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 1 && parsed <= MAX_FACE_ROI_SCALE
+        ? parsed
+        : DEFAULT_FACE_ROI_SCALE;
+}
+
+function resolveFaceRoiUpwardOffsetRatio(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 && parsed <= MAX_FACE_ROI_UPWARD_OFFSET_RATIO
+        ? parsed
+        : DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO;
+}
 
 export function resolveRawPatchConfiguration(environment = process.env) {
     const requestedMode = environment.REACT_APP_RAW_PATCH_CAPTURE || 'off';
     const requestedRoiCoordinates = environment.REACT_APP_PATCH_ROI_COORDINATES || 'camera';
+    const requestedFaceRoiSmoothingWindowMs = environment.REACT_APP_FACE_ROI_SMOOTHING_WINDOW_MS;
+    const requestedFaceRoiScale = environment.REACT_APP_FACE_ROI_SCALE;
+    const requestedFaceRoiUpwardOffsetRatio = environment.REACT_APP_FACE_ROI_UPWARD_OFFSET_RATIO;
 
     return {
         requestedMode,
         mode: RAW_PATCH_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
         requestedRoiCoordinates,
-        roiCoordinates: RAW_PATCH_ROI_COORDINATES.includes(requestedRoiCoordinates) ? requestedRoiCoordinates : 'camera'
+        roiCoordinates: RAW_PATCH_ROI_COORDINATES.includes(requestedRoiCoordinates) ? requestedRoiCoordinates : 'camera',
+        requestedFaceRoiSmoothingWindowMs,
+        faceRoiSmoothingWindowMs: resolveFaceRoiSmoothingWindowMs(requestedFaceRoiSmoothingWindowMs),
+        requestedFaceRoiScale,
+        faceRoiScale: resolveFaceRoiScale(requestedFaceRoiScale),
+        requestedFaceRoiUpwardOffsetRatio,
+        faceRoiUpwardOffsetRatio: resolveFaceRoiUpwardOffsetRatio(requestedFaceRoiUpwardOffsetRatio)
     };
 }
 
@@ -79,7 +116,8 @@ export async function probeRawPatchCapability(video) {
  * Coordinates requestVideoFrameCallback capture without owning UI or recorder state.
  */
 export class RawPatchCaptureController {
-    constructor({video, studyResultId, studyPage, videoCounter, configuration, uploadTracker, uploadResultFile, onStatus}) {
+    constructor({video, studyResultId, studyPage, videoCounter, configuration, uploadTracker, uploadResultFile, onStatus,
+        createFaceDetector = createMediaPipeFaceDetector}) {
         this.video = video;
         this.studyResultId = studyResultId;
         this.studyPage = studyPage;
@@ -88,7 +126,24 @@ export class RawPatchCaptureController {
         this.uploadTracker = uploadTracker;
         this.uploadResultFile = uploadResultFile;
         this.onStatus = onStatus || (() => {});
-        this.roiProvider = new CameraRoiProvider();
+        this.faceRoiSmoothingWindowMs = Number.isSafeInteger(configuration.faceRoiSmoothingWindowMs)
+            ? configuration.faceRoiSmoothingWindowMs
+            : DEFAULT_FACE_ROI_SMOOTHING_WINDOW_MS;
+        this.faceRoiScale = Number.isFinite(configuration.faceRoiScale)
+            ? configuration.faceRoiScale
+            : DEFAULT_FACE_ROI_SCALE;
+        this.faceRoiUpwardOffsetRatio = Number.isFinite(configuration.faceRoiUpwardOffsetRatio)
+            ? configuration.faceRoiUpwardOffsetRatio
+            : DEFAULT_FACE_ROI_UPWARD_OFFSET_RATIO;
+        this.roiProvider = configuration.roiCoordinates === 'face'
+            ? new FaceRoiProvider({
+                smoothingWindowMs: this.faceRoiSmoothingWindowMs,
+                scale: this.faceRoiScale,
+                upwardOffsetRatio: this.faceRoiUpwardOffsetRatio
+            })
+            : new CameraRoiProvider();
+        this.createFaceDetector = createFaceDetector;
+        this.faceDetector = null;
         this.processor = new RawPatchProcessor();
         this.segmenter = new RawPatchSegmenter({studyResultId, studyPage, videoCounter});
         this.sink = new JatosPatchSink({uploadResultFile, uploadTracker});
@@ -100,15 +155,24 @@ export class RawPatchCaptureController {
         this.copyInFlight = false;
         this.finalization = null;
         this.incompleteReason = null;
+        this.starting = null;
+        this.faceDetections = 0;
+        this.faceDetectionMisses = 0;
     }
 
-    async start() {
-        if (this.configuration.roiCoordinates === 'face') {
-            this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, 'Face ROI is not implemented');
+    start() {
+        if (!this.starting) {
+            this.starting = this.startInternal();
+        }
+        return this.starting;
+    }
+
+    async startInternal() {
+        const generation = this.generation;
+        const capability = await probeRawPatchCapability(this.video);
+        if (generation !== this.generation) {
             return this.status;
         }
-
-        const capability = await probeRawPatchCapability(this.video);
         if (!capability.supported) {
             this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, capability.reason);
             return this.status;
@@ -118,16 +182,34 @@ export class RawPatchCaptureController {
             return this.status;
         }
 
+        if (this.configuration.roiCoordinates === 'face') {
+            try {
+                this.faceDetector = await this.createFaceDetector();
+            } catch (error) {
+                this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
+                return this.status;
+            }
+            if (generation !== this.generation) {
+                this.closeFaceDetector();
+                return this.status;
+            }
+        }
+
         this.setStatus(RAW_PATCH_STATUS.CAPTURING);
         this.registerCallback();
         return this.status;
     }
 
     async stop() {
-        if (this.status === RAW_PATCH_STATUS.DISABLED || this.status === RAW_PATCH_STATUS.UNSUPPORTED) {
-            return this.status;
+        this.deactivate();
+        if (this.starting) {
+            await this.starting;
         }
         this.deactivate();
+        if (this.status === RAW_PATCH_STATUS.DISABLED || this.status === RAW_PATCH_STATUS.UNSUPPORTED) {
+            this.closeFaceDetector();
+            return this.status;
+        }
         return this.finalizeWhenIdle();
     }
 
@@ -157,6 +239,22 @@ export class RawPatchCaptureController {
             }
 
             const sourceTimestampUs = timestampUs(metadata);
+            let roi;
+            if (this.faceDetector) {
+                const result = this.faceDetector.detectForVideo(this.video, sourceTimestampUs / 1000);
+                roi = this.roiProvider.getRoi({...dimensions, detections: result.detections, timestampMs: sourceTimestampUs / 1000});
+                if (!roi) {
+                    this.faceDetectionMisses += 1;
+                    return;
+                }
+                if (result.detections && result.detections.length > 0) {
+                    this.faceDetections += 1;
+                } else {
+                    this.faceDetectionMisses += 1;
+                }
+            } else {
+                roi = this.roiProvider.getRoi(dimensions);
+            }
             frame = new window.VideoFrame(this.video, {timestamp: sourceTimestampUs});
             const rgbx = new Uint8Array(dimensions.width * dimensions.height * 4);
             await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
@@ -164,13 +262,13 @@ export class RawPatchCaptureController {
                 return;
             }
 
-            const roi = this.roiProvider.getRoi(dimensions);
             const rgb24 = this.processor.process({...dimensions, rgbx, roi});
             const sealedParts = this.segmenter.appendFrame({
                 rgb24,
                 sourceWidth: dimensions.width,
                 sourceHeight: dimensions.height,
-                roi
+                roi,
+                dynamicRoi: this.configuration.roiCoordinates === 'face'
             });
             this.enqueueSealedParts(sealedParts);
             this.acceptedFrames += 1;
@@ -224,6 +322,7 @@ export class RawPatchCaptureController {
                 const finalParts = this.segmenter.finish();
                 this.enqueueSealedParts(finalParts);
                 const result = await this.sink.finalize();
+                this.closeFaceDetector();
                 const partFailure = result.parts.some(part => part.status !== 'succeeded');
                 if (partFailure) {
                     this.incompleteReason = 'One or more patch-video uploads failed';
@@ -264,7 +363,13 @@ export class RawPatchCaptureController {
             requestedCaptureMode: this.configuration.requestedMode,
             appliedCaptureMode: this.configuration.mode,
             requestedRoiCoordinates: this.configuration.requestedRoiCoordinates,
-            appliedRoiCoordinates: 'camera',
+            appliedRoiCoordinates: this.configuration.roiCoordinates,
+            roiProvider: this.configuration.roiCoordinates === 'face' ? 'mediapipe-face-detector' : 'centered-camera',
+            faceDetections: this.faceDetections,
+            faceDetectionMisses: this.faceDetectionMisses,
+            faceRoiSmoothingWindowMs: this.faceRoiSmoothingWindowMs,
+            faceRoiScale: this.faceRoiScale,
+            faceRoiUpwardOffsetRatio: this.faceRoiUpwardOffsetRatio,
             extraction: {api: 'VideoFrame.copyTo', format: 'RGBX', colorSpace: 'srgb'},
             acceptedFrames: this.acceptedFrames,
             skippedFrames: this.skippedFrames
@@ -274,5 +379,12 @@ export class RawPatchCaptureController {
     setStatus(status, reason) {
         this.status = status;
         this.onStatus({...this.captureMetadata(status), reason: reason || null});
+    }
+
+    closeFaceDetector() {
+        if (this.faceDetector) {
+            this.faceDetector.close();
+            this.faceDetector = null;
+        }
     }
 }

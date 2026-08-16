@@ -20,11 +20,6 @@ export function startRawPatchCaptureSession({webcam, props}) {
     if (!shouldCaptureRawPatches(configuration, props.studyPage)) {
         return null;
     }
-    if (configuration.roiCoordinates === 'face') {
-        reportStatus(props, RAW_PATCH_STATUS.UNSUPPORTED, 'Face ROI is not implemented');
-        return null;
-    }
-
     const video = webcam && webcam.video;
     if (!video || !window.jatos || typeof window.jatos.uploadResultFile !== 'function') {
         reportStatus(props, RAW_PATCH_STATUS.INCOMPLETE, 'Video element or JATOS upload API is unavailable');
@@ -55,7 +50,9 @@ export function startRawPatchCaptureSession({webcam, props}) {
             }
         }
     });
-    controller.start();
+    controller.start().catch(error => {
+        reportStatus(props, RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'Raw patch capture failed to start');
+    });
     return controller;
 }
 
