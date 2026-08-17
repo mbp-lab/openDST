@@ -72,7 +72,12 @@ describe('resolveRawPatchConfiguration', () => {
             copyTo: jest.fn(() => Promise.resolve()),
             close: jest.fn()
         };
-        const detector = {close: jest.fn(), detectForVideo: jest.fn()};
+        const pipelineWorker = {
+            initialize: jest.fn(() => Promise.resolve()),
+            processFrame: jest.fn(),
+            finish: jest.fn(() => Promise.resolve({parts: []})),
+            close: jest.fn(() => Promise.resolve())
+        };
         const video = {
             videoWidth: 72,
             videoHeight: 72,
@@ -83,7 +88,7 @@ describe('resolveRawPatchConfiguration', () => {
         window.CompressionStream = jest.fn();
 
         try {
-            const createFaceDetector = jest.fn(() => Promise.resolve(detector));
+            const createPipelineWorker = jest.fn(() => pipelineWorker);
             const controller = new RawPatchCaptureController({
                 video,
                 studyResultId: 'RESULT',
@@ -96,15 +101,24 @@ describe('resolveRawPatchConfiguration', () => {
                 }),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
                 uploadResultFile: jest.fn(),
-                createFaceDetector
+                createPipelineWorker
             });
 
             await expect(controller.start()).resolves.toBe(RAW_PATCH_STATUS.CAPTURING);
-            expect(createFaceDetector).toHaveBeenCalledWith({minDetectionConfidence: 0.7, minSuppressionThreshold: 0.2});
+            expect(pipelineWorker.initialize).toHaveBeenCalledWith({
+                configuration: {
+                    faceRoiSmoothingTauMs: DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
+                    faceRoiScale: DEFAULT_FACE_ROI_SCALE,
+                    faceRoiVerticalShiftRatio: DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO,
+                    faceDetectionMinConfidence: 0.7,
+                    faceDetectionMinSuppressionThreshold: 0.2
+                },
+                identity: {studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1}
+            });
             await expect(controller.stop()).resolves.toBe(RAW_PATCH_STATUS.COMPLETE);
 
             expect(video.cancelVideoFrameCallback).toHaveBeenCalledWith(7);
-            expect(detector.close).toHaveBeenCalledTimes(1);
+            expect(pipelineWorker.close).toHaveBeenCalledTimes(1);
         } finally {
             window.VideoFrame = original.VideoFrame;
             window.CompressionStream = original.CompressionStream;
@@ -116,9 +130,21 @@ describe('resolveRawPatchConfiguration', () => {
         const copy = deferred();
         const probeFrame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
         const captureFrame = {copyTo: jest.fn(() => copy.promise), close: jest.fn()};
-        const detector = {
-            close: jest.fn(),
-            detectForVideo: jest.fn(() => ({detections: [{boundingBox: {originX: 0, originY: 0, width: 72, height: 72}, categories: [{score: 0.9}]}]}))
+        const pipelineWorker = {
+            initialize: jest.fn(() => Promise.resolve()),
+            processFrame: jest.fn(({frame}) => copy.promise.then(() => {
+                frame.close();
+                return {accepted: true, detectionState: 'largest', parts: []};
+            })),
+            finish: jest.fn(() => Promise.resolve({parts: [{
+                filename: 'part.avi.gz',
+                faceEventsFilename: 'part.face-events.json',
+                frameCount: 1,
+                byteLength: 1,
+                bytes: new Uint8Array([1]),
+                faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1}
+            }]})),
+            close: jest.fn(() => Promise.resolve())
         };
         let callback;
         let callbackId = 0;
@@ -147,7 +173,7 @@ describe('resolveRawPatchConfiguration', () => {
                 configuration: resolveRawPatchConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
                 uploadResultFile,
-                createFaceDetector: jest.fn(() => Promise.resolve(detector))
+                createPipelineWorker: jest.fn(() => pipelineWorker)
             });
             controller.sink.encode = jest.fn(() => Promise.resolve(new Uint8Array([1])));
 

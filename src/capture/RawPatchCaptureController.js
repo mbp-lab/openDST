@@ -1,9 +1,6 @@
-import {FaceRoiProvider} from './FaceRoiProvider';
-import {RawPatchProcessor} from './RawPatchProcessor';
-import {RawPatchSegmenter} from './RawPatchPartAccumulator';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE} from './AviPatchVideoFormat';
 import {JatosPatchSink} from './JatosPatchSink';
-import {createMediaPipeFaceDetector} from './MediaPipeFaceDetector';
+import {createRawPatchPipelineWorker} from './RawPatchPipelineWorker';
 
 export const RAW_PATCH_CAPTURE_MODES = ['off', 'calibration', 'all'];
 export const RAW_PATCH_STATUS = {
@@ -117,7 +114,7 @@ export async function probeRawPatchCapability(video) {
  */
 export class RawPatchCaptureController {
     constructor({video, studyResultId, studyPage, videoCounter, configuration, uploadTracker, uploadResultFile, onStatus,
-        createFaceDetector = createMediaPipeFaceDetector}) {
+        createPipelineWorker = createRawPatchPipelineWorker}) {
         this.video = video;
         this.studyResultId = studyResultId;
         this.studyPage = studyPage;
@@ -141,25 +138,8 @@ export class RawPatchCaptureController {
         this.faceDetectionMinSuppressionThreshold = Number.isFinite(configuration.faceDetectionMinSuppressionThreshold)
             ? configuration.faceDetectionMinSuppressionThreshold
             : DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD;
-        this.roiProvider = new FaceRoiProvider({
-            smoothingTauMs: this.faceRoiSmoothingTauMs,
-            scale: this.faceRoiScale,
-            verticalShiftRatio: this.faceRoiVerticalShiftRatio,
-            minDetectionConfidence: this.faceDetectionMinConfidence
-        });
-        this.createFaceDetector = createFaceDetector;
-        this.faceDetector = null;
-        this.processor = new RawPatchProcessor();
-        this.segmenter = new RawPatchSegmenter({
-            studyResultId,
-            studyPage,
-            videoCounter,
-            selectionConfiguration: {
-                minDetectionConfidence: this.faceDetectionMinConfidence,
-                minSuppressionThreshold: this.faceDetectionMinSuppressionThreshold,
-                policy: 'largest-eligible-bounding-box-v1'
-            }
-        });
+        this.createPipelineWorker = createPipelineWorker;
+        this.pipelineWorker = null;
         this.sink = new JatosPatchSink({uploadResultFile, uploadTracker});
         this.status = RAW_PATCH_STATUS.DISABLED;
         this.acceptedFrames = 0;
@@ -198,16 +178,24 @@ export class RawPatchCaptureController {
         }
 
         try {
-            this.faceDetector = await this.createFaceDetector({
-                minDetectionConfidence: this.faceDetectionMinConfidence,
-                minSuppressionThreshold: this.faceDetectionMinSuppressionThreshold
+            this.pipelineWorker = this.createPipelineWorker();
+            await this.pipelineWorker.initialize({
+                configuration: {
+                    faceRoiSmoothingTauMs: this.faceRoiSmoothingTauMs,
+                    faceRoiScale: this.faceRoiScale,
+                    faceRoiVerticalShiftRatio: this.faceRoiVerticalShiftRatio,
+                    faceDetectionMinConfidence: this.faceDetectionMinConfidence,
+                    faceDetectionMinSuppressionThreshold: this.faceDetectionMinSuppressionThreshold
+                },
+                identity: {studyResultId: this.studyResultId, studyPage: this.studyPage, videoCounter: this.videoCounter}
             });
         } catch (error) {
+            await this.closePipelineWorker();
             this.setStatus(RAW_PATCH_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
             return this.status;
         }
         if (this.stopped) {
-            this.closeFaceDetector();
+            await this.closePipelineWorker();
             return this.status;
         }
 
@@ -226,7 +214,7 @@ export class RawPatchCaptureController {
             await this.captureLoop;
         }
         if (this.status === RAW_PATCH_STATUS.DISABLED || this.status === RAW_PATCH_STATUS.UNSUPPORTED) {
-            this.closeFaceDetector();
+            await this.closePipelineWorker();
             return this.status;
         }
         return this.finalize();
@@ -293,36 +281,30 @@ export class RawPatchCaptureController {
             }
 
             const sourceTimestampUs = timestampUs(metadata);
-            const result = this.faceDetector.detectForVideo(this.video, sourceTimestampUs / 1000);
-            const selection = this.roiProvider.getSelection({...dimensions, detections: result.detections, timestampMs: sourceTimestampUs / 1000});
-            const roi = selection.roi;
-            if (!roi) {
+            frame = new window.VideoFrame(this.video, {timestamp: sourceTimestampUs});
+            const result = await this.pipelineWorker.processFrame({
+                frame,
+                width: dimensions.width,
+                height: dimensions.height,
+                timestampUs: sourceTimestampUs,
+                wallClockMs
+            });
+            frame = null; // Ownership was transferred to the worker.
+            if (!result.accepted) {
                 this.faceDetectionMisses += 1;
                 this.noInitialFaceSkippedFrames += 1;
                 return;
             }
-            if (selection.state === 'largest' || selection.state === 'reacquired') {
+            if (result.detectionState === 'largest' || result.detectionState === 'reacquired') {
                 this.faceDetections += 1;
             } else {
                 this.faceDetectionMisses += 1;
             }
-            frame = new window.VideoFrame(this.video, {timestamp: sourceTimestampUs});
-            const rgbx = new Uint8Array(dimensions.width * dimensions.height * 4);
-            await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
             if (this.stopped || this.status !== RAW_PATCH_STATUS.CAPTURING) {
                 return;
             }
 
-            const bgr24 = this.processor.process({...dimensions, rgbx, roi});
-            this.enqueueSealedParts(this.segmenter.appendFrame({
-                bgr24,
-                sourceWidth: dimensions.width,
-                sourceHeight: dimensions.height,
-                roi,
-                provenance: selection,
-                timestampUs: sourceTimestampUs,
-                wallClockMs
-            }));
+            this.enqueueSealedParts(result.parts);
             this.acceptedFrames += 1;
         } catch (error) {
             this.markIncomplete(error.message || 'Raw patch frame processing failed');
@@ -357,9 +339,12 @@ export class RawPatchCaptureController {
     finalize() {
         if (!this.finalization) {
             this.finalization = (async () => {
-                this.enqueueSealedParts(this.segmenter.finish());
+                if (this.pipelineWorker) {
+                    const workerResult = await this.pipelineWorker.finish();
+                    this.enqueueSealedParts(workerResult.parts);
+                }
                 const result = await this.sink.finalize();
-                this.closeFaceDetector();
+                await this.closePipelineWorker();
                 const partFailure = result.parts.some(part => part.status !== 'succeeded');
                 if (partFailure) {
                     this.incompleteReason = 'One or more patch-video uploads failed';
@@ -406,10 +391,11 @@ export class RawPatchCaptureController {
         this.onStatus({...this.captureMetadata(status), reason: reason || null});
     }
 
-    closeFaceDetector() {
-        if (this.faceDetector) {
-            this.faceDetector.close();
-            this.faceDetector = null;
+    async closePipelineWorker() {
+        if (this.pipelineWorker) {
+            const worker = this.pipelineWorker;
+            this.pipelineWorker = null;
+            await worker.close();
         }
     }
 }

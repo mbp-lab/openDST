@@ -55,12 +55,17 @@ owns frame callbacks; the existing processor, segmenter, and JATOS sink retain
 their independent responsibilities.
 
 Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
-RGBX/sRGB copying, and native `CompressionStream("gzip")`, then enters a
-cancellable sequential frame loop. Each iteration waits for one frame callback,
-runs synchronous MediaPipe detection, copies pixels, and processes the frame
-before requesting the next callback. `presentedFrames` records frames skipped
-between accepted callbacks. Stopping cancels any outstanding callback before
-finalizing sealed parts through the AVI sink.
+RGBX/sRGB copying, and native `CompressionStream("gzip")`, then initializes a
+dedicated bundled worker and enters a cancellable sequential frame loop. Each
+iteration waits for one frame callback, creates a transferable `VideoFrame`, and
+hands ownership to the worker. MediaPipe initialization and synchronous detection,
+full-frame RGBX extraction, deterministic ROI selection/downsampling, and part
+segmentation all run in that worker. The controller awaits one result before
+requesting the next callback, so work remains bounded without blocking the UI
+thread; `presentedFrames` records frames skipped while the worker is busy. Sealed
+part buffers are transferred back without copying for bounded AVI encoding and
+JATOS upload. Stopping cancels any outstanding callback, finishes the worker's
+active part, closes the worker, and finalizes the sink.
 
 ## Bounded JATOS sink
 
