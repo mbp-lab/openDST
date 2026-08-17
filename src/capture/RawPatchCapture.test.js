@@ -7,7 +7,7 @@ import {
     RAW_PATCH_STATUS,
     RawPatchCaptureController,
     resolveRawPatchConfiguration
-} from './RawPatchCaptureController';
+} from './RawPatchCapture';
 function deferred() {
     let resolve;
     return {
@@ -125,7 +125,7 @@ describe('resolveRawPatchConfiguration', () => {
         }
     });
 
-    test('processes one frame before awaiting the next callback', async () => {
+    test('preserves a completed in-flight part when stop begins', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         const copy = deferred();
         const probeFrame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
@@ -134,16 +134,11 @@ describe('resolveRawPatchConfiguration', () => {
             initialize: jest.fn(() => Promise.resolve()),
             processFrame: jest.fn(({frame}) => copy.promise.then(() => {
                 frame.close();
-                return {accepted: true, detectionState: 'largest', parts: []};
+                return {accepted: true, detectionState: 'largest', parts: [{
+                    filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json', frameCount: 1, byteLength: 1,
+                    bytes: new Uint8Array([1]), faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1}}]};
             })),
-            finish: jest.fn(() => Promise.resolve({parts: [{
-                filename: 'part.avi.gz',
-                faceEventsFilename: 'part.face-events.json',
-                frameCount: 1,
-                byteLength: 1,
-                bytes: new Uint8Array([1]),
-                faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1}
-            }]})),
+            finish: jest.fn(() => Promise.resolve({parts: []})),
             close: jest.fn(() => Promise.resolve())
         };
         let callback;
@@ -180,11 +175,12 @@ describe('resolveRawPatchConfiguration', () => {
             await controller.start();
             callback(0, {mediaTime: 1, presentedFrames: 1});
             await Promise.resolve();
+            const stopping = controller.stop();
             copy.resolve();
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await stopping;
 
             expect(controller.acceptedFrames).toBe(1);
-            expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(2);
+            expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
             await expect(controller.stop()).resolves.toBe(RAW_PATCH_STATUS.COMPLETE);
             expect(uploadResultFile).toHaveBeenCalledTimes(2);
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
