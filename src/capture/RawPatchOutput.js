@@ -149,7 +149,6 @@ export class RawPatchSink {
         this.tail = completion;
         this.pending.push(completion);
         completion.then(() => { this.pending = this.pending.filter(candidate => candidate !== completion); });
-        return completion;
     }
 
     async finalize() {

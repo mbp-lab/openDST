@@ -167,21 +167,24 @@ describe('JatosPatchSink', () => {
         const first = sealedPart(0);
         const second = sealedPart(1);
 
-        const firstCompletion = sink.enqueuePart(first);
-        const secondCompletion = sink.enqueuePart(second);
+        await sink.enqueuePart(first);
+        await sink.enqueuePart(second);
 
         const third = sealedPart(2);
-        const thirdCompletion = sink.enqueuePart(third);
+        let thirdAdmitted = false;
+        const thirdAdmission = sink.enqueuePart(third).then(() => { thirdAdmitted = true; });
+        await Promise.resolve();
+        expect(thirdAdmitted).toBe(false);
         expect(first.bytes).toBeInstanceOf(Uint8Array);
         expect(second.bytes).toBeInstanceOf(Uint8Array);
 
-        const finalization = sink.finalize();
         expect(uploads).not.toHaveBeenCalled();
 
         encoding.resolve(new Uint8Array([31]));
 
-        await Promise.all([firstCompletion, secondCompletion, thirdCompletion]);
-        await finalization;
+        await thirdAdmission;
+        expect(thirdAdmitted).toBe(true);
+        await sink.finalize();
 
         expect(first.bytes).toBeNull();
         expect(second.bytes).toBeNull();
@@ -216,7 +219,8 @@ describe('JatosPatchSink', () => {
             sleep: jest.fn(() => Promise.resolve())
         });
 
-        const result = await sink.enqueuePart(sealedPart(0));
+        await sink.enqueuePart(sealedPart(0));
+        const [result] = (await sink.finalize()).parts;
 
         expect(uploads).toHaveBeenCalledTimes(4);
         expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {status: UPLOAD_STATUS.SUCCEEDED}, faceEvents: {attempts: 3}});
@@ -236,7 +240,8 @@ describe('JatosPatchSink', () => {
             sleep: jest.fn(() => Promise.resolve())
         });
 
-        const result = await sink.enqueuePart(sealedPart(0));
+        await sink.enqueuePart(sealedPart(0));
+        const [result] = (await sink.finalize()).parts;
 
         expect(uploads).toHaveBeenCalledTimes(3);
         expect(uploadTracker.registerUpload).toHaveBeenCalledTimes(2);
