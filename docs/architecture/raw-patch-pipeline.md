@@ -81,11 +81,13 @@ The sealed-part state machine is:
 sealed -> queued -> AVI muxing -> gzip -> uploading/retrying -> succeeded | failed
 ```
 
-The upstream segmenter owns one active, unsealed part. The sink accepts at
+The upstream segmenter owns one active, unsealed part. The sink admits at
 most two sealed parts, including a part currently being muxed or uploaded.
-Accepted BGR24 bytes transfer to the sink and are released after muxing and gzip compression. A
-third sealed part is an overflow signal; the capture controller stops patch
-capture as incomplete rather than affect the participant recording. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes patch capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
+Admission returns without waiting for upload completion, so capture and transport
+can overlap. Accepted BGR24 bytes transfer to the sink and are released after
+muxing and gzip compression. When two parts are pending, admission of the next
+part waits for capacity, providing bounded backpressure without unbounded memory
+growth. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes patch capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
 
 
 ## Frame timing

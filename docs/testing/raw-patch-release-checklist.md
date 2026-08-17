@@ -45,8 +45,9 @@ UI responsiveness, source dimensions, and the final `rawPatchCapture` status.
   segment/part indexes and deterministic names.
 - Force frame backpressure and confirm callbacks are counted as skipped rather
   than duplicated or cadence-corrected.
-- Hold two sealed uploads in the sink, then confirm the next sealed part stops
-  only patch capture as `incomplete` while MP4/WebM recording continues.
+- Hold two sealed uploads in the sink and confirm both admissions return without
+  waiting for upload completion; verify admission of the next sealed part waits
+  for capacity, then resumes after the oldest part settles.
 - Confirm each AVI part and its JSON sidecar settle together; force a sidecar
   failure and verify terminal raw-patch status is `incomplete`.
 - Repeat the normal recording flow with raw patches `off` and compare the
