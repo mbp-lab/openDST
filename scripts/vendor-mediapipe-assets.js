@@ -2,8 +2,9 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const TASKS_VISION_VERSION = '0.10.3';
+const TASKS_VISION_VERSION = '1.0.1';
 const MODEL_SHA256 = 'b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f';
+const VISION_BUNDLE_FILE = 'vision_bundle.js';
 const WASM_FILES = [
     'vision_wasm_internal.js',
     'vision_wasm_internal.wasm',
@@ -14,7 +15,8 @@ const root = path.resolve(__dirname, '..');
 const tasksVisionRoot = path.join(root, 'node_modules', '@mediapipe', 'tasks-vision');
 const modelSource = path.join(root, 'vendor', 'mediapipe', 'blaze_face_short_range.tflite');
 const licenseSource = path.join(root, 'vendor', 'mediapipe', 'LICENSE');
-const wasmDestination = path.join(root, 'public', 'mediapipe', `tasks-vision-${TASKS_VISION_VERSION}`, 'wasm');
+const tasksVisionDestination = path.join(root, 'public', 'mediapipe', `tasks-vision-${TASKS_VISION_VERSION}`);
+const wasmDestination = path.join(tasksVisionDestination, 'wasm');
 const modelDestination = path.join(root, 'public', 'mediapipe', 'models', 'blaze_face_short_range.tflite');
 const licenseDestination = path.join(root, 'public', 'mediapipe', 'LICENSE');
 
@@ -39,6 +41,7 @@ if (sha256(modelSource) !== MODEL_SHA256) {
 }
 
 WASM_FILES.forEach(file => copy(path.join(tasksVisionRoot, 'wasm', file), path.join(wasmDestination, file)));
+copy(path.join(tasksVisionRoot, VISION_BUNDLE_FILE), path.join(tasksVisionDestination, VISION_BUNDLE_FILE));
 copy(modelSource, modelDestination);
 copy(licenseSource, licenseDestination);
 console.log('Vendored MediaPipe Wasm runtime and BlazeFace model into public/mediapipe');

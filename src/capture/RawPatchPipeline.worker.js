@@ -1,4 +1,4 @@
-import {FaceDetector, FilesetResolver} from '@mediapipe/tasks-vision';
+/* global globalThis */
 import {createFaceEventsFilename, createPatchVideoFilename, FACE_EVENTS_FORMAT_VERSION} from './RawPatchOutput';
 
 export const PATCH_SIZE = 72;
@@ -14,8 +14,20 @@ export const AREA_AVERAGE_V1 = 'area-average-v1';
 export const FACE_ROI_DESCRIPTOR_VERSION = 2;
 
 const PUBLIC_ASSET_ROOT = process.env.PUBLIC_URL || '';
-const MEDIAPIPE_WASM_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-0.10.3/wasm';
+const MEDIAPIPE_WASM_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/wasm';
 const FACE_DETECTOR_MODEL_URL = PUBLIC_ASSET_ROOT + '/mediapipe/models/blaze_face_short_range.tflite';
+const MEDIAPIPE_VISION_BUNDLE_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/vision_bundle.js';
+
+let visionTasks;
+
+function loadVisionTasks() {
+    if (visionTasks) return visionTasks;
+    if (typeof globalThis.importScripts !== 'function') throw new Error('importScripts is unavailable in the capture worker');
+    globalThis.importScripts(MEDIAPIPE_VISION_BUNDLE_URL);
+    if (!globalThis.Vision) throw new Error('MediaPipe vision bundle did not initialize');
+    visionTasks = globalThis.Vision;
+    return visionTasks;
+}
 
 function initializationError(stage, error) {
     const wrapped = new Error('MediaPipe ' + stage + ' failed: ' + (error && error.message ? error.message : String(error)));
@@ -24,6 +36,7 @@ function initializationError(stage, error) {
 }
 
 export async function createMediaPipeFaceDetector({minDetectionConfidence = 0.5, minSuppressionThreshold = 0.3} = {}) {
+    const {FaceDetector, FilesetResolver} = loadVisionTasks();
     let fileset;
     let modelAssetBuffer;
     try {
@@ -281,11 +294,8 @@ export class RawPatchPipeline {
     }
 
     async processFrame({frame, width, height, timestampUs, wallClockMs}) {
-        let bitmap;
         try {
-            if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable in the capture worker');
-            bitmap = await createImageBitmap(frame);
-            const detected = this.detector.detectForVideo(bitmap, timestampUs / 1000);
+            const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
             const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
             if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
             const rgbx = new Uint8Array(width * height * 4);
@@ -294,7 +304,6 @@ export class RawPatchPipeline {
                 writeBgr24: output => processRawPatch({width, height, rgbx, roi: selection.roi, output}),
                 sourceWidth: width, sourceHeight: height, roi: selection.roi, provenance: selection, timestampUs, wallClockMs})};
         } finally {
-            if (bitmap) bitmap.close();
             frame.close();
         }
     }

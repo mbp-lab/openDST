@@ -190,24 +190,16 @@ describe('FaceRoiProvider', () => {
 
 
 describe('RawPatchPipeline worker input', () => {
-    test('converts a VideoFrame to ImageBitmap for MediaPipe and closes both resources', async () => {
-        const originalCreateImageBitmap = global.createImageBitmap;
-        const bitmap = {close: jest.fn()};
-        global.createImageBitmap = jest.fn(() => Promise.resolve(bitmap));
+    test('passes VideoFrame directly to MediaPipe and closes it', async () => {
         const pipeline = new RawPatchPipeline();
         pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(0, 0, 72, 72)]}))};
         pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
         pipeline.segmenter = {appendFrame: jest.fn(() => [])};
         const frame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
 
-        try {
-            await expect(pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1000, wallClockMs: 1000}))
-                .resolves.toMatchObject({accepted: true});
-            expect(pipeline.detector.detectForVideo).toHaveBeenCalledWith(bitmap, 1);
-            expect(bitmap.close).toHaveBeenCalledTimes(1);
-            expect(frame.close).toHaveBeenCalledTimes(1);
-        } finally {
-            global.createImageBitmap = originalCreateImageBitmap;
-        }
+        await expect(pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1000, wallClockMs: 1000}))
+            .resolves.toMatchObject({accepted: true});
+        expect(pipeline.detector.detectForVideo).toHaveBeenCalledWith(frame, 1);
+        expect(frame.close).toHaveBeenCalledTimes(1);
     });
 });
