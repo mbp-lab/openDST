@@ -1,5 +1,5 @@
 import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, RawPatchPipeline} from './RawPatchPipeline.worker';
-import {RawPatchProcessor, BGR24_FRAME_BYTES} from './RawPatchPipeline.worker';
+import {RawPatchProcessor, BGR24_FRAME_BYTES, processRawPatch} from './RawPatchPipeline.worker';
 
 function setPixel(rgbx, width, x, y, color) {
     const offset = (y * width + x) * 4;
@@ -55,6 +55,25 @@ describe('RawPatchProcessor', () => {
 
         expect(output.byteLength).toBe(BGR24_FRAME_BYTES);
         expect(output.slice(0, 3)).toEqual(new Uint8Array([33, 22, 11]));
+    });
+    test('writes into a caller-provided BGR24 output buffer', () => {
+        const rgbx = new Uint8Array(PATCH_SIZE * PATCH_SIZE * 4);
+        for (let offset = 0; offset < rgbx.byteLength; offset += 4) rgbx.set([11, 22, 33, 255], offset);
+        const roi = {
+            coordinateSystem: FACE_COORDINATE_SYSTEM,
+            transformType: DYNAMIC_FACE_SQUARE,
+            samplingVersion: AREA_AVERAGE_V1,
+            descriptorVersion: FACE_ROI_DESCRIPTOR_VERSION,
+            x: 0,
+            y: 0,
+            size: PATCH_SIZE
+        };
+        const output = new Uint8Array(BGR24_FRAME_BYTES).fill(255);
+
+        expect(processRawPatch({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi, output})).toBe(output);
+        expect(output.slice(0, 3)).toEqual(new Uint8Array([33, 22, 11]));
+        expect(() => processRawPatch({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi, output: new Uint8Array(1)}))
+            .toThrow('BGR24 output must be a');
     });
 });
 describe('FaceRoiProvider', () => {

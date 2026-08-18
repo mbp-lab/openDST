@@ -156,14 +156,28 @@ function buildAxisWeights(sourceSize) {
     });
 }
 
-export function processRawPatch({rgbx, width, height, roi}) {
+let cachedAxisWeightSize = null;
+let cachedAxisWeights = null;
+
+function axisWeights(sourceSize) {
+    if (cachedAxisWeightSize !== sourceSize) {
+        cachedAxisWeightSize = sourceSize;
+        cachedAxisWeights = buildAxisWeights(sourceSize);
+    }
+    return cachedAxisWeights;
+}
+
+export function processRawPatch({rgbx, width, height, roi, output}) {
     if (!(rgbx instanceof Uint8Array) || rgbx.byteLength !== width * height * 4) {
         throw new Error('RGBX source must be a tightly packed Uint8Array');
     }
     validateFaceRoiDescriptor(roi);
     if (roi.x + roi.size > width || roi.y + roi.size > height) throw new Error('ROI extends beyond source dimensions');
-    const weights = buildAxisWeights(roi.size);
-    const output = new Uint8Array(BGR24_FRAME_BYTES);
+    if (output === undefined) output = new Uint8Array(BGR24_FRAME_BYTES);
+    if (!(output instanceof Uint8Array) || output.byteLength !== BGR24_FRAME_BYTES) {
+        throw new Error('BGR24 output must be a ' + BGR24_FRAME_BYTES + '-byte Uint8Array');
+    }
+    const weights = axisWeights(roi.size);
     const totalWeight = roi.size * roi.size;
     const halfWeight = Math.floor(totalWeight / 2);
     for (let y = 0; y < PATCH_SIZE; y += 1) {
@@ -208,7 +222,7 @@ export class RawPatchSegmenter {
         this.part = null;
     }
 
-    appendFrame({bgr24, sourceWidth, sourceHeight, roi, provenance, timestampUs, wallClockMs}) {
+    appendFrame({bgr24, writeBgr24, sourceWidth, sourceHeight, roi, provenance, timestampUs, wallClockMs}) {
         validateFaceRoiDescriptor(roi);
         const dimensionsChanged = !this.sourceDimensions || this.sourceDimensions.width !== sourceWidth || this.sourceDimensions.height !== sourceHeight;
         const sealed = dimensionsChanged ? this.seal() : null;
@@ -218,8 +232,15 @@ export class RawPatchSegmenter {
             this.partIndex = 0;
         }
         if (!this.part) this.part = {bytes: new Uint8Array(this.maxFrames * BGR24_FRAME_BYTES), frameCount: 0, events: []};
-        if (!(bgr24 instanceof Uint8Array) || bgr24.byteLength !== BGR24_FRAME_BYTES) throw new Error('BGR24 frame is invalid');
-        this.part.bytes.set(bgr24, this.part.frameCount * BGR24_FRAME_BYTES);
+        const output = this.part.bytes.subarray(this.part.frameCount * BGR24_FRAME_BYTES,
+            (this.part.frameCount + 1) * BGR24_FRAME_BYTES);
+        if (writeBgr24 !== undefined) {
+            if (typeof writeBgr24 !== 'function') throw new Error('BGR24 writer is invalid');
+            writeBgr24(output);
+        } else {
+            if (!(bgr24 instanceof Uint8Array) || bgr24.byteLength !== BGR24_FRAME_BYTES) throw new Error('BGR24 frame is invalid');
+            output.set(bgr24);
+        }
         this.part.events.push(copyEvent(provenance, this.part.frameCount, timestampUs, wallClockMs, roi));
         this.part.frameCount += 1;
         const full = this.part.frameCount === this.maxFrames ? this.seal() : null;
@@ -269,8 +290,8 @@ export class RawPatchPipeline {
             if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
             const rgbx = new Uint8Array(width * height * 4);
             await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
-            const bgr24 = processRawPatch({width, height, rgbx, roi: selection.roi});
-            return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({bgr24,
+            return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({
+                writeBgr24: output => processRawPatch({width, height, rgbx, roi: selection.roi, output}),
                 sourceWidth: width, sourceHeight: height, roi: selection.roi, provenance: selection, timestampUs, wallClockMs})};
         } finally {
             if (bitmap) bitmap.close();

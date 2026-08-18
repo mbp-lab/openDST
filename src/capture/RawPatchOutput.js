@@ -81,28 +81,34 @@ function bitmapHeader() {
     return bytes;
 }
 
-function indexChunk(frames) {
-    const entries = new Uint8Array(frames.length * 16);
-    const view = new DataView(entries.buffer);
-    let offset = 4;
-    frames.forEach((frame, index) => {
-        const entry = index * 16;
-        entries.set(fourCC('00db'), entry); view.setUint32(entry + 4, 0x10, true);
-        view.setUint32(entry + 8, offset, true); view.setUint32(entry + 12, FRAME_BYTES, true);
-        offset += frame.byteLength;
-    });
-    return chunk('idx1', entries);
-}
-
 export function buildUncompressedAvi({bytes, frameCount}) {
     if (!(bytes instanceof Uint8Array) || !Number.isSafeInteger(frameCount) || frameCount < 1 || bytes.byteLength !== frameCount * FRAME_BYTES) {
         throw new Error('AVI encoder requires complete 72x72 BGR24 frames');
     }
-    const frames = Array.from({length: frameCount}, (_, index) =>
-        chunk('00db', bytes.subarray(index * FRAME_BYTES, (index + 1) * FRAME_BYTES)));
     const header = list('hdrl', [chunk('avih', mainHeader(frameCount)),
         list('strl', [chunk('strh', streamHeader(frameCount)), chunk('strf', bitmapHeader())])]);
-    return chunk('RIFF', concat([fourCC('AVI '), header, list('movi', frames), indexChunk(frames)]));
+    const frameChunkLength = 8 + FRAME_BYTES;
+    const moviPayloadLength = 4 + frameCount * frameChunkLength;
+    const indexPayloadLength = frameCount * 16;
+    const avi = new Uint8Array(8 + 4 + header.byteLength + 8 + moviPayloadLength + 8 + indexPayloadLength);
+    const view = new DataView(avi.buffer);
+    let offset = 0;
+    avi.set(fourCC('RIFF'), offset); view.setUint32(offset + 4, avi.byteLength - 8, true); offset += 8;
+    avi.set(fourCC('AVI '), offset); offset += 4;
+    avi.set(header, offset); offset += header.byteLength;
+    avi.set(fourCC('LIST'), offset); view.setUint32(offset + 4, moviPayloadLength, true); offset += 8;
+    avi.set(fourCC('movi'), offset); offset += 4;
+    for (let index = 0; index < frameCount; index += 1) {
+        avi.set(fourCC('00db'), offset); view.setUint32(offset + 4, FRAME_BYTES, true); offset += 8;
+        avi.set(bytes.subarray(index * FRAME_BYTES, (index + 1) * FRAME_BYTES), offset); offset += FRAME_BYTES;
+    }
+    avi.set(fourCC('idx1'), offset); view.setUint32(offset + 4, indexPayloadLength, true); offset += 8;
+    for (let index = 0; index < frameCount; index += 1) {
+        avi.set(fourCC('00db'), offset); view.setUint32(offset + 4, 0x10, true);
+        view.setUint32(offset + 8, 4 + index * frameChunkLength, true); view.setUint32(offset + 12, FRAME_BYTES, true);
+        offset += 16;
+    }
+    return avi;
 }
 
 export async function encodeGzipAvi(part) {

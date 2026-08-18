@@ -42,7 +42,12 @@ describe('uncompressed AVI patch video', () => {
         expect(strf).toBeGreaterThan(-1);
         expect(view.getInt32(strf + 16, true)).toBe(-72);
         expect(textAt(avi, frame + 8, 3)).toBe(String.fromCharCode(1, 2, 3));
-        expect(chunkOffset(avi, 'idx1')).toBeGreaterThan(frame);
+        const index = chunkOffset(avi, 'idx1');
+        expect(index).toBeGreaterThan(frame);
+        expect(view.getUint32(index + 4, true)).toBe(32);
+        expect(textAt(avi, index + 8)).toBe('00db');
+        expect(view.getUint32(index + 16, true)).toBe(4);
+        expect(view.getUint32(index + 32, true)).toBe(4 + BGR24_FRAME_BYTES + 8);
     });
 
     test('wraps the AVI payload in native gzip for upload', async () => {
@@ -96,6 +101,31 @@ describe('uncompressed AVI patch video', () => {
             bgr24: new Uint8Array(BGR24_FRAME_BYTES).fill(8), sourceWidth: 73, sourceHeight: 72, roi: secondRoi, provenance: provenance(), timestampUs: MAX_FRAMES_PER_PART * 1000, wallClockMs: 1700000000000 + MAX_FRAMES_PER_PART
         })).toEqual([]);
         expect(segmenter.finish()[0]).toMatchObject({segmentIndex: 1, partIndex: 0, frameCount: 1});
+    });
+
+    test('writes a frame directly into the active part buffer', () => {
+        const segmenter = new RawPatchSegmenter({
+            studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1, maxFramesPerPart: 1
+        });
+        const roi = {
+            coordinateSystem: FACE_COORDINATE_SYSTEM,
+            transformType: DYNAMIC_FACE_SQUARE,
+            samplingVersion: AREA_AVERAGE_V1,
+            descriptorVersion: FACE_ROI_DESCRIPTOR_VERSION,
+            x: 0,
+            y: 0,
+            size: 72
+        };
+        const writeBgr24 = jest.fn(output => {
+            expect(output.byteLength).toBe(BGR24_FRAME_BYTES);
+            output.fill(9);
+        });
+
+        const [part] = segmenter.appendFrame({writeBgr24, sourceWidth: 72, sourceHeight: 72, roi,
+            provenance: provenance(), timestampUs: 0, wallClockMs: 1700000000000});
+
+        expect(writeBgr24).toHaveBeenCalledTimes(1);
+        expect(part.bytes).toEqual(new Uint8Array(BGR24_FRAME_BYTES).fill(9));
     });
 
     test('increments part indexes without retaining segment history', () => {
