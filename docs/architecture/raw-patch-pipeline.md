@@ -13,7 +13,7 @@ best-effort face-crop uploads.
 
 ## Deterministic v1 processor
 
-`src/capture/FaceCropPipeline.worker.js` contains `FaceRoiProvider`, which converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs, and `FaceCropProcessor`, which accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic BGR24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
+`src/faceCrop/FaceCropPipeline.worker.js` contains `FaceRoiProvider`, which converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs, and `FaceCropProcessor`, which accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic BGR24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
 
 ### Crop arithmetic and byte layout
 
