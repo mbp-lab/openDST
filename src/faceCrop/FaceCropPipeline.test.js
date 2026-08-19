@@ -1,6 +1,8 @@
 import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropPipeline} from './FaceCropPipeline.worker';
 import {FaceCropProcessor, BGR24_FRAME_BYTES, processFaceCropFrame} from './FaceCropPipeline.worker';
 
+// Worker tests cover deterministic ROI selection and pixel conversion without
+// loading MediaPipe, so algorithm changes remain cheap to validate in Jest.
 function setPixel(rgbx, width, x, y, color) {
     const offset = (y * width + x) * 4;
     rgbx[offset] = color[0];
@@ -14,6 +16,8 @@ function detection(originX, originY, width, height, score = 0.9) {
 
 
 describe('FaceCropProcessor', () => {
+    // Pixel tests define the RGBX-to-BGR24 byte order and area-resampling rule;
+    // these are data-contract tests, not implementation-detail tests.
     test('rejects the removed camera ROI descriptor', () => {
         expect(() => validateFaceRoiDescriptor({coordinateSystem: 'camera'})).toThrow('Unsupported ROI coordinate system');
     });
@@ -77,6 +81,8 @@ describe('FaceCropProcessor', () => {
     });
 });
 describe('FaceRoiProvider', () => {
+    // ROI tests protect deterministic selection, smoothing, bounds, and the
+    // policy of holding a valid crop through temporary detector misses.
     test('creates a padded, bounded MediaPipe face crop in source pixels', () => {
         const provider = new FaceRoiProvider({smoothingTauMs: 0});
         const roi = provider.getRoi({
@@ -190,6 +196,8 @@ describe('FaceRoiProvider', () => {
 
 
 describe('FaceCropPipeline worker input', () => {
+    // The worker boundary must pass the original VideoFrame to MediaPipe and
+    // close it exactly once after processing, including asynchronous failures.
     test('passes VideoFrame directly to MediaPipe and closes it', async () => {
         const pipeline = new FaceCropPipeline();
         pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(0, 0, 72, 72)]}))};

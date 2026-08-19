@@ -1,6 +1,8 @@
 import {UPLOAD_STATUS} from '../uploadState';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink} from './FaceCropOutput';
 
+// Face-crop capture is an optional companion to MediaRecorder. It must fail
+// closed so unsupported browsers never affect the participant-facing recording.
 export const FACE_CROP_CAPTURE_MODES = ['off', 'calibration', 'all'];
 export const FACE_CROP_STATUS = {
     DISABLED: 'disabled',
@@ -55,6 +57,8 @@ export function resolveFaceCropConfiguration(environment = process.env) {
     };
 }
 
+// Calibration mode is deliberately narrow: it supplies one reference capture
+// without adding face-crop work to every speech-task recording.
 export function shouldCaptureFaceCrop(configuration, studyPage) {
     return configuration.mode === 'all' || (configuration.mode === 'calibration' && studyPage === 'introduction');
 }
@@ -121,6 +125,8 @@ class PipelineWorker {
     }
 
     request(type, payload = {}, transfer = []) {
+        // The worker protocol allows one in-flight request so frame buffers and
+        // responses stay ordered and the browser cannot build an unbounded queue.
         if (this.closed) return Promise.reject(new Error('Face-crop worker is closed'));
         if (this.pending) return Promise.reject(new Error('Face-crop worker already has a request in flight'));
         return new Promise((resolve, reject) => {
@@ -230,6 +236,8 @@ export class FaceCropCaptureController {
     }
 
     async stopInternal() {
+        // Cancel the browser callback first, then drain the capture loop, then
+        // flush the worker and sink. This prevents frames arriving during teardown.
         if (this.state !== 'terminal') this.state = 'stopping';
         this.cancelFrameWait();
         if (this.startPromise) await this.startPromise;
@@ -319,6 +327,8 @@ export class FaceCropCaptureController {
     }
 
     async finalize() {
+        // AVI and face-event sidecars are finalized together; either upload
+        // failure makes the logical face-crop capture incomplete.
         let result = {parts: []};
         try {
             if (this.worker) await this.enqueueParts((await this.worker.finish()).parts);
@@ -369,6 +379,8 @@ export class FaceCropCaptureController {
     }
 
     setStatus(status, reason) {
+        // Status metadata is the durable diagnostic record consumed by Main;
+        // terminal failures are reported but do not block the study flow.
         this.status = status;
         const metadata = {...this.metadata(status), reason: reason || null};
         if (status === FACE_CROP_STATUS.UNSUPPORTED || status === FACE_CROP_STATUS.INCOMPLETE) {

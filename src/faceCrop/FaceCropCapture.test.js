@@ -8,6 +8,9 @@ import {
     FaceCropCaptureController,
     resolveFaceCropConfiguration
 } from './FaceCropCapture';
+
+// These tests protect the browser-side lifecycle boundary: unsupported capture
+// must remain optional, while stop must drain in-flight work before finalization.
 function deferred() {
     let resolve;
     return {
@@ -18,6 +21,8 @@ function deferred() {
     };
 }
 
+// Configuration is an external contract: values are build-time strings, so
+// bounds and defaults must be enforced before they reach the worker.
 describe('resolveFaceCropConfiguration', () => {
     test('uses the default face ROI time constant in milliseconds', () => {
         expect(resolveFaceCropConfiguration({}).faceRoiSmoothingTauMs).toBe(DEFAULT_FACE_ROI_SMOOTHING_TAU_MS);
@@ -64,6 +69,7 @@ describe('resolveFaceCropConfiguration', () => {
             .toBe(DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD);
     });
 
+    // Stopping must cancel scheduling but still await work already handed off.
     test('cancels the pending frame callback before finalizing a stopped capture', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         const probeFrame = {

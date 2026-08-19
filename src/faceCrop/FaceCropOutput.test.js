@@ -5,6 +5,8 @@ import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_D
 import {UPLOAD_STATUS} from '../uploadState';
 import {MAX_FRAMES_PER_PART, FaceCropSegmenter} from './FaceCropPipeline.worker';
 
+// Output tests pin the byte-level AVI contract and the upload invariant that
+// every AVI part has a matching face-event sidecar with its own terminal state.
 function textAt(bytes, offset, length = 4) {
     return String.fromCharCode(...bytes.subarray(offset, offset + length));
 }
@@ -23,6 +25,8 @@ function provenance() {
 }
 
 describe('uncompressed AVI patch video', () => {
+    // AVI remains deliberately uncompressed and top-down so downstream tools
+    // receive a simple, stable BGR24 container before gzip transport.
     test('muxes top-down BGR frames into an indexed AVI container', () => {
         const frames = new Uint8Array(BGR24_FRAME_BYTES * 2);
         frames.set([1, 2, 3], 0);
@@ -184,6 +188,8 @@ function tracker() {
 }
 
 describe('FaceCropSink', () => {
+    // The sink admits only bounded work, uploads AVI before its sidecar, and
+    // settles every artifact independently while returning one logical result.
     test('owns at most one active and one queued part, then finalizes after parts settle', async () => {
         const encoding = deferred();
         const uploads = jest.fn(() => Promise.resolve());

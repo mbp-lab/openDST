@@ -1,5 +1,7 @@
 import {UPLOAD_STATUS} from '../uploadState';
 
+// This module is the transport boundary: the worker emits sealed BGR24 parts,
+// while this side owns AVI framing, gzip, retries, and JATOS upload tracking.
 export const PATCH_VIDEO_FORMAT_VERSION = 'patch-video-avi-gzip-bgr24-v1';
 export const PATCH_VIDEO_FRAME_RATE = 30;
 export const FACE_EVENTS_FORMAT_VERSION = 'face-events-json-v1';
@@ -14,6 +16,8 @@ function token(value, name) {
 }
 
 export function createPatchVideoFilename({studyResultId, studyPage, videoCounter, segmentIndex, partIndex}) {
+    // Stable names let AVI parts and their JSON sidecars be matched after upload
+    // without requiring a separate manifest or archive.
     return token(studyResultId, 'Study result ID') + '_' + token(studyPage, 'Study page') + '_' +
         token(videoCounter, 'Video counter') + '_patch_s' + String(segmentIndex).padStart(3, '0') +
         '_p' + String(partIndex).padStart(3, '0') + '.avi.gz';
@@ -112,6 +116,8 @@ export function buildUncompressedAvi({bytes, frameCount}) {
 }
 
 export async function encodeGzipAvi(part) {
+    // Native CompressionStream keeps encoding off the worker protocol and avoids
+    // adding a WASM/FFmpeg dependency to the participant browser.
     if (typeof window.CompressionStream !== 'function' || typeof window.Blob !== 'function' || typeof window.Response !== 'function') {
         throw new Error('Native Blob, Response, and CompressionStream APIs are required for gzip AVI encoding');
     }
@@ -148,6 +154,8 @@ export class FaceCropSink {
     }
 
     async enqueuePart(part) {
+        // At most maxPendingParts are retained. Waiting here applies backpressure
+        // to frame processing instead of allowing upload latency to grow memory.
         if (!this.accepting) throw new Error('Cannot enqueue a part after sink finalization begins');
         validatePart(part);
         while (this.pending.length >= this.maxPendingParts) await this.pending[0];
@@ -164,6 +172,8 @@ export class FaceCropSink {
     }
 
     async uploadPart(part) {
+        // AVI and face-event uploads are one logical result: the sidecar is not
+        // attempted when the corresponding video artifact cannot be uploaded.
         const aviId = 'patch-part-' + part.filename;
         const eventsId = 'patch-events-' + part.faceEventsFilename;
         this.uploadTracker.registerUpload(aviId); this.uploadTracker.registerUpload(eventsId);

@@ -1,6 +1,8 @@
 /* global globalThis */
 import {createFaceEventsFilename, createPatchVideoFilename, FACE_EVENTS_FORMAT_VERSION} from './FaceCropOutput';
 
+// The worker contains all MediaPipe and pixel processing so the main thread only
+// schedules VideoFrames and hands sealed upload parts to FaceCropSink.
 export const PATCH_SIZE = 72;
 export const BGR24_FRAME_BYTES = PATCH_SIZE * PATCH_SIZE * 3;
 export const MAX_FRAMES_PER_PART = 539;
@@ -21,6 +23,8 @@ const MEDIAPIPE_VISION_BUNDLE_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision
 let visionTasks;
 
 function loadVisionTasks() {
+    // The vendored bundle is loaded synchronously inside the worker; keeping it
+    // here makes the same module usable in both the worker and Jest environments.
     if (visionTasks) return visionTasks;
     if (typeof globalThis.importScripts !== 'function') throw new Error('importScripts is unavailable in the capture worker');
     globalThis.importScripts(MEDIAPIPE_VISION_BUNDLE_URL);
@@ -113,6 +117,8 @@ export class FaceRoiProvider {
     }
 
     getSelection({width, height, detections, timestampMs}) {
+        // Selection is deterministic: largest eligible area wins, then score and
+        // positional tie-breakers. A valid previous ROI is held through misses.
         requireInteger(width, 'Source width', PATCH_SIZE);
         requireInteger(height, 'Source height', PATCH_SIZE);
         const eligible = eligibleDetections(detections, this.configuration.minDetectionConfidence);
@@ -157,6 +163,8 @@ export class FaceRoiProvider {
 }
 
 function buildAxisWeights(sourceSize) {
+    // Precompute exact pixel-overlap weights so arbitrary source crops are
+    // area-resampled to 72x72 without browser scaling differences.
     return Array.from({length: PATCH_SIZE}, (_, outputIndex) => {
         const start = outputIndex * sourceSize;
         const end = start + sourceSize;
@@ -236,6 +244,8 @@ export class FaceCropSegmenter {
     }
 
     appendFrame({bgr24, writeBgr24, sourceWidth, sourceHeight, roi, provenance, timestampUs, wallClockMs}) {
+        // A source resize starts a new segment because one part must have one
+        // source geometry. Parts are sealed by frame count or geometry change.
         validateFaceRoiDescriptor(roi);
         const dimensionsChanged = !this.sourceDimensions || this.sourceDimensions.width !== sourceWidth || this.sourceDimensions.height !== sourceHeight;
         const sealed = dimensionsChanged ? this.seal() : null;
@@ -294,6 +304,8 @@ export class FaceCropPipeline {
     }
 
     async processFrame({frame, width, height, timestampUs, wallClockMs}) {
+        // MediaPipe sees the original VideoFrame; RGBX extraction happens only
+        // after a face is accepted, avoiding a full-frame copy for skipped frames.
         try {
             const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
             const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
@@ -314,6 +326,8 @@ export class FaceCropPipeline {
 
 /* eslint-disable no-restricted-globals */
 if (typeof self !== 'undefined') {
+    // Keep the protocol small and explicit: initialize, process frames in order,
+    // finish pending parts, then close the detector during teardown.
     const pipeline = new FaceCropPipeline();
     const handlers = {
         initialize: payload => pipeline.initialize(payload).then(() => ({})),
