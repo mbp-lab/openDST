@@ -1,5 +1,5 @@
-import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, RawPatchPipeline} from './RawPatchPipeline.worker';
-import {RawPatchProcessor, BGR24_FRAME_BYTES, processRawPatch} from './RawPatchPipeline.worker';
+import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropPipeline} from './FaceCropPipeline.worker';
+import {FaceCropProcessor, BGR24_FRAME_BYTES, processFaceCropFrame} from './FaceCropPipeline.worker';
 
 function setPixel(rgbx, width, x, y, color) {
     const offset = (y * width + x) * 4;
@@ -13,7 +13,7 @@ function detection(originX, originY, width, height, score = 0.9) {
 }
 
 
-describe('RawPatchProcessor', () => {
+describe('FaceCropProcessor', () => {
     test('rejects the removed camera ROI descriptor', () => {
         expect(() => validateFaceRoiDescriptor({coordinateSystem: 'camera'})).toThrow('Unsupported ROI coordinate system');
     });
@@ -31,7 +31,7 @@ describe('RawPatchProcessor', () => {
             size: 73
         };
 
-        const output = new RawPatchProcessor().process({rgbx, width, height: width, roi});
+        const output = new FaceCropProcessor().process({rgbx, width, height: width, roi});
 
         expect(output.slice((71 * PATCH_SIZE + 71) * 3, (71 * PATCH_SIZE + 72) * 3)).toEqual(new Uint8Array([248, 248, 248]));
         expect(output.slice((70 * PATCH_SIZE + 71) * 3, (70 * PATCH_SIZE + 72) * 3)).toEqual(new Uint8Array([0, 0, 0]));
@@ -51,7 +51,7 @@ describe('RawPatchProcessor', () => {
             size: PATCH_SIZE
         };
 
-        const output = new RawPatchProcessor().process({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi});
+        const output = new FaceCropProcessor().process({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi});
 
         expect(output.byteLength).toBe(BGR24_FRAME_BYTES);
         expect(output.slice(0, 3)).toEqual(new Uint8Array([33, 22, 11]));
@@ -70,9 +70,9 @@ describe('RawPatchProcessor', () => {
         };
         const output = new Uint8Array(BGR24_FRAME_BYTES).fill(255);
 
-        expect(processRawPatch({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi, output})).toBe(output);
+        expect(processFaceCropFrame({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi, output})).toBe(output);
         expect(output.slice(0, 3)).toEqual(new Uint8Array([33, 22, 11]));
-        expect(() => processRawPatch({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi, output: new Uint8Array(1)}))
+        expect(() => processFaceCropFrame({rgbx, width: PATCH_SIZE, height: PATCH_SIZE, roi, output: new Uint8Array(1)}))
             .toThrow('BGR24 output must be a');
     });
 });
@@ -189,9 +189,9 @@ describe('FaceRoiProvider', () => {
 });
 
 
-describe('RawPatchPipeline worker input', () => {
+describe('FaceCropPipeline worker input', () => {
     test('passes VideoFrame directly to MediaPipe and closes it', async () => {
-        const pipeline = new RawPatchPipeline();
+        const pipeline = new FaceCropPipeline();
         pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(0, 0, 72, 72)]}))};
         pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
         pipeline.segmenter = {appendFrame: jest.fn(() => [])};

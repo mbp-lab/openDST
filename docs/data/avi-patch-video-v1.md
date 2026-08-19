@@ -1,6 +1,6 @@
-# AVI patch-video format v1 with face-event sidecars
+# AVI face-crop video format v1 with face-event sidecars
 
-`patch-video-avi-gzip-bgr24-v1` stores each raw-patch part as a lossless AVI
+`patch-video-avi-gzip-bgr24-v1` stores each face-crop part as a lossless AVI
 file wrapped in gzip. Each AVI upload has one required companion plain JSON
 face-event sidecar. The AVI pixel encoding remains v1; the sidecar supplies the
 face-selection provenance that an AVI stream cannot represent.

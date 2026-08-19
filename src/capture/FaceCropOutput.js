@@ -131,7 +131,7 @@ function validatePart(part) {
     }
 }
 
-export class RawPatchSink {
+export class FaceCropSink {
     constructor({uploadResultFile, uploadTracker = defaultTracker(), encode = encodeGzipAvi, sleep = delay,
         maxPendingParts = MAX_PENDING_PATCH_PARTS, maxAttempts = MAX_UPLOAD_ATTEMPTS, retryDelayMs = 100}) {
         if (typeof uploadResultFile !== 'function' || !uploadTracker || typeof uploadTracker.registerUpload !== 'function' ||
@@ -172,7 +172,7 @@ export class RawPatchSink {
             const encoded = await this.encode(part);
             avi = await this.uploadWithRetry(encoded, part.filename, aviId);
         } catch (error) {
-            console.error('[raw-patch] AVI encoding failed', error);
+            console.error('[face-crop] AVI encoding failed', error);
             this.uploadTracker.settleUpload(aviId, UPLOAD_STATUS.FAILED);
             avi = {uploadId: aviId, filename: part.filename, status: UPLOAD_STATUS.FAILED, attempts: 0, error};
         } finally {
@@ -201,9 +201,7 @@ export class RawPatchSink {
             }
         }
         this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.FAILED);
-        console.error('[raw-patch] Upload failed after ' + this.maxAttempts + ' attempts', error);
+        console.error('[face-crop] Upload failed after ' + this.maxAttempts + ' attempts', error);
         return {uploadId, filename, status: UPLOAD_STATUS.FAILED, attempts: this.maxAttempts, error};
     }
 }
-
-export const JatosPatchSink = RawPatchSink;

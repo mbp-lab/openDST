@@ -2,7 +2,7 @@
 
 ## Current readiness
 
-The raw-patch pipeline is a production candidate for controlled pilots, but it
+The face-crop capture pipeline is a production candidate for controlled pilots, but it
 is not yet approved for broad unattended deployment. Keep
 `REACT_APP_FACE_CROP_RECORDING_MODE` set to `off` by default until the release
 gates in `../testing/raw-patch-release-checklist.md` pass for the target

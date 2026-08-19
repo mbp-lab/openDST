@@ -1,4 +1,4 @@
-# Raw patch pipeline architecture
+# Face-crop capture architecture
 
 ## Upload terminal-state invariant
 
@@ -9,11 +9,11 @@ redirection are gated only by the absence of `pending` uploads. A failed upload
 therefore does not block the study, and it is never represented as successful.
 
 This invariant is shared by the existing video upload flow and future
-best-effort raw-patch uploads.
+best-effort face-crop uploads.
 
 ## Deterministic v1 processor
 
-`src/capture/FaceRoiProvider.js` converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs. `src/capture/RawPatchProcessor.js` accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic BGR24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
+`src/capture/FaceCropPipeline.worker.js` contains `FaceRoiProvider`, which converts MediaPipe face bounding boxes into validated, axis-aligned square ROIs, and `FaceCropProcessor`, which accepts a tightly packed, visible, unmirrored 8-bit sRGB RGBX frame plus one of those ROIs and returns one deterministic BGR24 patch. It does not select an ROI, use browser APIs, compress output, or upload data.
 
 ### Crop arithmetic and byte layout
 
@@ -45,13 +45,13 @@ The build runs `scripts/vendor-mediapipe-assets.js` before development and produ
 ## Browser capture lifecycle
 
 The disabled-by-default browser integration lets `WebcamCapture` start
-and stops a raw-patch session beside the existing `MediaRecorder` lifecycle;
+and stop a face-crop capture session beside the existing `MediaRecorder` lifecycle;
 it does not alter the participant-facing UI or recorder configuration.
 
 Module map:
-`RawPatchCaptureSession` resolves build-time configuration and adapts JATOS
-plus upload tracking; `RawPatchCaptureController` probes browser APIs and
-owns frame callbacks; the existing processor, segmenter, and JATOS sink retain
+`startFaceCropCaptureSession` resolves build-time configuration and adapts JATOS
+plus upload tracking; `FaceCropCaptureController` probes browser APIs and
+owns frame callbacks; the existing processor, segmenter, and sink retain
 their independent responsibilities.
 
 Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
@@ -69,7 +69,7 @@ active part, closes the worker, and finalizes the sink.
 
 ## Bounded JATOS sink
 
-`JatosPatchSink` is the isolated best-effort transport boundary. It accepts
+`FaceCropSink` is the isolated best-effort transport boundary. It accepts
 sealed BGR24 parts, muxes each as an uncompressed AVI and wraps it in native
 gzip before calling the injected JATOS `uploadResultFile` adapter. It has no
 FFmpeg/Wasm or `SharedArrayBuffer` requirement, but does require native
@@ -87,7 +87,7 @@ Admission returns without waiting for upload completion, so capture and transpor
 can overlap. Accepted BGR24 bytes transfer to the sink and are released after
 muxing and gzip compression. When two parts are pending, admission of the next
 part waits for capacity, providing bounded backpressure without unbounded memory
-growth. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes patch capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
+growth. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes face-crop capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
 
 
 ## Frame timing

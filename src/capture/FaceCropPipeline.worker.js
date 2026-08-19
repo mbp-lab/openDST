@@ -1,5 +1,5 @@
 /* global globalThis */
-import {createFaceEventsFilename, createPatchVideoFilename, FACE_EVENTS_FORMAT_VERSION} from './RawPatchOutput';
+import {createFaceEventsFilename, createPatchVideoFilename, FACE_EVENTS_FORMAT_VERSION} from './FaceCropOutput';
 
 export const PATCH_SIZE = 72;
 export const BGR24_FRAME_BYTES = PATCH_SIZE * PATCH_SIZE * 3;
@@ -180,7 +180,7 @@ function axisWeights(sourceSize) {
     return cachedAxisWeights;
 }
 
-export function processRawPatch({rgbx, width, height, roi, output}) {
+export function processFaceCropFrame({rgbx, width, height, roi, output}) {
     if (!(rgbx instanceof Uint8Array) || rgbx.byteLength !== width * height * 4) {
         throw new Error('RGBX source must be a tightly packed Uint8Array');
     }
@@ -210,8 +210,8 @@ export function processRawPatch({rgbx, width, height, roi, output}) {
     return output;
 }
 
-export class RawPatchProcessor {
-    process(input) { return processRawPatch(input); }
+export class FaceCropProcessor {
+    process(input) { return processFaceCropFrame(input); }
 }
 
 function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi) {
@@ -221,7 +221,7 @@ function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi) {
         tieBreakOccurred: Boolean(provenance.tieBreakOccurred), roi: {...roi}};
 }
 
-export class RawPatchSegmenter {
+export class FaceCropSegmenter {
     constructor({studyResultId, studyPage, videoCounter, maxFramesPerPart = MAX_FRAMES_PER_PART, selectionConfiguration = {}}) {
         if (!Number.isSafeInteger(maxFramesPerPart) || maxFramesPerPart < 1 || maxFramesPerPart > MAX_FRAMES_PER_PART) {
             throw new Error('Max frames per part must be between 1 and ' + MAX_FRAMES_PER_PART);
@@ -281,13 +281,13 @@ export class RawPatchSegmenter {
     }
 }
 
-export class RawPatchPipeline {
+export class FaceCropPipeline {
     async initialize({configuration, identity}) {
         this.detector = await createMediaPipeFaceDetector({minDetectionConfidence: configuration.faceDetectionMinConfidence,
             minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold});
         this.roi = new FaceRoiProvider({smoothingTauMs: configuration.faceRoiSmoothingTauMs, scale: configuration.faceRoiScale,
             verticalShiftRatio: configuration.faceRoiVerticalShiftRatio, minDetectionConfidence: configuration.faceDetectionMinConfidence});
-        this.segmenter = new RawPatchSegmenter({...identity, selectionConfiguration: {
+        this.segmenter = new FaceCropSegmenter({...identity, selectionConfiguration: {
             minDetectionConfidence: configuration.faceDetectionMinConfidence,
             minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold,
             policy: 'largest-eligible-bounding-box-v1'}});
@@ -301,7 +301,7 @@ export class RawPatchPipeline {
             const rgbx = new Uint8Array(width * height * 4);
             await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
             return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({
-                writeBgr24: output => processRawPatch({width, height, rgbx, roi: selection.roi, output}),
+                writeBgr24: output => processFaceCropFrame({width, height, rgbx, roi: selection.roi, output}),
                 sourceWidth: width, sourceHeight: height, roi: selection.roi, provenance: selection, timestampUs, wallClockMs})};
         } finally {
             frame.close();
@@ -314,7 +314,7 @@ export class RawPatchPipeline {
 
 /* eslint-disable no-restricted-globals */
 if (typeof self !== 'undefined') {
-    const pipeline = new RawPatchPipeline();
+    const pipeline = new FaceCropPipeline();
     const handlers = {
         initialize: payload => pipeline.initialize(payload).then(() => ({})),
         processFrame: payload => pipeline.processFrame(payload),
@@ -324,13 +324,13 @@ if (typeof self !== 'undefined') {
     self.onmessage = async event => {
         const {type, payload = {}} = event.data || {};
         try {
-            if (!handlers[type]) throw new Error('Unknown raw patch worker request: ' + type);
+            if (!handlers[type]) throw new Error('Unknown face-crop worker request: ' + type);
             const result = await handlers[type](payload);
             self.postMessage({result}, (result.parts || []).map(part => part.bytes.buffer));
         } catch (error) {
-            console.error('[raw-patch] Worker request failed', {type, error});
+            console.error('[face-crop] Worker request failed', {type, error});
             self.postMessage({error: {name: error && error.name ? error.name : 'Error',
-                message: error && error.message ? error.message : 'Raw patch worker failed',
+                message: error && error.message ? error.message : 'Face-crop worker failed',
                 stack: error && error.stack ? error.stack : null}});
         }
     };

@@ -1,6 +1,6 @@
 import React from 'react';
 import Webcam from "react-webcam";
-import {startRawPatchCaptureSession, stopRawPatchCaptureSession} from '../capture/RawPatchCapture';
+import {startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../capture/FaceCropCapture';
 
 // Put variables in global scope to make them available to the browser console.
 const constraints = window.constraints = {
@@ -19,7 +19,7 @@ class WebcamCapture extends React.Component {
         this.recordedChunks = [];
         this.mediaStreamRecorder = null;
         this.webcamRef = React.createRef();
-        this.rawPatchController = null;
+        this.faceCropController = null;
 
         this.startRecording = this.startRecording.bind(this);
         this.stopRecording = this.stopRecording.bind(this);
@@ -111,7 +111,7 @@ class WebcamCapture extends React.Component {
     async startRecording() {
         try {
             await this.createMediaRecorder(this.webcamRef.current.stream);
-            this.rawPatchController = startRawPatchCaptureSession({webcam: this.webcamRef.current, props: this.props});
+            this.faceCropController = startFaceCropCaptureSession({webcam: this.webcamRef.current, props: this.props});
             await this.mediaStreamRecorder.start();
             if (this.props.studyPage === 'introduction') {
                 this.setState({
@@ -150,9 +150,9 @@ class WebcamCapture extends React.Component {
 
     async stopRecording() {
         // Stop both pipelines together: recorder stop triggers MP4/WebM upload,
-        // and raw-patch stop flushes worker/sink state before teardown completes.
-        const patchStop = stopRawPatchCaptureSession(this.rawPatchController);
-        this.rawPatchController = null;
+        // and face-crop stop flushes worker/sink state before teardown completes.
+        const patchStop = stopFaceCropCaptureSession(this.faceCropController);
+        this.faceCropController = null;
         if (this.mediaStreamRecorder) {
             await this.mediaStreamRecorder.stop();
         }

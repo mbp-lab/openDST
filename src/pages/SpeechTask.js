@@ -264,7 +264,7 @@ export default class SpeechTask extends React.Component {
                     markVideoAsUploading={this.props.markVideoAsUploading}
                     markVideoAsUploaded={this.props.markVideoAsUploaded}
                     markVideoAsFailed={this.props.markVideoAsFailed}
-                    onRawPatchStatus={this.props.onRawPatchStatus}
+                    onFaceCropStatus={this.props.onFaceCropStatus}
                     handleCancelDialog={this.props.handleCancelDialog}
                     videoCounter={this.state.videoCounter}
                     speechTaskStates={this.state.speechTaskStates}
@@ -296,7 +296,7 @@ export default class SpeechTask extends React.Component {
                                                 studyPage='speechTask'
                                                 markVideoAsUploading={this.props.markVideoAsUploading}
                                                 markVideoAsFailed={this.props.markVideoAsFailed}
-                                                onRawPatchStatus={this.props.onRawPatchStatus}
+                                                onFaceCropStatus={this.props.onFaceCropStatus}
                                                 markVideoAsUploaded={this.props.markVideoAsUploaded}
                                                 studyResultId={this.props.studyResultId}
                                                 videoCounter={this.state.videoCounter}

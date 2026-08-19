@@ -1,6 +1,6 @@
-# Raw patch release checklist
+# Face-crop release checklist
 
-This checklist is the reproducible release gate for raw-patch capture. Do not
+This checklist is the reproducible release gate for face-crop capture. Do not
 change `REACT_APP_FACE_CROP_RECORDING_MODE` from `off` until every applicable item is
 recorded as passed for the target deployment.
 
@@ -10,17 +10,17 @@ recorded as passed for the target deployment.
 | --- | --- | --- | --- | --- |
 | 2026-08-14 | Workspace CI | `CI=true npm test -- --watchAll=false` | Passed | 4 suites, 10 tests. |
 | 2026-08-14 | Workspace CI | `npm run build` | Passed | Production bundle compiled. |
-| Not run | Deployed JATOS/Nginx | End-to-end raw-patch upload | Pending | No deployment endpoint was available in this workspace. |
+| Not run | Deployed JATOS/Nginx | End-to-end face-crop upload | Pending | No deployment endpoint was available in this workspace. |
 | Not run | Physical browser/device | WebCodecs/gzip capture | Pending | Requires capable desktop and iOS/Android devices. |
 
 ## Browser and device matrix
 
 For each target browser/device, record browser version, OS version, camera
-resolution, the selected raw-patch mode, and the final participant metadata
+resolution, the selected face-crop mode, and the final participant metadata
 status. Test at least one capable desktop browser plus representative capable
 iOS and Android phones.
 
-- Confirm `off` creates no raw-patch session or files.
+- Confirm `off` creates no face-crop session or files.
 - Confirm `calibration` captures only the introduction feedback recording, for its full duration until stopped
   recording; speech-task calibration must remain excluded.
 - Confirm `all` covers every recorder session without changing the existing
@@ -33,7 +33,7 @@ iOS and Android phones.
   without affecting `MediaRecorder`.
 
 Record accepted frames, skipped callbacks, processing latency, peak memory,
-UI responsiveness, source dimensions, and the final `rawPatchCapture` status.
+UI responsiveness, source dimensions, and the final face-crop capture status.
 
 ## Byte, queue, and recorder checks
 
@@ -49,8 +49,8 @@ UI responsiveness, source dimensions, and the final `rawPatchCapture` status.
   waiting for upload completion; verify admission of the next sealed part waits
   for capacity, then resumes after the oldest part settles.
 - Confirm each AVI part and its JSON sidecar settle together; force a sidecar
-  failure and verify terminal raw-patch status is `incomplete`.
-- Repeat the normal recording flow with raw patches `off` and compare the
+  failure and verify terminal face-crop status is `incomplete`.
+- Repeat the normal recording flow with face-crop capture `off` and compare the
   resulting MP4/WebM recording behavior to the pre-feature baseline.
 
 ## Deployed JATOS and Nginx checks
@@ -64,7 +64,7 @@ UI responsiveness, source dimensions, and the final `rawPatchCapture` status.
   record the deployed JATOS version's duplicate-file behavior.
 - Measure the largest gzip part for each target browser and set
   `jatos.resultUploads.maxFileSize` and Nginx `client_max_body_size` above it.
-- Set `jatos.resultUploads.limitPerStudyRun` above the expected raw-patch part
+- Set `jatos.resultUploads.limitPerStudyRun` above the expected face-crop part
   count, AVI sidecars, and companion MP4/WebM files; verify enforcement at and
   beyond the configured limit.
 - Record actual JATOS/Nginx settings, server version, failure symptoms, and

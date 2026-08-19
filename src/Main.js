@@ -117,7 +117,7 @@ class Main extends React.Component {
         this.markVideoAsUploading = this.markVideoAsUploading.bind(this)
         this.markVideoAsUploaded = this.markVideoAsUploaded.bind(this)
         this.markVideoAsFailed = this.markVideoAsFailed.bind(this)
-        this.updateRawPatchCaptureStatus = this.updateRawPatchCaptureStatus.bind(this)
+        this.updateFaceCropCaptureStatus = this.updateFaceCropCaptureStatus.bind(this)
         this.speechTestAnalysisCallback = this.speechTestAnalysisCallback.bind(this)
         this.endMathTask = this.endMathTask.bind(this)
         this.setStudyTimes = this.setStudyTimes.bind(this)
@@ -230,7 +230,7 @@ class Main extends React.Component {
                 language: null,
                 age: null,
                 gender: null,
-                rawPatchCapture: {status: 'disabled'},
+                faceCropCapture: {status: 'disabled'},
                 videosSubmitted: null,
             },
             checkBoxForPriorParticipation: {participated:null},
@@ -303,8 +303,8 @@ class Main extends React.Component {
         });
     }
 
-    updateRawPatchCaptureStatus(metadata) {
-        this.data.studyMetaTracker.rawPatchCapture = metadata;
+    updateFaceCropCaptureStatus(metadata) {
+        this.data.studyMetaTracker.faceCropCapture = metadata;
     }
 
     /**
@@ -328,7 +328,7 @@ class Main extends React.Component {
                     browser: `${ua.browser.name} ${ua.browser.version}`,
                     language: language,
                     age: null,
-                    rawPatchCapture: {status: 'disabled'},
+                    faceCropCapture: {status: 'disabled'},
                     gender: null,
                     videosSubmitted: null,
                 };
@@ -572,7 +572,7 @@ class Main extends React.Component {
                         handBackStressData={this.handBackStressData}
                         referenceTime={this.data.studyTimes.reference}
                         continueFromPanas={this.continueFromPanas}
-                        onRawPatchStatus={this.updateRawPatchCaptureStatus}
+                        onFaceCropStatus={this.updateFaceCropCaptureStatus}
                         markVideoAsUploading={this.markVideoAsUploading}
                         markVideoAsUploaded={this.markVideoAsUploaded}
                         markVideoAsFailed={this.markVideoAsFailed}
@@ -607,7 +607,7 @@ class Main extends React.Component {
                     endMathTask={this.endMathTask}
                     handleCancelDialog={this.handleCancelDialog}
                     cancelDialogIsOpen={this.state.cancelDialogIsOpen}
-                    onRawPatchStatus={this.updateRawPatchCaptureStatus}
+                    onFaceCropStatus={this.updateFaceCropCaptureStatus}
                     markVideoAsUploading={this.markVideoAsUploading}
                     markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploaded={this.markVideoAsUploaded}
@@ -647,7 +647,7 @@ class Main extends React.Component {
                     startSpeechTask={this.startSpeechTask}
                     endSpeechTask={this.endSpeechTask}
                     updateSpeechTaskFeedback={this.updateSpeechTaskFeedback}
-                    onRawPatchStatus={this.updateRawPatchCaptureStatus}
+                    onFaceCropStatus={this.updateFaceCropCaptureStatus}
                     studyResultId={this.data.studyMetaTracker.studyResultId}
                     markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploading={this.markVideoAsUploading}

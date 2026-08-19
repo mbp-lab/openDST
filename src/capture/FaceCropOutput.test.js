@@ -1,9 +1,9 @@
-import {createPatchVideoFilename, PATCH_VIDEO_FORMAT_VERSION, JatosPatchSink} from './RawPatchOutput';
-import {buildUncompressedAvi, encodeGzipAvi} from './RawPatchOutput';
-import {BGR24_FRAME_BYTES} from './RawPatchPipeline.worker';
-import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION} from './RawPatchPipeline.worker';
+import {createPatchVideoFilename, PATCH_VIDEO_FORMAT_VERSION, FaceCropSink} from './FaceCropOutput';
+import {buildUncompressedAvi, encodeGzipAvi} from './FaceCropOutput';
+import {BGR24_FRAME_BYTES} from './FaceCropPipeline.worker';
+import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION} from './FaceCropPipeline.worker';
 import {UPLOAD_STATUS} from '../uploadState';
-import {MAX_FRAMES_PER_PART, RawPatchSegmenter} from './RawPatchPipeline.worker';
+import {MAX_FRAMES_PER_PART, FaceCropSegmenter} from './FaceCropPipeline.worker';
 
 function textAt(bytes, offset, length = 4) {
     return String.fromCharCode(...bytes.subarray(offset, offset + length));
@@ -77,7 +77,7 @@ describe('uncompressed AVI patch video', () => {
         })).toBe('RESULT_introduction_1_patch_s000_p000.avi.gz');
         expect(PATCH_VIDEO_FORMAT_VERSION).toBe('patch-video-avi-gzip-bgr24-v1');
 
-        const segmenter = new RawPatchSegmenter({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1});
+        const segmenter = new FaceCropSegmenter({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1});
         const firstRoi = {
             coordinateSystem: FACE_COORDINATE_SYSTEM,
             transformType: DYNAMIC_FACE_SQUARE,
@@ -104,7 +104,7 @@ describe('uncompressed AVI patch video', () => {
     });
 
     test('writes a frame directly into the active part buffer', () => {
-        const segmenter = new RawPatchSegmenter({
+        const segmenter = new FaceCropSegmenter({
             studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1, maxFramesPerPart: 1
         });
         const roi = {
@@ -129,7 +129,7 @@ describe('uncompressed AVI patch video', () => {
     });
 
     test('increments part indexes without retaining segment history', () => {
-        const segmenter = new RawPatchSegmenter({
+        const segmenter = new FaceCropSegmenter({
             studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1, maxFramesPerPart: 1
         });
         const roi = {
@@ -183,12 +183,12 @@ function tracker() {
     };
 }
 
-describe('JatosPatchSink', () => {
+describe('FaceCropSink', () => {
     test('owns at most one active and one queued part, then finalizes after parts settle', async () => {
         const encoding = deferred();
         const uploads = jest.fn(() => Promise.resolve());
         const uploadTracker = tracker();
-        const sink = new JatosPatchSink({
+        const sink = new FaceCropSink({
             uploadResultFile: uploads,
             uploadTracker,
             encode: jest.fn(() => encoding.promise),
@@ -242,7 +242,7 @@ describe('JatosPatchSink', () => {
             ? Promise.reject(new Error('sidecar unavailable'))
             : Promise.resolve());
         const uploadTracker = tracker();
-        const sink = new JatosPatchSink({
+        const sink = new FaceCropSink({
             uploadResultFile: uploads,
             uploadTracker,
             encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
@@ -263,7 +263,7 @@ describe('JatosPatchSink', () => {
     test('retries a part three times and reports one terminal failure', async () => {
         const uploads = jest.fn(() => Promise.reject(new Error('unavailable')));
         const uploadTracker = tracker();
-        const sink = new JatosPatchSink({
+        const sink = new FaceCropSink({
             uploadResultFile: uploads,
             uploadTracker,
             encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
