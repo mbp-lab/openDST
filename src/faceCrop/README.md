@@ -37,3 +37,19 @@ WebcamCapture
 - A source-dimension change starts a new segment.
 - Each AVI upload has a matching `.face-events.json` sidecar. Either artifact failing makes the logical part incomplete.
 - Upload failures are terminal and observable, but do not block study completion or redirect.
+
+## Scientific contract
+
+### Implemented behavior
+
+- Detection uses the vendored MediaPipe Tasks Vision `blaze_face_short_range.tflite` model in `VIDEO` mode with the CPU delegate. `minDetectionConfidence` and `minSuppressionThreshold` are configurable; the first controls eligibility, while the second is passed to MediaPipe's detector.
+- Eligible detections are sorted deterministically by bounding-box area, confidence, left position, top position, and original result order. The largest eligible face is selected.
+- The selected box becomes a bounded square ROI. `faceRoiScale`, `faceRoiVerticalShiftRatio`, and the EMA time constant `faceRoiSmoothingTauMs` control size, vertical placement, and temporal smoothing. During detector misses, the last in-bounds ROI is held; otherwise the frame is skipped.
+- Each accepted ROI is area-resampled from sRGB RGBX source pixels to exactly 72x72 using pixel-overlap weights, with half-up rounding, and emitted as BGR24. This is deterministic and independent of browser image-scaling APIs.
+- Browser `requestVideoFrameCallback` timestamps and `presentedFrames` are recorded in the sidecar. Sidecar events also record detector state, candidate count, score, bounding box, ROI, accepted frames, and skipped callbacks. Final capture status distinguishes `unsupported`, `complete`, and `incomplete`.
+
+### Failure modes and hardening
+
+- Capability, MediaPipe asset/model, dimension, worker, encoding, and upload failures are surfaced in capture metadata and logs; missing detections are observable through sidecar states and counters. A held ROI currently has no time limit, so analyses must distinguish `held` from freshly detected frames.
+- AVI headers currently declare a fixed 30 FPS. Capture is callback-driven and may contain dropped or irregularly timed frames, so scientific timing must use sidecar `mediaTimeUs` until the AVI frame-rate contract is validated or changed.
+- Before scientific deployment, validate model/runtime checksums and versions, browser/device support, camera color conversion, actual frame timing and drop behavior, ROI parameter defaults, prolonged detector misses, upload completeness, and end-to-end AVI decoding across analysis tools.
