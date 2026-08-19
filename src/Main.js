@@ -263,6 +263,7 @@ class Main extends React.Component {
      * Registers a video upload and returns its stable ID.
      */
     markVideoAsUploading(providedUploadId) {
+        // Stable IDs decouple upload tracking from array index/order changes across re-renders.
         const uploadId = providedUploadId || `video-${this.nextVideoUploadId}`;
         if (!providedUploadId) this.nextVideoUploadId += 1;
 
@@ -293,6 +294,8 @@ class Main extends React.Component {
     settleVideoUpload(uploadId, status) {
         this.setState(prevState => {
             const videoUploads = settleUpload(prevState.videoUploads, uploadId, status);
+            // Study completion waits only for pending uploads to settle.
+            // Failed uploads are recorded as failed and must not be treated as succeeded.
             return {
                 videoUploads,
                 areAllUploadsSettled: !hasPendingUploads(videoUploads)

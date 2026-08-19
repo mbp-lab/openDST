@@ -20,6 +20,8 @@ export function registerUpload(uploads, id) {
  * Settles a pending upload. A terminal upload cannot be changed afterwards.
  */
 export function settleUpload(uploads, id, status) {
+    // Invariant: uploads transition only once from pending to a terminal state
+    // (succeeded or failed). Terminal states are never overwritten.
     if (status !== UPLOAD_STATUS.SUCCEEDED && status !== UPLOAD_STATUS.FAILED) {
         throw new Error(`Upload must settle as succeeded or failed, received: ${status}`);
     }

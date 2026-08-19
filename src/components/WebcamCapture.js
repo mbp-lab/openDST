@@ -137,6 +137,7 @@ class WebcamCapture extends React.Component {
             let uploadId = this.props.markVideoAsUploading();
             let fileExtension = this.state.mimeType === 'video/mp4' ? '.mp4' : '.webm';
             jatos.uploadResultFile(blob, this.props.studyResultId + '_' + this.props.studyPage + '_' + this.props.videoCounter + fileExtension)//eslint-disable-line no-undef
+                // Mark success only on resolved upload; do not mark success after a failed attempt.
                 .then(() => this.props.markVideoAsUploaded(uploadId))
                 .catch((error) => {
                     console.log(error);
