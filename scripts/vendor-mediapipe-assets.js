@@ -1,3 +1,8 @@
+/**
+ * Vendors pinned MediaPipe runtime/model assets into public/mediapipe for same-origin loading.
+ * Runs before start/build to keep browser capture dependencies local and version-stable.
+ * Fails fast if package version or model checksum differ from pinned values.
+ */
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +38,7 @@ function copy(source, destination) {
 }
 
 const packageMetadata = JSON.parse(fs.readFileSync(path.join(tasksVisionRoot, 'package.json'), 'utf8'));
+// Pin package version and model digest to detect supply-chain drift before publishing assets.
 if (packageMetadata.version !== TASKS_VISION_VERSION) {
     throw new Error(`Expected @mediapipe/tasks-vision ${TASKS_VISION_VERSION}, found ${packageMetadata.version}`);
 }

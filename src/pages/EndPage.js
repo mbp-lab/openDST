@@ -54,6 +54,7 @@ export default class EndPage extends React.Component{
                     handleCancelDialog={this.props.handleCancelDialog}
                 />
             </Slide>
+            {/* Keep users on this slide while upload work is still pending; terminal upload states allow proceeding. */}
             <Slide direction="right" in={this.props.activeSlide === 'explanation' || (this.props.activeSlide === 'questionnaire' && !this.props.areAllUploadsSettled && !this.state.forceLastSlide)} mountOnEnter unmountOnExit>
                 <div>
                     <Card>

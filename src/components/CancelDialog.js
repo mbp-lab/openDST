@@ -20,7 +20,8 @@ export default function CancelDialog(props) {
         setCancelValue(event.target.value);
     }
 
-    // the redirection to the debriefing slides happens in Redirection which is only rendered after 0.5s AND if all videos have been uploaded
+    // Redirection renders after the delay only when uploads are settled
+    // (succeeded or failed); pending uploads keep the spinner visible.
     function handleOK() {
         if (cancelValue === "cancel_with_video" || cancelValue === "cancel_no_video") {
             setTimeout(() => setRedirectAllowed(true), 500);
@@ -75,6 +76,7 @@ export default function CancelDialog(props) {
                         ? <Button
                             onClick={handleOK}
                             className="alert-buttons">OK</Button>
+                        // forceRedirect is a timeout fallback so cancellation cannot block indefinitely.
                         : ((props.areAllUploadsSettled || forceRedirect) && redirectAllowed
                                 ? <Redirection handleCancelDialog={props.handleCancelDialog}
                                                cancelValue={cancelValue}

@@ -93,6 +93,8 @@ class WebcamCapture extends React.Component {
         this.mediaStreamRecorder.ondataavailable = event => {
             this.recordedChunks.push(event.data);
         }
+        // Upload is triggered from MediaRecorder.onstop so every stop path
+        // (manual, timeout, unmount) uses the same finalization behavior.
         this.mediaStreamRecorder.onstop = event => {
             this.uploadVideo();
         }
@@ -147,6 +149,8 @@ class WebcamCapture extends React.Component {
     }
 
     async stopRecording() {
+        // Stop both pipelines together: recorder stop triggers MP4/WebM upload,
+        // and raw-patch stop flushes worker/sink state before teardown completes.
         const patchStop = stopRawPatchCaptureSession(this.rawPatchController);
         this.rawPatchController = null;
         if (this.mediaStreamRecorder) {
