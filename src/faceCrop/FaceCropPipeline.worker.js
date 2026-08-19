@@ -304,14 +304,15 @@ export class FaceCropPipeline {
     }
 
     async processFrame({frame, width, height, timestampUs, wallClockMs}) {
-        // MediaPipe sees the original VideoFrame; RGBX extraction happens only
-        // after a face is accepted, avoiding a full-frame copy for skipped frames.
+        // Use ImageData so MediaPipe stays on its CPU-readable path when WebGL
+        // is unavailable. The same RGBX buffer is used for crop extraction.
         try {
-            const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
-            const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
-            if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
             const rgbx = new Uint8Array(width * height * 4);
             await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
+            const imageData = new ImageData(new Uint8ClampedArray(rgbx.buffer), width, height);
+            const detected = this.detector.detectForVideo(imageData, timestampUs / 1000);
+            const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
+            if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
             return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({
                 writeBgr24: output => processFaceCropFrame({width, height, rgbx, roi: selection.roi, output}),
                 sourceWidth: width, sourceHeight: height, roi: selection.roi, provenance: selection, timestampUs, wallClockMs})};

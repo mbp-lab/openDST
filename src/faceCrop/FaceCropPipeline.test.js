@@ -196,18 +196,28 @@ describe('FaceRoiProvider', () => {
 
 
 describe('FaceCropPipeline worker input', () => {
-    // The worker boundary must pass the original VideoFrame to MediaPipe and
-    // close it exactly once after processing, including asynchronous failures.
-    test('passes VideoFrame directly to MediaPipe and closes it', async () => {
+    test('passes CPU-readable ImageData to MediaPipe and closes the frame', async () => {
         const pipeline = new FaceCropPipeline();
         pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(0, 0, 72, 72)]}))};
         pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
         pipeline.segmenter = {appendFrame: jest.fn(() => [])};
         const frame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
+        const previousImageData = global.ImageData;
+        global.ImageData = class ImageDataShim {
+            constructor(data, width, height) { this.data = data; this.width = width; this.height = height; }
+        };
 
-        await expect(pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1000, wallClockMs: 1000}))
-            .resolves.toMatchObject({accepted: true});
-        expect(pipeline.detector.detectForVideo).toHaveBeenCalledWith(frame, 1);
-        expect(frame.close).toHaveBeenCalledTimes(1);
+        try {
+            await expect(pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1000, wallClockMs: 1000}))
+                .resolves.toMatchObject({accepted: true});
+            const [imageData, timestamp] = pipeline.detector.detectForVideo.mock.calls[0];
+            expect(imageData).toBeInstanceOf(global.ImageData);
+            expect(imageData.width).toBe(72);
+            expect(imageData.height).toBe(72);
+            expect(timestamp).toBe(1);
+            expect(frame.close).toHaveBeenCalledTimes(1);
+        } finally {
+            global.ImageData = previousImageData;
+        }
     });
 });
