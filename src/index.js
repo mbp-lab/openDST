@@ -7,7 +7,9 @@ import './home.css'
 import './stresstask.css'
 import './imprint.css'
 import './i18n';
+import {installConsoleLogCapture} from './consoleLog';
 
+installConsoleLogCapture();
 
 // Append app to dom
 ReactDOM.render(
