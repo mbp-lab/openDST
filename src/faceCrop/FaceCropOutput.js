@@ -15,12 +15,18 @@ function token(value, name) {
     return resolved;
 }
 
-export function createPatchVideoFilename({studyResultId, studyPage, videoCounter, segmentIndex, partIndex}) {
+export function createPatchVideoFilename({studyResultId, studyPage, videoCounter, captureId, segmentIndex, partIndex}) {
     // Stable names let AVI parts and their JSON sidecars be matched after upload
     // without requiring a separate manifest or archive.
+    const captureToken = captureId ? token(captureId, 'Capture ID') + '_' : '';
     return token(studyResultId, 'Study result ID') + '_' + token(studyPage, 'Study page') + '_' +
-        token(videoCounter, 'Video counter') + '_patch_s' + String(segmentIndex).padStart(3, '0') +
+        token(videoCounter, 'Video counter') + '_' + captureToken + 'patch_s' + String(segmentIndex).padStart(3, '0') +
         '_p' + String(partIndex).padStart(3, '0') + '.avi.gz';
+}
+
+export function createCaptureManifestFilename({studyResultId, studyPage, videoCounter, captureId}) {
+    return token(studyResultId, 'Study result ID') + '_' + token(studyPage, 'Study page') + '_' +
+        token(videoCounter, 'Video counter') + '_' + token(captureId, 'Capture ID') + '_manifest.json';
 }
 
 export function createFaceEventsFilename(identity) {
@@ -192,11 +198,13 @@ export class FaceCropSink {
         }
         if (avi.status !== UPLOAD_STATUS.SUCCEEDED) {
             this.uploadTracker.settleUpload(eventsId, UPLOAD_STATUS.FAILED);
-            return {filename: part.filename, faceEventsFilename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, avi,
+            return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount,
+                filename: part.filename, faceEventsFilename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, avi,
                 faceEvents: {uploadId: eventsId, filename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, attempts: 0}};
         }
         const faceEvents = await this.uploadWithRetry(JSON.stringify(part.faceEvents), part.faceEventsFilename, eventsId);
-        return {filename: part.filename, faceEventsFilename: part.faceEventsFilename,
+        return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount,
+            filename: part.filename, faceEventsFilename: part.faceEventsFilename,
             status: faceEvents.status === UPLOAD_STATUS.SUCCEEDED ? UPLOAD_STATUS.SUCCEEDED : UPLOAD_STATUS.FAILED, avi, faceEvents};
     }
 

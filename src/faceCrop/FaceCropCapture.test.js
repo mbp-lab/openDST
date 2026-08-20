@@ -111,7 +111,7 @@ describe('resolveFaceCropConfiguration', () => {
             });
 
             await expect(controller.start()).resolves.toBe(FACE_CROP_STATUS.CAPTURING);
-            expect(pipelineWorker.initialize).toHaveBeenCalledWith({
+            expect(pipelineWorker.initialize).toHaveBeenCalledWith(expect.objectContaining({
                 configuration: {
                     faceRoiSmoothingTauMs: DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
                     faceRoiScale: DEFAULT_FACE_ROI_SCALE,
@@ -119,8 +119,8 @@ describe('resolveFaceCropConfiguration', () => {
                     faceDetectionMinConfidence: 0.7,
                     faceDetectionMinSuppressionThreshold: 0.2
                 },
-                identity: {studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1}
-            });
+                identity: expect.objectContaining({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1})
+            }));
             await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.COMPLETE);
 
             expect(video.cancelVideoFrameCallback).toHaveBeenCalledWith(7);
@@ -188,7 +188,8 @@ describe('resolveFaceCropConfiguration', () => {
             expect(controller.acceptedFrames).toBe(1);
             expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
             await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.COMPLETE);
-            expect(uploadResultFile).toHaveBeenCalledTimes(2);
+            expect(uploadResultFile).toHaveBeenCalledTimes(3);
+            expect(uploadResultFile.mock.calls[2][1]).toContain('_manifest.json');
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
         } finally {
             window.VideoFrame = original.VideoFrame;

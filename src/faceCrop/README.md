@@ -35,7 +35,7 @@ WebcamCapture
 - One worker request is in flight at a time, preserving frame order and bounding memory use.
 - Face selection is deterministic: the largest eligible detection wins, followed by stable tie-breakers; a centered largest-square fallback is used before the first detection, and a valid previous ROI is held through later detector misses.
 - A source-dimension change starts a new segment.
-- Each AVI upload has a matching `.face-events.json` sidecar. Either artifact failing makes the logical part incomplete.
+- Each AVI upload has a matching `.face-events.json` sidecar, and each capture attempt has a manifest listing its parts. Either part artifact failing makes the logical part incomplete.
 - Upload failures are terminal and observable, but do not block study completion or redirect.
 
 ## Scientific contract
@@ -44,7 +44,7 @@ WebcamCapture
 
 - Detection uses the vendored MediaPipe Tasks Vision `blaze_face_short_range.tflite` model in `VIDEO` mode with the CPU delegate. `minDetectionConfidence` and `minSuppressionThreshold` are configurable; the first controls eligibility, while the second is passed to MediaPipe's detector.
 - Eligible detections are sorted deterministically by bounding-box area, confidence, left position, top position, and original result order. The largest eligible face is selected.
-- The selected box becomes a bounded square ROI. Before a face is detected, the largest square fitting the source is centered on the free axis. `faceRoiScale`, `faceRoiVerticalShiftRatio`, and the EMA time constant `faceRoiSmoothingTauMs` control detected-face size, vertical placement, and temporal smoothing. During detector misses, the last in-bounds ROI is held.
+- The selected box becomes a bounded square ROI. Before a face is detected, the largest square fitting the source is centered on the free axis. `faceRoiScale`, `faceRoiVerticalShiftRatio`, and the EMA time constant `faceRoiSmoothingTauMs` control detected-face size, vertical placement, and temporal smoothing. During detector misses, the last in-bounds ROI is held. Sidecar states are `default`, `largest`, `held`, and `reacquired`.
 - Each accepted ROI is area-resampled from sRGB RGBX source pixels to exactly 72x72 using pixel-overlap weights, with half-up rounding, and emitted as BGR24. This is deterministic and independent of browser image-scaling APIs.
 - Browser `requestVideoFrameCallback` timestamps and `presentedFrames` are recorded in the sidecar. Sidecar events also record detector state, candidate count, score, bounding box, ROI, accepted frames, and skipped callbacks. Final capture status distinguishes `unsupported`, `complete`, and `incomplete`.
 

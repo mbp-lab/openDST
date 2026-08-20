@@ -102,6 +102,14 @@ function eligibleDetections(detections, minimumScore) {
         left.box.originY - right.box.originY || left.index - right.index);
 }
 
+function detectionSummary(detections, eligibleCount) {
+    return {
+        rawCount: Array.isArray(detections) ? detections.length : 0,
+        eligibleCount,
+        scores: (detections || []).map(detectionScore)
+    };
+}
+
 export class FaceRoiProvider {
     constructor({scale = 1.5, verticalShiftRatio = 0.15, smoothingTauMs = 100, minDetectionConfidence = 0.5} = {}) {
         requireInteger(smoothingTauMs, 'Face ROI time constant', 0);
@@ -131,16 +139,17 @@ export class FaceRoiProvider {
         requireInteger(width, 'Source width', PATCH_SIZE);
         requireInteger(height, 'Source height', PATCH_SIZE);
         const eligible = eligibleDetections(detections, this.configuration.minDetectionConfidence);
+        const detection = detectionSummary(detections, eligible.length);
         if (!eligible.length) {
             this.hadMiss = true;
             if (this.previous && this.previous.x + this.previous.size <= width && this.previous.y + this.previous.size <= height) {
                 return {roi: {...this.previous}, state: 'held', candidateCount: 0, selectedScore: null,
-                    selectedBoundingBox: null, tieBreakOccurred: false};
+                    selectedBoundingBox: null, tieBreakOccurred: false, detection};
             }
             this.previous = this.defaultRoi(width, height);
             this.previousDetectionTimestampMs = null;
             return {roi: {...this.previous}, state: 'default', candidateCount: 0, selectedScore: null,
-                selectedBoundingBox: null, tieBreakOccurred: false};
+                selectedBoundingBox: null, tieBreakOccurred: false, detection};
         }
 
         const selected = eligible[0];
@@ -163,7 +172,7 @@ export class FaceRoiProvider {
         const state = this.hadMiss ? 'reacquired' : 'largest';
         this.hadMiss = false;
         return {roi: {...this.previous}, state, candidateCount: eligible.length, selectedScore: selected.score,
-            selectedBoundingBox: {...selected.box}, tieBreakOccurred: eligible.length > 1 && eligible[0].area === eligible[1].area};
+            selectedBoundingBox: {...selected.box}, tieBreakOccurred: eligible.length > 1 && eligible[0].area === eligible[1].area, detection};
     }
 
     getRoi(input) {
@@ -231,19 +240,22 @@ export class FaceCropProcessor {
     process(input) { return processFaceCropFrame(input); }
 }
 
-function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi) {
+function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi, sourceWidth, sourceHeight) {
     return {frameIndex, mediaTimeUs: timestampUs, wallClockMs, state: provenance.state,
-        candidateCount: provenance.candidateCount, selectedScore: provenance.selectedScore,
-        selectedBoundingBox: provenance.selectedBoundingBox ? {...provenance.selectedBoundingBox} : null,
-        tieBreakOccurred: Boolean(provenance.tieBreakOccurred), roi: {...roi}};
+        source: {width: sourceWidth, height: sourceHeight},
+        detection: {...provenance.detection},
+        selection: {score: provenance.selectedScore,
+            boundingBox: provenance.selectedBoundingBox ? {...provenance.selectedBoundingBox} : null,
+            tieBreakOccurred: Boolean(provenance.tieBreakOccurred)},
+        roi: {...roi}};
 }
 
 export class FaceCropSegmenter {
-    constructor({studyResultId, studyPage, videoCounter, maxFramesPerPart = MAX_FRAMES_PER_PART, selectionConfiguration = {}}) {
+    constructor({studyResultId, studyPage, videoCounter, captureId, maxFramesPerPart = MAX_FRAMES_PER_PART, selectionConfiguration = {}}) {
         if (!Number.isSafeInteger(maxFramesPerPart) || maxFramesPerPart < 1 || maxFramesPerPart > MAX_FRAMES_PER_PART) {
             throw new Error('Max frames per part must be between 1 and ' + MAX_FRAMES_PER_PART);
         }
-        this.identity = {studyResultId, studyPage, videoCounter};
+        this.identity = {studyResultId, studyPage, videoCounter, captureId};
         this.maxFrames = maxFramesPerPart;
         this.selectionConfiguration = {...selectionConfiguration};
         this.sourceDimensions = null;
@@ -273,7 +285,7 @@ export class FaceCropSegmenter {
             if (!(bgr24 instanceof Uint8Array) || bgr24.byteLength !== BGR24_FRAME_BYTES) throw new Error('BGR24 frame is invalid');
             output.set(bgr24);
         }
-        this.part.events.push(copyEvent(provenance, this.part.frameCount, timestampUs, wallClockMs, roi));
+        this.part.events.push(copyEvent(provenance, this.part.frameCount, timestampUs, wallClockMs, roi, sourceWidth, sourceHeight));
         this.part.frameCount += 1;
         const full = this.part.frameCount === this.maxFrames ? this.seal() : null;
         return [sealed, full].filter(Boolean);
@@ -294,7 +306,7 @@ export class FaceCropSegmenter {
         this.partIndex += 1;
         return {segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, filename,
             faceEventsFilename: createFaceEventsFilename(identity), frameCount, byteLength: bytes.byteLength, bytes,
-            faceEvents: {formatVersion: FACE_EVENTS_FORMAT_VERSION, aviFilename: filename,
+            faceEvents: {formatVersion: FACE_EVENTS_FORMAT_VERSION, captureId: identity.captureId, aviFilename: filename,
                 segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, frameCount,
                 selectionConfiguration: {...this.selectionConfiguration}, frames: events}};
     }

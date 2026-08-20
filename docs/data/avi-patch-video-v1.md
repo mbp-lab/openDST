@@ -10,12 +10,14 @@ face-selection provenance that an AVI stream cannot represent.
 Each logical patch part has deterministic names:
 
 ```text
-{studyResultId}_{studyPage}_{videoCounter}_patch_s{segmentIndex}_p{partIndex}.avi.gz
-{studyResultId}_{studyPage}_{videoCounter}_patch_s{segmentIndex}_p{partIndex}.face-events.json
+{studyResultId}_{studyPage}_{videoCounter}_{captureId}_patch_s{segmentIndex}_p{partIndex}.avi.gz
+{studyResultId}_{studyPage}_{videoCounter}_{captureId}_patch_s{segmentIndex}_p{partIndex}.face-events.json
+{studyResultId}_{studyPage}_{videoCounter}_{captureId}_manifest.json
 ```
 
 Segment and part indexes are zero-based and padded to at least three digits.
-Both files are required. They are uploaded serially through the same bounded,
+The AVI and sidecar are required for each part; the manifest inventories the
+complete capture attempt. They are uploaded serially through the same bounded,
 retry-aware sink. If either cannot be uploaded, patch capture is terminally
 `incomplete`; the participant study and the ordinary MP4/WebM recording still
 continue.
@@ -43,9 +45,10 @@ entry for every AVI frame. Every entry includes:
 - `frameIndex`: zero-based AVI frame index;
 - `mediaTimeUs`: source media time in microseconds;
 - `wallClockMs`: wall-clock timestamp captured at the video-frame callback;
-- `state`: `largest`, `held`, or `reacquired`;
-- `candidateCount`: number of eligible face detections;
-- `selectedScore`, `selectedBoundingBox`, and `tieBreakOccurred`;
+	- `source`: source width and height for this frame;
+	- `state`: `default`, `largest`, `held`, or `reacquired`;
+	- `detection`: raw count, eligible count, and detector scores;
+	- `selection`: selected score, bounding box, and tie-break information;
 - the resolved dynamic-square `roi` used to produce that AVI frame.
 
 The sidecar also records the resolved selection configuration: MediaPipe
@@ -67,8 +70,8 @@ bystander becomes the largest eligible face, it is selected on the next run.
 
 When no detection is eligible after a face has been selected, the last valid ROI
 is emitted indefinitely as `held`. When an eligible face later returns, the first
-resulting AVI frame is `reacquired`. Before any eligible face is found, no crop
-is emitted because no valid ROI exists.
+resulting AVI frame is `reacquired`. Before any eligible face is found, the
+largest centered square is emitted as `default`.
 
 ## Runtime and deployment requirements
 

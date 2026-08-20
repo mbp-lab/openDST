@@ -1,5 +1,5 @@
 import {UPLOAD_STATUS} from '../uploadState';
-import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink} from './FaceCropOutput';
+import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
 
 // Face-crop capture is an optional companion to MediaRecorder. It must fail
 // closed so unsupported browsers never affect the participant-facing recording.
@@ -63,24 +63,58 @@ export function shouldCaptureFaceCrop(configuration, studyPage) {
     return configuration.mode === 'all' || (configuration.mode === 'calibration' && studyPage === 'introduction');
 }
 
-function dimensions(video) { return {width: video.videoWidth, height: video.videoHeight}; }
+const MAX_SOURCE_PIXELS = 1920 * 1080;
+
+function dimensions(video) {
+    return {
+        width: video && Number.isSafeInteger(video.videoWidth) && video.videoWidth > 0 ? video.videoWidth : null,
+        height: video && Number.isSafeInteger(video.videoHeight) && video.videoHeight > 0 ? video.videoHeight : null,
+        readyState: video && Number.isInteger(video.readyState) ? video.readyState : null
+    };
+}
 function supportedDimensions({width, height}) {
-    return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width >= 72 && height >= 72 && width <= 1920 && height <= 1080;
+    return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width >= 72 && height >= 72 && width * height <= MAX_SOURCE_PIXELS;
 }
 
 export async function probeFaceCropCapability(video) {
+    const source = dimensions(video);
+    const checks = {};
+    const failed = (reason, stage, error) => ({
+        supported: false,
+        capability: {status: 'failed', checks, failedStage: stage},
+        source,
+        reason,
+        error: error ? {name: error.name || 'Error', message: error.message || String(error)} : null
+    });
     if (!video || typeof video.requestVideoFrameCallback !== 'function' || typeof video.cancelVideoFrameCallback !== 'function') {
-        return {supported: false, reason: 'requestVideoFrameCallback is unavailable'};
+        checks.requestVideoFrameCallback = {status: 'failed'};
+        checks.cancelVideoFrameCallback = {status: 'failed'};
+        return failed('requestVideoFrameCallback is unavailable', 'requestVideoFrameCallback');
     }
-    if (typeof window.VideoFrame !== 'function') return {supported: false, reason: 'VideoFrame is unavailable'};
-    if (typeof window.CompressionStream !== 'function') return {supported: false, reason: 'Native CompressionStream is unavailable'};
+    checks.requestVideoFrameCallback = {status: 'passed'};
+    checks.cancelVideoFrameCallback = {status: 'passed'};
+    if (typeof window.VideoFrame !== 'function') {
+        checks.videoFrame = {status: 'failed', stage: 'available'};
+        return failed('VideoFrame is unavailable', 'videoFrame');
+    }
+    checks.videoFrame = {status: 'available'};
+    if (typeof window.CompressionStream !== 'function') {
+        checks.compressionStream = {status: 'failed'};
+        return failed('Native CompressionStream is unavailable', 'compressionStream');
+    }
+    checks.compressionStream = {status: 'passed'};
     let frame;
     try {
         frame = new window.VideoFrame(video);
+        checks.videoFrame.construct = {status: 'passed'};
         await frame.copyTo(new Uint8Array(frame.displayWidth * frame.displayHeight * 4), {format: 'RGBX', colorSpace: 'srgb'});
-        return {supported: true};
+        checks.videoFrame.copyTo = {status: 'passed', format: 'RGBX', colorSpace: 'srgb'};
+        return {supported: true, capability: {status: 'passed', checks}, source};
     } catch (error) {
-        return {supported: false, reason: error.message || 'VideoFrame RGBX/sRGB extraction failed'};
+        if (!checks.videoFrame.construct) checks.videoFrame.construct = {status: 'failed'};
+        else checks.videoFrame.copyTo = {status: 'failed'};
+        return failed(error.message || 'VideoFrame RGBX/sRGB extraction failed',
+            checks.videoFrame.construct.status === 'failed' ? 'videoFrame.construct' : 'videoFrame.copyTo', error);
     } finally {
         if (frame) frame.close();
     }
@@ -160,6 +194,7 @@ export class FaceCropCaptureController {
         studyResultId,
         studyPage,
         videoCounter,
+        captureId: providedCaptureId,
         configuration,
         uploadTracker,
         uploadResultFile,
@@ -170,6 +205,8 @@ export class FaceCropCaptureController {
         this.onStatus = onStatus || (() => {});
         this.createPipelineWorker = createPipelineWorker;
         this.sink = new FaceCropSink({uploadResultFile, uploadTracker});
+        this.uploadResultFile = uploadResultFile;
+        this.uploadTracker = uploadTracker;
         this.state = 'idle';
         this.status = FACE_CROP_STATUS.DISABLED;
         this.startPromise = null;
@@ -178,12 +215,16 @@ export class FaceCropCaptureController {
         this.captureLoop = null;
         this.worker = null;
         this.incompleteReason = null;
+        this.captureId = providedCaptureId || createCaptureId(studyPage, videoCounter);
         this.acceptedFrames = 0;
         this.skippedFrames = 0;
         this.lastPresentedFrame = null;
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
         this.noInitialFaceSkippedFrames = 0;
+        this.capability = {status: 'not-run', checks: {}};
+        this.source = null;
+        this.manifest = null;
     }
 
     start() {
@@ -194,11 +235,27 @@ export class FaceCropCaptureController {
     async startInternal() {
         this.state = 'starting';
         const capability = await probeFaceCropCapability(this.video);
+        this.capability = capability.capability;
+        this.source = capability.source;
         if (this.state === 'stopping') return this.status;
-        if (!capability.supported) return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, capability.reason);
-        if (!supportedDimensions(dimensions(this.video))) {
+        if (!capability.supported) {
+            await this.uploadManifest([], FACE_CROP_STATUS.UNSUPPORTED);
+            return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, capability.reason);
+        }
+        const source = dimensions(this.video);
+        this.source = source;
+        if (!supportedDimensions(source)) {
+            this.capability = {...this.capability, status: 'failed', failedStage: 'sourceDimensions', checks: {
+                ...this.capability.checks,
+                sourceDimensions: {status: 'failed', width: source.width, height: source.height, maxPixels: MAX_SOURCE_PIXELS}
+            }};
+            await this.uploadManifest([], FACE_CROP_STATUS.INCOMPLETE);
             return this.terminate(FACE_CROP_STATUS.INCOMPLETE, 'Source dimensions are outside supported bounds');
         }
+        this.capability = {...this.capability, checks: {
+            ...this.capability.checks,
+            sourceDimensions: {status: 'passed', width: source.width, height: source.height, maxPixels: MAX_SOURCE_PIXELS}
+        }};
         try {
             this.worker = this.createPipelineWorker();
             const config = this.configuration;
@@ -213,7 +270,8 @@ export class FaceCropCaptureController {
                 identity: {
                     studyResultId: this.studyResultId,
                     studyPage: this.studyPage,
-                    videoCounter: this.videoCounter
+                    videoCounter: this.videoCounter,
+                    captureId: this.captureId
                 }
             });
         } catch (error) {
@@ -244,6 +302,7 @@ export class FaceCropCaptureController {
         if (this.captureLoop) await this.captureLoop;
         if (this.status === FACE_CROP_STATUS.DISABLED || this.status === FACE_CROP_STATUS.UNSUPPORTED) {
             await this.closeWorker();
+            if (!this.manifest && this.status !== FACE_CROP_STATUS.DISABLED) await this.uploadManifest([], this.status);
             return this.status;
         }
         return this.finalize();
@@ -293,6 +352,7 @@ export class FaceCropCaptureController {
         let frame;
         try {
             const source = dimensions(this.video);
+            this.source = source;
             if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
             const timestampUs = Math.round(metadata.mediaTime * 1000000);
             frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
@@ -341,7 +401,59 @@ export class FaceCropCaptureController {
         } finally {
             await this.closeWorker();
         }
+        await this.uploadManifest(result.parts);
         return this.terminate(this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE, this.incompleteReason);
+    }
+
+    async uploadManifest(parts, terminalStatus) {
+        const filename = createCaptureManifestFilename({studyResultId: this.studyResultId, studyPage: this.studyPage,
+            videoCounter: this.videoCounter, captureId: this.captureId});
+        const uploadId = 'face-crop-manifest-' + this.captureId;
+        const manifest = {
+            capture: {captureId: this.captureId,
+                identity: {studyResultId: this.studyResultId, studyPage: this.studyPage, videoCounter: this.videoCounter}},
+            source: this.sourceMetadata(),
+            capability: this.capability,
+            configuration: this.configurationMetadata(),
+            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', frameRate: PATCH_VIDEO_FRAME_RATE, frameSize: 72},
+            status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
+                : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
+            statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
+                noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames, acceptedFrames: this.acceptedFrames,
+                skippedFrames: this.skippedFrames},
+            parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
+                segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, status: part.status}))
+        };
+        this.manifest = {filename, status: 'pending'};
+        this.uploadTracker.registerUpload(uploadId);
+        try {
+            await this.uploadResultFile(JSON.stringify(manifest), filename);
+            this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.SUCCEEDED);
+            this.manifest.status = UPLOAD_STATUS.SUCCEEDED;
+        } catch (error) {
+            this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.FAILED);
+            this.manifest.status = UPLOAD_STATUS.FAILED;
+            this.incompleteReason = this.incompleteReason || 'Face-crop manifest upload failed';
+        }
+    }
+
+    sourceMetadata() {
+        const source = this.source || {};
+        const width = source.width;
+        const height = source.height;
+        return {...source,
+            pixelCount: Number.isSafeInteger(width) && Number.isSafeInteger(height) ? width * height : null,
+            aspectRatio: Number.isSafeInteger(width) && Number.isSafeInteger(height) ? width / height : null,
+            orientation: Number.isSafeInteger(width) && Number.isSafeInteger(height)
+                ? (width === height ? 'square' : width > height ? 'landscape' : 'portrait') : null};
+    }
+
+    configurationMetadata() {
+        const config = this.configuration;
+        return {requestedMode: config.requestedMode, appliedMode: config.mode,
+            roi: {smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale, verticalShiftRatio: config.faceRoiVerticalShiftRatio},
+            detector: {minConfidence: config.faceDetectionMinConfidence, minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold},
+            selectionPolicy: 'largest-eligible-bounding-box-v1'};
     }
 
     terminate(status, reason) {
@@ -351,30 +463,19 @@ export class FaceCropCaptureController {
     }
 
     metadata(status) {
-        const config = this.configuration;
         return {
             status,
-            formatVersion: PATCH_VIDEO_FORMAT_VERSION,
-            container: 'avi.gz',
-            transportEncoding: 'gzip',
-            videoCodec: 'DIB',
-            pixelFormat: 'bgr24',
-            frameRate: PATCH_VIDEO_FRAME_RATE,
-            requestedCaptureMode: config.requestedMode,
-            appliedCaptureMode: config.mode,
-            roiProvider: 'mediapipe-face-detector',
-            faceDetections: this.faceDetections,
-            faceDetectionMisses: this.faceDetectionMisses,
-            faceRoiSmoothingTauMs: config.faceRoiSmoothingTauMs,
-            faceRoiScale: config.faceRoiScale,
-            faceRoiVerticalShiftRatio: config.faceRoiVerticalShiftRatio,
-            faceDetectionMinConfidence: config.faceDetectionMinConfidence,
-            faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
-            faceSelectionPolicy: 'largest-eligible-bounding-box-v1',
-            noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames,
-            extraction: {api: 'VideoFrame.copyTo', format: 'RGBX', colorSpace: 'srgb'},
-            acceptedFrames: this.acceptedFrames,
-            skippedFrames: this.skippedFrames
+            capability: this.capability,
+            capture: {captureId: this.captureId,
+                identity: {studyResultId: this.studyResultId, studyPage: this.studyPage, videoCounter: this.videoCounter}},
+            source: this.sourceMetadata(),
+            manifest: this.manifest,
+            configuration: this.configurationMetadata(),
+            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24', frameRate: PATCH_VIDEO_FRAME_RATE, frameSize: 72,
+                extraction: {api: 'VideoFrame.copyTo', format: 'RGBX', colorSpace: 'srgb'}},
+            statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
+                noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames, acceptedFrames: this.acceptedFrames,
+                skippedFrames: this.skippedFrames}
         };
     }
 
@@ -401,6 +502,11 @@ export class FaceCropCaptureController {
             console.warn('[face-crop] Worker cleanup failed', error);
         }
     }
+}
+
+let nextCaptureId = 0;
+function createCaptureId(studyPage, videoCounter) {
+    return 'capture-' + String(studyPage) + '-' + String(videoCounter) + '-' + Date.now() + '-' + nextCaptureId++;
 }
 
 function reportStatus(props, status, reason) {
@@ -431,6 +537,7 @@ export function startFaceCropCaptureSession({webcam, props}) {
         studyResultId: props.studyResultId,
         studyPage: props.studyPage,
         videoCounter: props.videoCounter,
+        captureId: props.captureId,
         uploadResultFile: (payload, filename) => window.jatos.uploadResultFile(payload, filename),
         onStatus: metadata => {
             if (typeof props.onFaceCropStatus === 'function') props.onFaceCropStatus(metadata);
