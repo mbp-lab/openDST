@@ -240,6 +240,35 @@ export class FaceCropProcessor {
     process(input) { return processFaceCropFrame(input); }
 }
 
+async function copyPackedRgba(frame, width, height) {
+    // Keep extraction full-frame for browser compatibility. Cropped VideoFrame
+    // copyTo() is unreliable on some I420-backed camera implementations.
+    const options = {format: 'RGBA', colorSpace: 'srgb'};
+    const rect = {x: 0, y: 0, width, height};
+    const rowBytes = rect.width * 4;
+    const allocationSize = typeof frame.allocationSize === 'function'
+        ? frame.allocationSize(options) : rowBytes * rect.height;
+    if (!Number.isSafeInteger(allocationSize) || allocationSize < rowBytes * rect.height) {
+        throw new Error('VideoFrame RGBA allocation is smaller than the requested frame');
+    }
+    const allocated = new Uint8Array(allocationSize);
+    const layouts = await frame.copyTo(allocated, options);
+    const plane = Array.isArray(layouts) ? layouts[0] : null;
+    const offset = plane && Number.isSafeInteger(plane.offset) ? plane.offset : 0;
+    const stride = plane && Number.isSafeInteger(plane.stride) ? plane.stride : rowBytes;
+    if (stride < rowBytes || offset < 0 || offset + stride * (rect.height - 1) + rowBytes > allocated.byteLength) {
+        throw new Error('VideoFrame RGBA layout cannot represent the requested frame');
+    }
+    if (offset === 0 && stride === rowBytes && allocated.byteLength === rowBytes * rect.height) return allocated;
+    // VideoFrame.copyTo() may return padded rows. Normalize the layout before
+    // pixel indexing assumes tightly packed width * 4 RGBA rows.
+    const packed = new Uint8Array(rowBytes * rect.height);
+    for (let row = 0; row < rect.height; row += 1) {
+        packed.set(allocated.subarray(offset + row * stride, offset + row * stride + rowBytes), row * rowBytes);
+    }
+    return packed;
+}
+
 function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi, sourceWidth, sourceHeight) {
     return {frameIndex, mediaTimeUs: timestampUs, wallClockMs, state: provenance.state,
         source: {width: sourceWidth, height: sourceHeight},
@@ -326,17 +355,15 @@ export class FaceCropPipeline {
 
     async processFrame({frame, width, height, timestampUs, wallClockMs}) {
         try {
+            // MediaPipe consumes the VideoFrame directly; CPU RGBA is materialized
+            // separately because the deterministic resampler needs pixel bytes.
             const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
             const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
             if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
             const sourceRoi = selection.roi;
-            const rgba = new Uint8Array(sourceRoi.size * sourceRoi.size * 4);
-            await frame.copyTo(rgba, {format: 'RGBA', colorSpace: 'srgb', rect: {
-                x: sourceRoi.x, y: sourceRoi.y, width: sourceRoi.size, height: sourceRoi.size
-            }});
-            const localRoi = {...sourceRoi, x: 0, y: 0};
+            const rgba = await copyPackedRgba(frame, width, height);
             return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({
-                writeBgr24: output => processFaceCropFrame({width: sourceRoi.size, height: sourceRoi.size, rgbx: rgba, roi: localRoi, output}),
+                writeBgr24: output => processFaceCropFrame({width, height, rgbx: rgba, roi: sourceRoi, output}),
                 sourceWidth: width, sourceHeight: height, roi: sourceRoi, provenance: selection, timestampUs, wallClockMs})};
         } finally {
             frame.close();

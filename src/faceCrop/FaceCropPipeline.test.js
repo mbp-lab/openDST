@@ -204,9 +204,9 @@ describe('FaceRoiProvider', () => {
 
 
 describe('FaceCropPipeline worker input', () => {
-    test('passes the VideoFrame directly and extracts only the selected ROI', async () => {
+    test('passes the VideoFrame directly and resamples the selected source ROI', async () => {
         const pipeline = new FaceCropPipeline();
-        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(20, 20, 60, 60)]}))};
+        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(21, 21, 60, 60)]}))};
         pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
         let appendInput;
         pipeline.segmenter = {appendFrame: jest.fn(input => { appendInput = input; return []; })};
@@ -218,9 +218,9 @@ describe('FaceCropPipeline worker input', () => {
         expect(frame.copyTo).toHaveBeenCalledTimes(1);
         const [rgba, options] = frame.copyTo.mock.calls[0];
         expect(rgba).toBeInstanceOf(Uint8Array);
-        expect(rgba.byteLength).toBe(72 * 72 * 4);
-        expect(options).toEqual({format: 'RGBA', colorSpace: 'srgb', rect: {x: 14, y: 14, width: 72, height: 72}});
-        expect(appendInput).toMatchObject({sourceWidth: 100, sourceHeight: 120, roi: {x: 14, y: 14, size: 72}});
+        expect(rgba.byteLength).toBe(100 * 120 * 4);
+        expect(options).toEqual({format: 'RGBA', colorSpace: 'srgb'});
+        expect(appendInput).toMatchObject({sourceWidth: 100, sourceHeight: 120, roi: {x: 15, y: 15, size: 72}});
         expect(frame.close).toHaveBeenCalledTimes(1);
 
         const output = new Uint8Array(BGR24_FRAME_BYTES);
@@ -236,6 +236,30 @@ describe('FaceCropPipeline worker input', () => {
 
         await expect(pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000})).rejects.toBe(error);
         expect(frame.copyTo).not.toHaveBeenCalled();
+        expect(frame.close).toHaveBeenCalledTimes(1);
+    });
+
+    test('repackages padded VideoFrame rows before resampling', async () => {
+        const pipeline = new FaceCropPipeline();
+        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(21, 21, 60, 60)]}))};
+        pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
+        let appendInput;
+        pipeline.segmenter = {appendFrame: jest.fn(input => { appendInput = input; return []; })};
+        const frame = {
+            allocationSize: jest.fn(() => 112 * 120 * 4),
+            copyTo: jest.fn(buffer => {
+                for (let row = 0; row < 120; row += 1) {
+                    for (let column = 0; column < 100; column += 1) buffer[row * 112 * 4 + column * 4] = 11;
+                }
+                return Promise.resolve([{offset: 0, stride: 112 * 4}]);
+            }),
+            close: jest.fn()
+        };
+
+        await pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000});
+        const output = new Uint8Array(BGR24_FRAME_BYTES);
+        appendInput.writeBgr24(output);
+        expect(output[2]).toBe(11);
         expect(frame.close).toHaveBeenCalledTimes(1);
     });
 
