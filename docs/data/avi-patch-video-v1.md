@@ -24,7 +24,8 @@ continue.
 
 ## AVI payload
 
-Each AVI contains one 72 by 72 video stream at a nominal 30 frames per second.
+Each AVI contains one 72 by 72 video stream with one constant header frame
+rate per part, derived from that part's `mediaTimeUs` intervals.
 Frames are 24-bit uncompressed DIB video: the capture processor emits sRGB
 BGR24 pixels, and the muxer stores the equivalent BGR24 triplets required by
 the DIB AVI convention. A negative bitmap height marks the frame rows as

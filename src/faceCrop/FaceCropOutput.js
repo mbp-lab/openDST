@@ -8,6 +8,8 @@ export const FACE_EVENTS_FORMAT_VERSION = 'face-events-json-v1';
 export const MAX_PENDING_PATCH_PARTS = 2;
 export const MAX_UPLOAD_ATTEMPTS = 3;
 const FRAME_BYTES = 72 * 72 * 3;
+const MIN_PATCH_VIDEO_FRAME_RATE = 1;
+const MAX_PATCH_VIDEO_FRAME_RATE = 120;
 
 function token(value, name) {
     const resolved = String(value);
@@ -59,11 +61,32 @@ function chunk(type, payload) {
 
 function list(type, chunks) { return chunk('LIST', concat([fourCC(type), ...chunks])); }
 
-function mainHeader(frameCount) {
+function resolveAviFrameRate(part) {
+    const frames = part && part.faceEvents && Array.isArray(part.faceEvents.frames) ? part.faceEvents.frames : null;
+    if (!frames || frames.length < 2) return PATCH_VIDEO_FRAME_RATE;
+    let totalDeltaUs = 0;
+    let deltaCount = 0;
+    for (let index = 1; index < frames.length; index += 1) {
+        const previous = frames[index - 1] && frames[index - 1].mediaTimeUs;
+        const current = frames[index] && frames[index].mediaTimeUs;
+        if (!Number.isSafeInteger(previous) || !Number.isSafeInteger(current)) continue;
+        const delta = current - previous;
+        if (delta > 0) {
+            totalDeltaUs += delta;
+            deltaCount += 1;
+        }
+    }
+    if (!deltaCount || totalDeltaUs <= 0) return PATCH_VIDEO_FRAME_RATE;
+    const frameRate = Math.round((deltaCount * 1000000) / totalDeltaUs);
+    if (!Number.isSafeInteger(frameRate)) return PATCH_VIDEO_FRAME_RATE;
+    return Math.max(MIN_PATCH_VIDEO_FRAME_RATE, Math.min(MAX_PATCH_VIDEO_FRAME_RATE, frameRate));
+}
+
+function mainHeader(frameCount, frameRate) {
     const bytes = new Uint8Array(56);
     const view = new DataView(bytes.buffer);
-    view.setUint32(0, Math.round(1000000 / PATCH_VIDEO_FRAME_RATE), true);
-    view.setUint32(4, FRAME_BYTES * PATCH_VIDEO_FRAME_RATE, true);
+    view.setUint32(0, Math.round(1000000 / frameRate), true);
+    view.setUint32(4, FRAME_BYTES * frameRate, true);
     view.setUint32(12, 0x10, true);
     view.setUint32(16, frameCount, true);
     view.setUint32(24, 1, true);
@@ -73,11 +96,11 @@ function mainHeader(frameCount) {
     return bytes;
 }
 
-function streamHeader(frameCount) {
+function streamHeader(frameCount, frameRate) {
     const bytes = new Uint8Array(56);
     const view = new DataView(bytes.buffer);
     bytes.set(fourCC('vids'), 0); bytes.set(fourCC('DIB '), 4);
-    view.setUint32(20, 1, true); view.setUint32(24, PATCH_VIDEO_FRAME_RATE, true);
+    view.setUint32(20, 1, true); view.setUint32(24, frameRate, true);
     view.setUint32(32, frameCount, true); view.setUint32(36, FRAME_BYTES, true);
     view.setUint32(40, 0xffffffff, true); view.setUint16(52, 72, true); view.setUint16(54, 72, true);
     return bytes;
@@ -91,12 +114,15 @@ function bitmapHeader() {
     return bytes;
 }
 
-export function buildUncompressedAvi({bytes, frameCount}) {
+export function buildUncompressedAvi({bytes, frameCount, frameRate = PATCH_VIDEO_FRAME_RATE}) {
     if (!(bytes instanceof Uint8Array) || !Number.isSafeInteger(frameCount) || frameCount < 1 || bytes.byteLength !== frameCount * FRAME_BYTES) {
         throw new Error('AVI encoder requires complete 72x72 BGR24 frames');
     }
-    const header = list('hdrl', [chunk('avih', mainHeader(frameCount)),
-        list('strl', [chunk('strh', streamHeader(frameCount)), chunk('strf', bitmapHeader())])]);
+    if (!Number.isSafeInteger(frameRate) || frameRate < MIN_PATCH_VIDEO_FRAME_RATE || frameRate > MAX_PATCH_VIDEO_FRAME_RATE) {
+        throw new Error('AVI frame rate is outside supported bounds');
+    }
+    const header = list('hdrl', [chunk('avih', mainHeader(frameCount, frameRate)),
+        list('strl', [chunk('strh', streamHeader(frameCount, frameRate)), chunk('strf', bitmapHeader())])]);
     const frameChunkLength = 8 + FRAME_BYTES;
     const moviPayloadLength = 4 + frameCount * frameChunkLength;
     const indexPayloadLength = frameCount * 16;
@@ -127,7 +153,7 @@ export async function encodeGzipAvi(part) {
     if (typeof window.CompressionStream !== 'function' || typeof window.Blob !== 'function' || typeof window.Response !== 'function') {
         throw new Error('Native Blob, Response, and CompressionStream APIs are required for gzip AVI encoding');
     }
-    const avi = new window.Blob([buildUncompressedAvi(part)], {type: 'video/avi'});
+    const avi = new window.Blob([buildUncompressedAvi({...part, frameRate: resolveAviFrameRate(part)})], {type: 'video/avi'});
     return new window.Response(avi.stream().pipeThrough(new window.CompressionStream('gzip'))).blob();
 }
 

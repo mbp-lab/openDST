@@ -52,6 +52,19 @@ describe('uncompressed AVI patch video', () => {
         expect(textAt(avi, index + 8)).toBe('00db');
         expect(view.getUint32(index + 16, true)).toBe(4);
         expect(view.getUint32(index + 32, true)).toBe(4 + BGR24_FRAME_BYTES + 8);
+        expect(view.getUint32(avih + 8, true)).toBe(Math.round(1000000 / 30));
+        expect(view.getUint32(chunkOffset(avi, 'strh') + 32, true)).toBe(30);
+    });
+
+    test('writes AVI timing headers from the provided frame rate', () => {
+        const frames = new Uint8Array(BGR24_FRAME_BYTES * 3);
+        const avi = buildUncompressedAvi({bytes: frames, frameCount: 3, frameRate: 15});
+        const view = new DataView(avi.buffer, avi.byteOffset, avi.byteLength);
+        const avih = chunkOffset(avi, 'avih');
+        const strh = chunkOffset(avi, 'strh');
+
+        expect(view.getUint32(avih + 8, true)).toBe(Math.round(1000000 / 15));
+        expect(view.getUint32(strh + 32, true)).toBe(15);
     });
 
     test('wraps the AVI payload in native gzip for upload', async () => {

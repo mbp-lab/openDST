@@ -51,5 +51,5 @@ WebcamCapture
 ### Failure modes and hardening
 
 - Capability, MediaPipe asset/model, dimension, worker, encoding, and upload failures are surfaced in capture metadata and logs; missing detections are observable through sidecar states and counters. A held ROI currently has no time limit, so analyses must distinguish `held` from freshly detected frames.
-- AVI headers currently declare a fixed 30 FPS. Capture is callback-driven and may contain dropped or irregularly timed frames, so scientific timing must use sidecar `mediaTimeUs` until the AVI frame-rate contract is validated or changed.
+- AVI headers declare one constant FPS per part, derived from that part's `mediaTimeUs` intervals. Capture remains callback-driven and may contain dropped or irregularly timed frames, so scientific timing must use sidecar `mediaTimeUs`.
 - Before scientific deployment, validate model/runtime checksums and versions, browser/device support, camera color conversion, actual frame timing and drop behavior, ROI parameter defaults, prolonged detector misses, upload completeness, and end-to-end AVI decoding across analysis tools.
