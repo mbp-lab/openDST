@@ -127,6 +127,7 @@ export async function encodeGzipAvi(part) {
 
 function delay(milliseconds) { return new Promise(resolve => setTimeout(resolve, milliseconds)); }
 function defaultTracker() { return {registerUpload() {}, settleUpload() {}}; }
+let nextUploadSessionId = 0;
 
 function validatePart(part) {
     if (!part || !(part.bytes instanceof Uint8Array) || part.bytes.byteLength !== part.byteLength ||
@@ -147,6 +148,7 @@ export class FaceCropSink {
             throw new Error('Patch sink configuration is invalid');
         }
         Object.assign(this, {uploadResultFile, uploadTracker, encode, sleep, maxPendingParts, maxAttempts, retryDelayMs});
+        this.uploadSessionId = nextUploadSessionId++;
         this.pending = [];
         this.tail = Promise.resolve();
         this.results = [];
@@ -174,8 +176,8 @@ export class FaceCropSink {
     async uploadPart(part) {
         // AVI and face-event uploads are one logical result: the sidecar is not
         // attempted when the corresponding video artifact cannot be uploaded.
-        const aviId = 'patch-part-' + part.filename;
-        const eventsId = 'patch-events-' + part.faceEventsFilename;
+        const aviId = 'patch-part-' + this.uploadSessionId + '-' + part.filename;
+        const eventsId = 'patch-events-' + this.uploadSessionId + '-' + part.faceEventsFilename;
         this.uploadTracker.registerUpload(aviId); this.uploadTracker.registerUpload(eventsId);
         let avi;
         try {

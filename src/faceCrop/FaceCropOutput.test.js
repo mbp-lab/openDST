@@ -261,7 +261,7 @@ describe('FaceCropSink', () => {
         expect(uploads).toHaveBeenCalledTimes(4);
         expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {status: UPLOAD_STATUS.SUCCEEDED}, faceEvents: {attempts: 3}});
         expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
-            'patch-events-RESULT_introduction_1_patch_s000_p000.face-events.json',
+            'patch-events-1-RESULT_introduction_1_patch_s000_p000.face-events.json',
             UPLOAD_STATUS.FAILED
         );
     });
@@ -282,13 +282,34 @@ describe('FaceCropSink', () => {
         expect(uploads).toHaveBeenCalledTimes(3);
         expect(uploadTracker.registerUpload).toHaveBeenCalledTimes(2);
         expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
-            'patch-part-RESULT_introduction_1_patch_s000_p000.avi.gz',
+            'patch-part-2-RESULT_introduction_1_patch_s000_p000.avi.gz',
             UPLOAD_STATUS.FAILED
         );
         expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
-            'patch-events-RESULT_introduction_1_patch_s000_p000.face-events.json',
+            'patch-events-2-RESULT_introduction_1_patch_s000_p000.face-events.json',
             UPLOAD_STATUS.FAILED
         );
         expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {attempts: 3}});
+    });
+
+    test('uses distinct tracking IDs for repeated captures with the same filename', async () => {
+        const firstTracker = tracker();
+        const secondTracker = tracker();
+        const options = {
+            uploadResultFile: jest.fn(() => Promise.resolve()),
+            encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
+            sleep: jest.fn(() => Promise.resolve())
+        };
+        const firstSink = new FaceCropSink({...options, uploadTracker: firstTracker});
+        const secondSink = new FaceCropSink({...options, uploadTracker: secondTracker});
+
+        await firstSink.enqueuePart(sealedPart(0));
+        await secondSink.enqueuePart(sealedPart(0));
+        await Promise.all([firstSink.finalize(), secondSink.finalize()]);
+
+        const firstIds = firstTracker.registerUpload.mock.calls.map(call => call[0]);
+        const secondIds = secondTracker.registerUpload.mock.calls.map(call => call[0]);
+        expect(firstIds).not.toEqual(secondIds);
+        expect(new Set([...firstIds, ...secondIds]).size).toBe(4);
     });
 });
