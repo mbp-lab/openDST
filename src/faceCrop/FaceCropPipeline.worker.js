@@ -208,7 +208,7 @@ function axisWeights(sourceSize) {
 
 export function processFaceCropFrame({rgbx, width, height, roi, output}) {
     if (!(rgbx instanceof Uint8Array) || rgbx.byteLength !== width * height * 4) {
-        throw new Error('RGBX source must be a tightly packed Uint8Array');
+        throw new Error('RGBA source must be a tightly packed Uint8Array');
     }
     validateFaceRoiDescriptor(roi);
     if (roi.x + roi.size > width || roi.y + roi.size > height) throw new Error('ROI extends beyond source dimensions');
@@ -325,18 +325,19 @@ export class FaceCropPipeline {
     }
 
     async processFrame({frame, width, height, timestampUs, wallClockMs}) {
-        // Use ImageData so MediaPipe stays on its CPU-readable path when WebGL
-        // is unavailable. The same RGBX buffer is used for crop extraction.
         try {
-            const rgbx = new Uint8Array(width * height * 4);
-            await frame.copyTo(rgbx, {format: 'RGBX', colorSpace: 'srgb'});
-            const imageData = new ImageData(new Uint8ClampedArray(rgbx.buffer), width, height);
-            const detected = this.detector.detectForVideo(imageData, timestampUs / 1000);
+            const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
             const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
             if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
+            const sourceRoi = selection.roi;
+            const rgba = new Uint8Array(sourceRoi.size * sourceRoi.size * 4);
+            await frame.copyTo(rgba, {format: 'RGBA', colorSpace: 'srgb', rect: {
+                x: sourceRoi.x, y: sourceRoi.y, width: sourceRoi.size, height: sourceRoi.size
+            }});
+            const localRoi = {...sourceRoi, x: 0, y: 0};
             return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({
-                writeBgr24: output => processFaceCropFrame({width, height, rgbx, roi: selection.roi, output}),
-                sourceWidth: width, sourceHeight: height, roi: selection.roi, provenance: selection, timestampUs, wallClockMs})};
+                writeBgr24: output => processFaceCropFrame({width: sourceRoi.size, height: sourceRoi.size, rgbx: rgba, roi: localRoi, output}),
+                sourceWidth: width, sourceHeight: height, roi: sourceRoi, provenance: selection, timestampUs, wallClockMs})};
         } finally {
             frame.close();
         }

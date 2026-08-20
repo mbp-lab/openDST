@@ -106,14 +106,14 @@ export async function probeFaceCropCapability(video) {
     let frame;
     try {
         frame = new window.VideoFrame(video);
-        checks.videoFrame.construct = {status: 'passed'};
-        await frame.copyTo(new Uint8Array(frame.displayWidth * frame.displayHeight * 4), {format: 'RGBX', colorSpace: 'srgb'});
-        checks.videoFrame.copyTo = {status: 'passed', format: 'RGBX', colorSpace: 'srgb'};
+        checks.videoFrame.construct = {status: 'passed', width: frame.displayWidth, height: frame.displayHeight};
+        await frame.copyTo(new Uint8Array(frame.displayWidth * frame.displayHeight * 4), {format: 'RGBA', colorSpace: 'srgb'});
+        checks.videoFrame.copyTo = {status: 'passed', format: 'RGBA', colorSpace: 'srgb'};
         return {supported: true, capability: {status: 'passed', checks}, source};
     } catch (error) {
         if (!checks.videoFrame.construct) checks.videoFrame.construct = {status: 'failed'};
         else checks.videoFrame.copyTo = {status: 'failed'};
-        return failed(error.message || 'VideoFrame RGBX/sRGB extraction failed',
+        return failed(error.message || 'VideoFrame RGBA/sRGB extraction failed',
             checks.videoFrame.construct.status === 'failed' ? 'videoFrame.construct' : 'videoFrame.copyTo', error);
     } finally {
         if (frame) frame.close();
@@ -356,7 +356,8 @@ export class FaceCropCaptureController {
             if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
             const timestampUs = Math.round(metadata.mediaTime * 1000000);
             frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
-            const result = await this.worker.processFrame({frame, ...source, timestampUs, wallClockMs});
+            const frameSource = {width: frame.displayWidth, height: frame.displayHeight};
+            const result = await this.worker.processFrame({frame, ...frameSource, timestampUs, wallClockMs});
             frame = null;
             await this.enqueueParts(result.parts);
             if (!result.accepted) {
@@ -472,7 +473,7 @@ export class FaceCropCaptureController {
             manifest: this.manifest,
             configuration: this.configurationMetadata(),
             output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24', frameRate: PATCH_VIDEO_FRAME_RATE, frameSize: 72,
-                extraction: {api: 'VideoFrame.copyTo', format: 'RGBX', colorSpace: 'srgb'}},
+                extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
                 noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames, acceptedFrames: this.acceptedFrames,
                 skippedFrames: this.skippedFrames}
