@@ -124,6 +124,14 @@ describe('FaceRoiProvider', () => {
         });
     });
 
+    test('uses the largest centered square before a face is detected', () => {
+        const provider = new FaceRoiProvider();
+        expect(provider.getSelection({width: 640, height: 480, detections: [], timestampMs: 0})).toMatchObject({
+            state: 'default',
+            roi: {x: 80, y: 0, size: 480}
+        });
+    });
+
     test('uses documented tie breakers for equal-size candidates', () => {
         const provider = new FaceRoiProvider({scale: 1, smoothingTauMs: 0});
         const selection = provider.getSelection({
@@ -186,11 +194,11 @@ describe('FaceRoiProvider', () => {
             .toMatchObject({state: 'reacquired'});
     });
 
-    test('does not return an out-of-bounds held crop after a source resize', () => {
+    test('uses a centered default crop after a source resize', () => {
         const provider = new FaceRoiProvider();
         provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 200, 200)], timestampMs: 0});
 
-        expect(provider.getRoi({width: 320, height: 240, detections: [], timestampMs: 100})).toBeNull();
+        expect(provider.getRoi({width: 320, height: 240, detections: [], timestampMs: 100})).toMatchObject({x: 40, y: 0, size: 240});
     });
 });
 

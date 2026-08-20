@@ -116,9 +116,18 @@ export class FaceRoiProvider {
         this.hadMiss = false;
     }
 
+    defaultRoi(width, height) {
+        const size = Math.min(width, height);
+        return validateFaceRoiDescriptor({...FACE_ROI_DESCRIPTOR,
+            x: Math.round((width - size) / 2),
+            y: Math.round((height - size) / 2),
+            size});
+    }
+
     getSelection({width, height, detections, timestampMs}) {
         // Selection is deterministic: largest eligible area wins, then score and
-        // positional tie-breakers. A valid previous ROI is held through misses.
+        // positional tie-breakers. A valid previous ROI is held through misses;
+        // before the first detection, use the largest centered square.
         requireInteger(width, 'Source width', PATCH_SIZE);
         requireInteger(height, 'Source height', PATCH_SIZE);
         const eligible = eligibleDetections(detections, this.configuration.minDetectionConfidence);
@@ -128,9 +137,9 @@ export class FaceRoiProvider {
                 return {roi: {...this.previous}, state: 'held', candidateCount: 0, selectedScore: null,
                     selectedBoundingBox: null, tieBreakOccurred: false};
             }
-            this.previous = null;
+            this.previous = this.defaultRoi(width, height);
             this.previousDetectionTimestampMs = null;
-            return {roi: null, state: 'skipped', candidateCount: 0, selectedScore: null,
+            return {roi: {...this.previous}, state: 'default', candidateCount: 0, selectedScore: null,
                 selectedBoundingBox: null, tieBreakOccurred: false};
         }
 
