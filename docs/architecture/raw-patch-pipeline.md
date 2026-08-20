@@ -33,10 +33,15 @@ The processor accepts a descriptor with all of these required fields:
 
 ### Face ROI mapping
 
-The face provider uses the MediaPipe short-range BlazeFace detector with the v2 `dynamic-face-square` descriptor. It filters detections at the resolved MediaPipe confidence threshold (0.5 by default) and selects the eligible face with the largest unmodified source-pixel bounding-box area on every detector run. Equal areas are resolved deterministically by confidence, then top-left position, then result index; the provider intentionally does not identify or track a person. The selected box is expanded by the configured scale (1.5 by default), rounded up to an integer source-pixel size, and shifted vertically by the configured signed ratio (0.15 by default; positive values shift upward and negative values downward). The crop is clamped to the source and smoothed between frames using an exponential moving average with a configurable 100 ms time constant by default. Each update uses elapsed media time, so smoothing remains stable when capture cadence varies. Once a face has been selected, no-face detector results retain that last crop indefinitely so every later accepted AVI frame remains a source-image crop. Before the first eligible face, no crop is emitted. The crop is then reduced to 72 by 72 with
+The face provider uses the MediaPipe short-range BlazeFace detector with the v2 `dynamic-face-square` descriptor. It filters detections at the resolved MediaPipe confidence threshold (0.5 by default) and selects the eligible face with the largest unmodified source-pixel bounding-box area on every detector run. Equal areas are resolved deterministically by confidence, then top-left position, then result index; the provider intentionally does not identify or track a person. The selected box is expanded by the configured scale (1.5 by default), rounded up to an integer source-pixel size, and shifted vertically by the configured signed ratio (0.15 by default; positive values shift upward and negative values downward). The crop is clamped to the source and smoothed between frames using an exponential moving average with a configurable 100 ms time constant by default. Each update uses elapsed media time, so smoothing remains stable when capture cadence varies. Once a face has been selected, no-face detector results retain that last crop indefinitely so every later accepted AVI frame remains a source-image crop. The crop is then reduced to 72 by 72 with
 `area-average-v1`: each output pixel is the area-weighted RGB average of its
 source-pixel overlap, using integer half-up rounding. This remains an axis-aligned crop: affine extraction and
 rotated sampling are not performed.
+
+The provider emits an in-bounds ROI for every processed frame: `default`
+before any eligible face, `largest` when a face is selected, `held` during
+misses after a prior selection, and `reacquired` on the first selected frame
+after misses.
 
 ## Vendored MediaPipe assets
 

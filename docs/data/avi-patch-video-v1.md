@@ -55,9 +55,8 @@ The sidecar also records the resolved selection configuration: MediaPipe
 confidence and suppression thresholds and the policy identifier
 `largest-eligible-bounding-box-v1`. After the first face selection, missed
 detections retain the last ROI indefinitely and are represented as `held` AVI
-frames. Only the period before any eligible face exists has no AVI frame; its
-aggregate count is in terminal participant metadata as
-`noInitialFaceSkippedFrames`.
+frames. Before any eligible face exists, `default` frames are emitted using the
+largest centered square.
 
 ## Selection semantics
 

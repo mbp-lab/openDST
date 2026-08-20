@@ -221,7 +221,6 @@ export class FaceCropCaptureController {
         this.lastPresentedFrame = null;
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
-        this.noInitialFaceSkippedFrames = 0;
         this.capability = {status: 'not-run', checks: {}};
         this.source = null;
         this.manifest = null;
@@ -362,7 +361,6 @@ export class FaceCropCaptureController {
             await this.enqueueParts(result.parts);
             if (!result.accepted) {
                 this.faceDetectionMisses += 1;
-                this.noInitialFaceSkippedFrames += 1;
                 return;
             }
             if (result.detectionState === 'largest' || result.detectionState === 'reacquired') this.faceDetections += 1;
@@ -420,8 +418,7 @@ export class FaceCropCaptureController {
             status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
                 : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames, acceptedFrames: this.acceptedFrames,
-                skippedFrames: this.skippedFrames},
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames},
             parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
                 segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, status: part.status}))
         };
@@ -475,8 +472,7 @@ export class FaceCropCaptureController {
             output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24', frameRate: PATCH_VIDEO_FRAME_RATE, frameSize: 72,
                 extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                noInitialFaceSkippedFrames: this.noInitialFaceSkippedFrames, acceptedFrames: this.acceptedFrames,
-                skippedFrames: this.skippedFrames}
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames}
         };
     }
 
