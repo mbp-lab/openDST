@@ -5,9 +5,11 @@ import {
     DEFAULT_FACE_DETECTION_MIN_CONFIDENCE,
     DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD,
     DEFAULT_FACE_DETECTION_DELEGATE,
+    DEFAULT_FACE_CROP_WORKER_COUNT,
     FACE_CROP_STATUS,
     FaceCropCaptureController,
-    resolveFaceCropConfiguration
+    resolveFaceCropConfiguration,
+    resolveStudyResultId
 } from './FaceCropCapture';
 
 // These tests protect the browser-side lifecycle boundary: unsupported capture
@@ -62,6 +64,13 @@ describe('resolveFaceCropConfiguration', () => {
             .toBe(DEFAULT_FACE_ROI_SMOOTHING_TAU_MS);
     });
 
+    test('bounds the experimental analysis worker count to one or two', () => {
+        expect(resolveFaceCropConfiguration({}).workerCount).toBe(DEFAULT_FACE_CROP_WORKER_COUNT);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}).workerCount).toBe(2);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '3'}).workerCount).toBe(1);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '1.5'}).workerCount).toBe(1);
+    });
+
     test('resolves bounded detector thresholds and time-based face hold configuration', () => {
         const configuration = resolveFaceCropConfiguration({
             REACT_APP_FACE_DETECTION_MIN_CONFIDENCE: '0.65',
@@ -96,6 +105,7 @@ describe('resolveFaceCropConfiguration', () => {
         window.CompressionStream = jest.fn();
 
         try {
+            const createPipelineWorker = jest.fn(() => pipelineWorker);
             const controller = new FaceCropCaptureController({
                 video,
                 studyResultId: 'RESULT',
@@ -104,7 +114,7 @@ describe('resolveFaceCropConfiguration', () => {
                 configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
                 uploadResultFile: jest.fn(),
-                createPipelineWorker: jest.fn(() => pipelineWorker)
+                createPipelineWorker
             });
 
             const preparing = controller.prepare();
@@ -112,15 +122,49 @@ describe('resolveFaceCropConfiguration', () => {
             expect(pipelineWorker.initialize).not.toHaveBeenCalled();
             video.videoWidth = 72;
             video.videoHeight = 72;
+            video.readyState = 2;
             callback(0, {mediaTime: 0, presentedFrames: 1});
             await expect(preparing).resolves.toBe(FACE_CROP_STATUS.DISABLED);
             expect(pipelineWorker.initialize).toHaveBeenCalledTimes(1);
+            expect(createPipelineWorker).toHaveBeenCalledTimes(1);
+            expect(pipelineWorker.initialize.mock.calls[0][0].configuration.analysisOnly).toBeUndefined();
             expect(pipelineWorker.warmup).toHaveBeenCalledTimes(3);
             expect(controller.state).toBe('prepared');
         } finally {
             window.VideoFrame = original.VideoFrame;
             window.CompressionStream = original.CompressionStream;
         }
+    });
+
+    test('waits for current frame data when dimensions are populated before video readiness', async () => {
+        const video = {
+            videoWidth: 480, videoHeight: 640, readyState: 0,
+            requestVideoFrameCallback: jest.fn(), cancelVideoFrameCallback: jest.fn()
+        };
+        let callback;
+        video.requestVideoFrameCallback.mockImplementation(nextCallback => { callback = nextCallback; return 1; });
+        const controller = new FaceCropCaptureController({
+            video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}),
+            uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
+        });
+
+        let resolved = false;
+        const ready = controller.waitForVideoReady().then(value => { resolved = value; });
+        await Promise.resolve();
+        expect(resolved).toBe(false);
+        expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
+
+        video.readyState = 2;
+        callback();
+        await ready;
+        expect(resolved).toBe(true);
+    });
+
+    test('uses the JATOS result ID while the React prop is still null', () => {
+        expect(resolveStudyResultId({studyResultId: null}, {studyResultId: 163})).toBe(163);
+        expect(resolveStudyResultId({studyResultId: 164}, {studyResultId: 163})).toBe(164);
+        expect(resolveStudyResultId({}, null)).toBeNull();
     });
 
     // Stopping must cancel scheduling but still await work already handed off.
@@ -142,6 +186,7 @@ describe('resolveFaceCropConfiguration', () => {
         const video = {
             videoWidth: 72,
             videoHeight: 72,
+            readyState: 2,
             requestVideoFrameCallback: jest.fn(() => 7),
             cancelVideoFrameCallback: jest.fn()
         };
@@ -177,7 +222,8 @@ describe('resolveFaceCropConfiguration', () => {
                 },
                 identity: expect.objectContaining({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1})
             }));
-            await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.COMPLETE);
+            await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.INCOMPLETE);
+            expect(controller.incompleteReason).toBe('No video frame callbacks were received during face-crop capture');
 
             expect(video.cancelVideoFrameCallback).toHaveBeenCalledWith(7);
             expect(pipelineWorker.close).toHaveBeenCalledTimes(1);
@@ -210,6 +256,7 @@ describe('resolveFaceCropConfiguration', () => {
         const video = {
             videoWidth: 72,
             videoHeight: 72,
+            readyState: 2,
             requestVideoFrameCallback: jest.fn(nextCallback => {
                 callback = nextCallback;
                 callbackId += 1;
@@ -251,6 +298,7 @@ describe('resolveFaceCropConfiguration', () => {
             await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.COMPLETE);
             expect(uploadResultFile).toHaveBeenCalledTimes(3);
             expect(uploadResultFile.mock.calls[2][1]).toContain('_manifest.json');
+            expect(JSON.parse(uploadResultFile.mock.calls[2][0]).statistics.frameCallbacks).toBe(1);
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
         } finally {
             window.VideoFrame = original.VideoFrame;

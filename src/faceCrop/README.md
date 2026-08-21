@@ -18,7 +18,7 @@ WebcamCapture
      -> AVI and face-events sidecar uploads
 ```
 
-`FaceCropCaptureController` owns browser APIs, frame scheduling, lifecycle, and participant metadata. `PipelineWorker` is the ordered request bridge between the main thread and the worker. The worker owns MediaPipe, ROI selection, RGBA-to-BGR24 conversion, provenance, and part segmentation. `FaceCropSink` owns bounded transport, retries, upload tracking, and the coupling between each AVI part and its JSON sidecar.
+`FaceCropCaptureController` owns browser APIs, frame scheduling, lifecycle, and participant metadata. `PipelineWorker` is the ordered request bridge. With one worker, that worker performs the full pipeline. With two workers, each worker performs MediaPipe detection and RGBA extraction, while the controller commits their results in source order using the same ROI, conversion, provenance, and segmentation logic. `FaceCropSink` owns bounded transport, retries, upload tracking, and the coupling between each AVI part and its JSON sidecar.
 
 ## Files
 
@@ -32,7 +32,7 @@ WebcamCapture
 ## Invariants
 
 - Face-crop capture is optional and disabled by default; unsupported browser APIs must not block the main recording flow.
-- One worker request is in flight at a time, preserving frame order and bounding memory use.
+- At most one request is in flight per worker and at most two frames are held across in-flight and reordered results, preserving commit order and bounding memory use.
 - Face selection is deterministic: the largest eligible detection wins, followed by stable tie-breakers; a centered largest-square fallback is used before the first detection, and a valid previous ROI is held through later detector misses.
 - A source-dimension change starts a new segment.
 - Each AVI upload has a matching `.face-events.json` sidecar, and each capture attempt has a manifest listing its parts. Either part artifact failing makes the logical part incomplete.

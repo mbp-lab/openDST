@@ -26,6 +26,15 @@ function timingNow() {
     return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
 }
 
+function warmupDetector(detector, frame, timestampUs) {
+    try {
+        detector.detectForVideo(frame, timestampUs / 1000);
+        return {};
+    } finally {
+        frame.close();
+    }
+}
+
 function loadVisionTasks() {
     // The vendored bundle is loaded synchronously inside the worker; keeping it
     // here makes the same module usable in both the worker and Jest environments.
@@ -386,32 +395,67 @@ export class FaceCropPipeline {
     }
 
     warmup({frame, timestampUs}) {
-        this.detector.detectForVideo(frame, timestampUs / 1000);
-        return {};
+        return warmupDetector(this.detector, frame, timestampUs);
     }
 
     finish() { return {parts: this.segmenter.finish()}; }
     close() { if (this.detector) this.detector.close(); this.detector = null; }
 }
 
+export class FaceCropAnalysisPipeline {
+    async initialize({configuration}) {
+        this.detector = await createMediaPipeFaceDetector({minDetectionConfidence: configuration.faceDetectionMinConfidence,
+            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold, delegate: configuration.faceDetectionDelegate});
+    }
+
+    async processFrame({frame, width, height, timestampUs, wallClockMs, sequence}) {
+        const startedAt = timingNow();
+        try {
+            const detectionStartedAt = timingNow();
+            const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
+            const detectionMs = timingNow() - detectionStartedAt;
+            const copyStartedAt = timingNow();
+            const rgbx = await copyPackedRgba(frame, width, height);
+            const rgbaCopyMs = timingNow() - copyStartedAt;
+            return {sequence, width, height, timestampUs, wallClockMs, detections: detected.detections, rgbx,
+                timings: {detectionMs, rgbaCopyMs, analysisMs: timingNow() - startedAt}};
+        } finally {
+            frame.close();
+        }
+    }
+
+    warmup({frame, timestampUs}) {
+        return warmupDetector(this.detector, frame, timestampUs);
+    }
+
+    close() { if (this.detector) this.detector.close(); this.detector = null; }
+}
+
 /* eslint-disable no-restricted-globals */
-if (typeof self !== 'undefined') {
+if (typeof self !== 'undefined' && typeof window === 'undefined') {
     // Keep the protocol small and explicit: initialize, process frames in order,
     // finish pending parts, then close the detector during teardown.
     const pipeline = new FaceCropPipeline();
+    const analysisPipeline = new FaceCropAnalysisPipeline();
+    let activePipeline = pipeline;
     const handlers = {
-        initialize: payload => pipeline.initialize(payload).then(() => ({})),
-        processFrame: payload => pipeline.processFrame(payload),
-        warmup: payload => pipeline.warmup(payload),
+        initialize: payload => {
+            activePipeline = payload.configuration && payload.configuration.analysisOnly ? analysisPipeline : pipeline;
+            return activePipeline.initialize(payload).then(() => ({}));
+        },
+        processFrame: payload => activePipeline.processFrame(payload),
+        warmup: payload => activePipeline.warmup(payload),
         finish: () => pipeline.finish(),
-        close: () => { pipeline.close(); return {}; }
+        close: () => { pipeline.close(); analysisPipeline.close(); return {}; }
     };
     self.onmessage = async event => {
         const {type, payload = {}} = event.data || {};
         try {
             if (!handlers[type]) throw new Error('Unknown face-crop worker request: ' + type);
             const result = await handlers[type](payload);
-            self.postMessage({result}, (result.parts || []).map(part => part.bytes.buffer));
+            const transfer = (result.parts || []).map(part => part.bytes.buffer);
+            if (result.rgbx) transfer.push(result.rgbx.buffer);
+            self.postMessage({result}, transfer);
         } catch (error) {
             console.error('[face-crop] Worker request failed', {type, error});
             self.postMessage({error: {name: error && error.name ? error.name : 'Error',

@@ -1,5 +1,6 @@
 import {UPLOAD_STATUS} from '../uploadState';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
+import {FaceRoiProvider, FaceCropSegmenter, processFaceCropFrame} from './FaceCropPipeline.worker';
 
 // Face-crop capture is an optional companion to MediaRecorder. It must fail
 // closed so unsupported browsers never affect the participant-facing recording.
@@ -19,6 +20,7 @@ export const DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD = 0.3;
 export const FACE_DETECTION_DELEGATES = ['CPU', 'GPU'];
 export const DEFAULT_FACE_DETECTION_DELEGATE = 'CPU';
 export const FACE_DETECTION_WARMUP_FRAMES = 3;
+export const DEFAULT_FACE_CROP_WORKER_COUNT = 1;
 
 function boundedNumber(value, minimum, maximum, fallback, integer = false) {
     const parsed = Number(value);
@@ -58,7 +60,8 @@ export function resolveFaceCropConfiguration(environment = process.env) {
             0,
             1,
             DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD
-        )
+        ),
+        workerCount: boundedNumber(environment.REACT_APP_FACE_CROP_WORKER_COUNT, 1, 2, DEFAULT_FACE_CROP_WORKER_COUNT, true)
     };
 }
 
@@ -81,7 +84,12 @@ function supportedDimensions({width, height}) {
     return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width >= 72 && height >= 72 && width * height <= MAX_SOURCE_PIXELS;
 }
 
-const FRAME_TIMING_STAGES = ['workerRoundTripMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs', 'pipelineTotalMs', 'enqueuePartsMs', 'totalMs'];
+function videoHasCurrentFrame(video) {
+    const source = dimensions(video);
+    return supportedDimensions(source) && Number.isInteger(source.readyState) && source.readyState >= 2;
+}
+
+const FRAME_TIMING_STAGES = ['workerRoundTripMs', 'analysisMs', 'commitMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs', 'pipelineTotalMs', 'enqueuePartsMs', 'totalMs'];
 
 function createTimingMetrics() {
     return FRAME_TIMING_STAGES.reduce((metrics, stage) => {
@@ -239,6 +247,14 @@ export class FaceCropCaptureController {
         this.frameWait = null;
         this.captureLoop = null;
         this.worker = null;
+        this.workers = [];
+        this.inFlight = new Map();
+        this.analysisResults = new Map();
+        this.nextSequence = 0;
+        this.nextCommitSequence = 0;
+        this.nextWorker = 0;
+        this.roi = null;
+        this.segmenter = null;
         this.incompleteReason = null;
         this.captureId = providedCaptureId || createCaptureId(studyPage, videoCounter);
         this.acceptedFrames = 0;
@@ -251,6 +267,7 @@ export class FaceCropCaptureController {
         this.capability = {status: 'not-run', checks: {}};
         this.source = null;
         this.manifest = null;
+        this.frameCallbacks = 0;
     }
 
     start() {
@@ -264,14 +281,19 @@ export class FaceCropCaptureController {
     }
 
     waitForVideoReady() {
-        if (supportedDimensions(dimensions(this.video))) return Promise.resolve(true);
+        if (videoHasCurrentFrame(this.video)) return Promise.resolve(true);
         return new Promise(resolve => {
-            const callbackId = this.video.requestVideoFrameCallback(() => {
-                if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
-                this.frameWait = null;
-                resolve(true);
-            });
-            this.frameWait = {callbackId, resolve: () => resolve(false)};
+            const schedule = () => {
+                const callbackId = this.video.requestVideoFrameCallback(() => {
+                    if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
+                    if (videoHasCurrentFrame(this.video)) {
+                        this.frameWait = null;
+                        resolve(true);
+                    } else schedule();
+                });
+                this.frameWait = {callbackId, resolve: () => resolve(false)};
+            };
+            schedule();
         });
     }
 
@@ -303,8 +325,9 @@ export class FaceCropCaptureController {
         }};
         try {
             this.worker = this.createPipelineWorker();
+            this.workers = this.configuration.workerCount === 2 ? [this.worker, this.createPipelineWorker()] : [this.worker];
             const config = this.configuration;
-            await this.worker.initialize({
+            const initializePayload = {
                 configuration: {
                     faceRoiSmoothingTauMs: config.faceRoiSmoothingTauMs,
                     faceRoiScale: config.faceRoiScale,
@@ -319,7 +342,18 @@ export class FaceCropCaptureController {
                     videoCounter: this.videoCounter,
                     captureId: this.captureId
                 }
-            });
+            };
+            if (config.workerCount === 2) initializePayload.configuration.analysisOnly = true;
+            await Promise.all(this.workers.map(worker => worker.initialize(initializePayload)));
+            if (config.workerCount === 2) {
+                this.roi = new FaceRoiProvider({smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale,
+                    verticalShiftRatio: config.faceRoiVerticalShiftRatio, minDetectionConfidence: config.faceDetectionMinConfidence});
+                this.segmenter = new FaceCropSegmenter({studyResultId: this.studyResultId, studyPage: this.studyPage,
+                    videoCounter: this.videoCounter, captureId: this.captureId, selectionConfiguration: {
+                        minDetectionConfidence: config.faceDetectionMinConfidence,
+                        minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
+                        policy: 'largest-eligible-bounding-box-v1'}});
+            }
         } catch (error) {
             await this.closeWorker();
             return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
@@ -334,8 +368,13 @@ export class FaceCropCaptureController {
                 const timestampUs = index * 1000 + Math.round((performance.now() - warmupStartedAt) * 1000);
                 const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
                 try {
-                    await this.worker.warmup({frame, width: frame.displayWidth || source.width,
-                        height: frame.displayHeight || source.height, timestampUs});
+                    await Promise.all(this.workers.map(worker => {
+                        const warmupFrame = worker === this.worker ? frame : new window.VideoFrame(this.video, {timestamp: timestampUs});
+                        return worker.warmup({frame: warmupFrame, width: warmupFrame.displayWidth || source.width,
+                            height: warmupFrame.displayHeight || source.height, timestampUs}).finally(() => {
+                            if (warmupFrame !== frame) warmupFrame.close();
+                        });
+                    }));
                     this.detectorWarmup.completed += 1;
                 } finally {
                     frame.close();
@@ -397,6 +436,7 @@ export class FaceCropCaptureController {
             const callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
                 if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
                 this.frameWait = null;
+                this.frameCallbacks += 1;
                 resolve({metadata, wallClockMs: Date.now()});
             });
             this.frameWait = {callbackId, resolve};
@@ -420,6 +460,7 @@ export class FaceCropCaptureController {
     }
 
     async processFrame(metadata, wallClockMs = Date.now()) {
+        if (this.configuration.workerCount === 2) return this.processAnalysisFrame(metadata, wallClockMs);
         let frame;
         const startedAt = performance.now();
         try {
@@ -452,7 +493,60 @@ export class FaceCropCaptureController {
         }
     }
 
+    async processAnalysisFrame(metadata, wallClockMs) {
+        while (this.inFlight.size + this.analysisResults.size >= 2) {
+            if (this.state !== 'capturing') return;
+            if (!this.inFlight.size) {
+                this.markIncomplete('Face-crop analysis result sequence gap');
+                return;
+            }
+            await Promise.race(this.inFlight.values());
+        }
+        const sequence = this.nextSequence++;
+        const worker = this.workers[this.nextWorker++ % this.workers.length];
+        const startedAt = performance.now();
+        const source = dimensions(this.video);
+        this.source = source;
+        if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
+        const timestampUs = Math.round(metadata.mediaTime * 1000000);
+        const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
+        const task = worker.processFrame({frame, width: frame.displayWidth, height: frame.displayHeight, timestampUs, wallClockMs, sequence})
+            .then(result => this.commitAnalysisResult({result, sequence, startedAt}))
+            .catch(error => this.markIncomplete(error.message || 'Face-crop frame processing failed'))
+            .finally(() => this.inFlight.delete(sequence));
+        this.inFlight.set(sequence, task);
+    }
+
+    async commitAnalysisResult({result, sequence, startedAt}) {
+        this.analysisResults.set(sequence, result);
+        while (this.analysisResults.has(this.nextCommitSequence)) {
+            const current = this.analysisResults.get(this.nextCommitSequence);
+            this.analysisResults.delete(this.nextCommitSequence++);
+            const commitStartedAt = performance.now();
+            const selection = this.roi.getSelection({width: current.width, height: current.height,
+                detections: current.detections, timestampMs: current.timestampUs / 1000});
+            const parts = selection.roi ? this.segmenter.appendFrame({
+                writeBgr24: output => processFaceCropFrame({width: current.width, height: current.height, rgbx: current.rgbx, roi: selection.roi, output}),
+                sourceWidth: current.width, sourceHeight: current.height, roi: selection.roi, provenance: selection,
+                timestampUs: current.timestampUs, wallClockMs: current.wallClockMs}) : [];
+            const enqueueStartedAt = performance.now();
+            await this.enqueueParts(parts);
+            addTiming(this.frameTimings, 'enqueuePartsMs', performance.now() - enqueueStartedAt);
+            addTiming(this.frameTimings, 'detectionMs', current.timings.detectionMs);
+            addTiming(this.frameTimings, 'rgbaCopyMs', current.timings.rgbaCopyMs);
+            addTiming(this.frameTimings, 'analysisMs', current.timings.analysisMs);
+            const commitDurationMs = performance.now() - commitStartedAt;
+            addTiming(this.frameTimings, 'commitMs', commitDurationMs);
+            addTiming(this.frameTimings, 'workerRoundTripMs', performance.now() - startedAt);
+            addTiming(this.frameTimings, 'totalMs', performance.now() - startedAt);
+            if (selection.state === 'largest' || selection.state === 'reacquired') this.faceDetections += 1;
+            else this.faceDetectionMisses += 1;
+            this.acceptedFrames += 1;
+        }
+    }
+
     async enqueueParts(parts = []) {
+        if (!parts.length) return;
         for (const part of parts) await this.sink.enqueuePart(part);
     }
 
@@ -469,7 +563,13 @@ export class FaceCropCaptureController {
         // failure makes the logical face-crop capture incomplete.
         let result = {parts: []};
         try {
-            if (this.worker) await this.enqueueParts((await this.worker.finish()).parts);
+            if (this.frameCallbacks === 0) {
+                this.incompleteReason = this.incompleteReason || 'No video frame callbacks were received during face-crop capture';
+            }
+            if (this.configuration.workerCount === 2) {
+                await Promise.all(this.inFlight.values());
+                await this.enqueueParts(this.segmenter.finish());
+            } else if (this.worker) await this.enqueueParts((await this.worker.finish()).parts);
             result = await this.sink.finalize();
             if (result.parts.some(part => part.status !== UPLOAD_STATUS.SUCCEEDED)) {
                 this.incompleteReason = 'One or more patch-video uploads failed';
@@ -498,8 +598,8 @@ export class FaceCropCaptureController {
             status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
                 : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings,
-                detectorWarmup: this.detectorWarmup},
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,
+                frameTimings: this.frameTimings, detectorWarmup: this.detectorWarmup},
             parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
                 segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, status: part.status}))
         };
@@ -531,6 +631,7 @@ export class FaceCropCaptureController {
         const config = this.configuration;
         return {requestedMode: config.requestedMode, appliedMode: config.mode,
             roi: {smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale, verticalShiftRatio: config.faceRoiVerticalShiftRatio},
+            workerCount: config.workerCount,
             detector: {delegate: config.faceDetectionDelegate, minConfidence: config.faceDetectionMinConfidence,
                 minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold},
             selectionPolicy: 'largest-eligible-bounding-box-v1'};
@@ -555,13 +656,13 @@ export class FaceCropCaptureController {
                 aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', frameSize: 72,
                 extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings,
-                detectorWarmup: this.detectorWarmup}
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,
+                frameTimings: this.frameTimings, detectorWarmup: this.detectorWarmup}
         };
     }
 
     setStatus(status, reason) {
-        // Status metadata is the durable diagnostic record consumed by Main;
+        // Status metadata is consumed by Main;
         // terminal failures are reported but do not block the study flow.
         this.status = status;
         const metadata = {...this.metadata(status), reason: reason || null};
@@ -574,11 +675,12 @@ export class FaceCropCaptureController {
     }
 
     async closeWorker() {
-        if (!this.worker) return;
-        const worker = this.worker;
+        if (!this.workers.length) return;
+        const workers = this.workers;
         this.worker = null;
+        this.workers = [];
         try {
-            await worker.close();
+            await Promise.all(workers.map(worker => worker.close()));
         } catch (error) {
             console.warn('[face-crop] Worker cleanup failed', error);
         }
@@ -588,6 +690,10 @@ export class FaceCropCaptureController {
 let nextCaptureId = 0;
 function createCaptureId(studyPage, videoCounter) {
     return 'capture-' + String(studyPage) + '-' + String(videoCounter) + '-' + Date.now() + '-' + nextCaptureId++;
+}
+
+export function resolveStudyResultId(props = {}, jatosApi = typeof window !== 'undefined' ? window.jatos : null) {
+    return props.studyResultId || (jatosApi && jatosApi.studyResultId) || null;
 }
 
 function reportStatus(props, status, reason) {
@@ -615,7 +721,7 @@ function createFaceCropCaptureController({webcam, props}) {
         video,
         configuration,
         uploadTracker,
-        studyResultId: props.studyResultId,
+        studyResultId: resolveStudyResultId(props),
         studyPage: props.studyPage,
         videoCounter: props.videoCounter,
         captureId: props.captureId,
