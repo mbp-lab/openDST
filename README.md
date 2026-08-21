@@ -47,6 +47,12 @@ Per default video recording and data logging are disabled in the .env-file. We d
  
 <i>Please note: If video recording or data logging are enabled the data privacy statement has to be adapted.</i>
 
+
+**Known limitation:** The ordinary `MediaRecorder` MP4/WebM path does not safely
+support repeated recordings within one mounted `WebcamCapture` instance. It reuses
+the chunk buffer and filename, so a later recording can include prior chunks and
+overwrite the earlier upload. This is unrelated to face-crop capture.
+
 # General Info on React
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
