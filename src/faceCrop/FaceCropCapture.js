@@ -76,6 +76,24 @@ function supportedDimensions({width, height}) {
     return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width >= 72 && height >= 72 && width * height <= MAX_SOURCE_PIXELS;
 }
 
+const FRAME_TIMING_STAGES = ['workerRoundTripMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs', 'pipelineTotalMs', 'enqueuePartsMs', 'totalMs'];
+
+function createTimingMetrics() {
+    return FRAME_TIMING_STAGES.reduce((metrics, stage) => {
+        metrics[stage] = {count: 0, meanMs: null, minMs: null, maxMs: null};
+        return metrics;
+    }, {});
+}
+
+function addTiming(metrics, stage, durationMs) {
+    if (!metrics[stage] || !Number.isFinite(durationMs) || durationMs < 0) return;
+    const current = metrics[stage];
+    current.count += 1;
+    current.meanMs = current.meanMs === null ? durationMs : current.meanMs + (durationMs - current.meanMs) / current.count;
+    current.minMs = current.minMs === null ? durationMs : Math.min(current.minMs, durationMs);
+    current.maxMs = current.maxMs === null ? durationMs : Math.max(current.maxMs, durationMs);
+}
+
 export async function probeFaceCropCapability(video) {
     const source = dimensions(video);
     const checks = {};
@@ -221,6 +239,7 @@ export class FaceCropCaptureController {
         this.lastPresentedFrame = null;
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
+        this.frameTimings = createTimingMetrics();
         this.capability = {status: 'not-run', checks: {}};
         this.source = null;
         this.manifest = null;
@@ -349,6 +368,7 @@ export class FaceCropCaptureController {
 
     async processFrame(metadata, wallClockMs = Date.now()) {
         let frame;
+        const startedAt = performance.now();
         try {
             const source = dimensions(this.video);
             this.source = source;
@@ -356,9 +376,15 @@ export class FaceCropCaptureController {
             const timestampUs = Math.round(metadata.mediaTime * 1000000);
             frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
             const frameSource = {width: frame.displayWidth, height: frame.displayHeight};
+            const workerStartedAt = performance.now();
             const result = await this.worker.processFrame({frame, ...frameSource, timestampUs, wallClockMs});
+            addTiming(this.frameTimings, 'workerRoundTripMs', performance.now() - workerStartedAt);
             frame = null;
+            const enqueueStartedAt = performance.now();
             await this.enqueueParts(result.parts);
+            addTiming(this.frameTimings, 'enqueuePartsMs', performance.now() - enqueueStartedAt);
+            Object.keys(result.timings || {}).forEach(stage => addTiming(this.frameTimings, stage, result.timings[stage]));
+            addTiming(this.frameTimings, 'totalMs', performance.now() - startedAt);
             if (!result.accepted) {
                 this.faceDetectionMisses += 1;
                 return;
@@ -419,7 +445,7 @@ export class FaceCropCaptureController {
             status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
                 : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames},
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings},
             parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
                 segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, status: part.status}))
         };
@@ -474,7 +500,7 @@ export class FaceCropCaptureController {
                 aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', frameSize: 72,
                 extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames}
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings}
         };
     }
 

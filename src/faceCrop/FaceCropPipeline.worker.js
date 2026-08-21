@@ -22,6 +22,10 @@ const MEDIAPIPE_VISION_BUNDLE_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision
 
 let visionTasks;
 
+function timingNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+}
+
 function loadVisionTasks() {
     // The vendored bundle is loaded synchronously inside the worker; keeping it
     // here makes the same module usable in both the worker and Jest environments.
@@ -354,17 +358,28 @@ export class FaceCropPipeline {
     }
 
     async processFrame({frame, width, height, timestampUs, wallClockMs}) {
+        const startedAt = timingNow();
+        const timings = {};
         try {
             // MediaPipe consumes the VideoFrame directly; CPU RGBA is materialized
             // separately because the deterministic resampler needs pixel bytes.
+            let stageStartedAt = timingNow();
             const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
+            timings.detectionMs = timingNow() - stageStartedAt;
+            stageStartedAt = timingNow();
             const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
-            if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: []};
+            timings.roiSelectionMs = timingNow() - stageStartedAt;
+            if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: [], timings: {...timings, pipelineTotalMs: timingNow() - startedAt}};
             const sourceRoi = selection.roi;
+            stageStartedAt = timingNow();
             const rgba = await copyPackedRgba(frame, width, height);
-            return {accepted: true, detectionState: selection.state, parts: this.segmenter.appendFrame({
+            timings.rgbaCopyMs = timingNow() - stageStartedAt;
+            stageStartedAt = timingNow();
+            const parts = this.segmenter.appendFrame({
                 writeBgr24: output => processFaceCropFrame({width, height, rgbx: rgba, roi: sourceRoi, output}),
-                sourceWidth: width, sourceHeight: height, roi: sourceRoi, provenance: selection, timestampUs, wallClockMs})};
+                sourceWidth: width, sourceHeight: height, roi: sourceRoi, provenance: selection, timestampUs, wallClockMs});
+            timings.cropAndSegmentMs = timingNow() - stageStartedAt;
+            return {accepted: true, detectionState: selection.state, parts, timings: {...timings, pipelineTotalMs: timingNow() - startedAt}};
         } finally {
             frame.close();
         }

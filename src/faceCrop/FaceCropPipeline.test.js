@@ -212,8 +212,12 @@ describe('FaceCropPipeline worker input', () => {
         pipeline.segmenter = {appendFrame: jest.fn(input => { appendInput = input; return []; })};
         const frame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
 
-        await expect(pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000}))
-            .resolves.toMatchObject({accepted: true});
+        const result = await pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000});
+        expect(result).toMatchObject({accepted: true});
+        expect(result.timings).toEqual(expect.objectContaining({
+            detectionMs: expect.any(Number), roiSelectionMs: expect.any(Number), rgbaCopyMs: expect.any(Number),
+            cropAndSegmentMs: expect.any(Number), pipelineTotalMs: expect.any(Number)
+        }));
         expect(pipeline.detector.detectForVideo).toHaveBeenCalledWith(frame, 1);
         expect(frame.copyTo).toHaveBeenCalledTimes(1);
         const [rgba, options] = frame.copyTo.mock.calls[0];
