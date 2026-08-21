@@ -11,6 +11,7 @@ import StepperWithLabels from "./components/StepperWithLabels";
 import CancelDialog from "./components/CancelDialog.js";
 import { UAParser } from 'ua-parser-js';
 import {hasPendingUploads, registerUpload, settleUpload, UPLOAD_STATUS} from './uploadState';
+import {flushConsoleLog, startConsoleLogUpload} from './consoleLog';
 
 /**
  * The main component holds most of the data that is collected during the study run. It's the parent component of the
@@ -332,6 +333,9 @@ class Main extends React.Component {
                     gender: null,
                     videosSubmitted: null,
                 };
+                if (process.env.REACT_APP_UPLOAD_CONSOLE_LOG === 'true') {
+                    startConsoleLogUpload((payload, filename) => jatos.uploadResultFile(payload, filename), jatos.studyResultId); // eslint-disable-line no-undef
+                }
             })
         }
     }
@@ -428,6 +432,7 @@ class Main extends React.Component {
             jatos.appendResultData(JSON.stringify(this.data.studyMetaTracker));//eslint-disable-line no-undef
             jatos.appendResultData(JSON.stringify(this.data.vasFeedback));//eslint-disable-line no-undef
             jatos.appendResultData(JSON.stringify(this.data.panasFeedback))//eslint-disable-line no-undef
+            if (process.env.REACT_APP_UPLOAD_CONSOLE_LOG === 'true') flushConsoleLog();
         }
     }
 
