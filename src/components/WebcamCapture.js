@@ -1,6 +1,6 @@
 import React from 'react';
 import Webcam from "react-webcam";
-import {prepareFaceCropCaptureSession, startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../faceCrop/FaceCropCapture';
+import {prepareFaceCropCaptureSession, resolveStudyResultId, startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../faceCrop/FaceCropCapture';
 
 // Put variables in global scope to make them available to the browser console.
 const constraints = window.constraints = {
@@ -144,7 +144,7 @@ class WebcamCapture extends React.Component {
         if (process.env.NODE_ENV !== 'development' && process.env.REACT_APP_VIDEO_RECORDING === 'true' && process.env.REACT_APP_LOGGING === 'true') {
             let uploadId = this.props.markVideoAsUploading();
             let fileExtension = this.state.mimeType === 'video/mp4' ? '.mp4' : '.webm';
-            jatos.uploadResultFile(blob, this.props.studyResultId + '_' + this.props.studyPage + '_' + this.props.videoCounter + fileExtension)//eslint-disable-line no-undef
+            jatos.uploadResultFile(blob, resolveStudyResultId(this.props) + '_' + this.props.studyPage + '_' + this.props.videoCounter + fileExtension)//eslint-disable-line no-undef
                 // Mark success only on resolved upload; do not mark success after a failed attempt.
                 .then(() => this.props.markVideoAsUploaded(uploadId))
                 .catch((error) => {
