@@ -1,6 +1,6 @@
 import React from 'react';
 import Webcam from "react-webcam";
-import {startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../faceCrop/FaceCropCapture';
+import {prepareFaceCropCaptureSession, startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../faceCrop/FaceCropCapture';
 
 // Put variables in global scope to make them available to the browser console.
 const constraints = window.constraints = {
@@ -31,6 +31,8 @@ class WebcamCapture extends React.Component {
     componentWillUnmount() {
         if(this.props.studyPage === 'mathTask' || this.props.studyPage === 'speechTask' ) {
             this.stopRecording();
+        } else if (this.faceCropController) {
+            stopFaceCropCaptureSession(this.faceCropController);
         }
     }
 
@@ -111,8 +113,12 @@ class WebcamCapture extends React.Component {
     async startRecording() {
         try {
             await this.createMediaRecorder(this.webcamRef.current.stream);
-            this.faceCropController = startFaceCropCaptureSession({webcam: this.webcamRef.current, props: this.props});
             await this.mediaStreamRecorder.start();
+            if (this.faceCropController) {
+                this.faceCropController.start().catch(error => console.log(error));
+            } else {
+                this.faceCropController = startFaceCropCaptureSession({webcam: this.webcamRef.current, props: this.props});
+            }
             if (this.props.studyPage === 'introduction') {
                 this.setState({
                     timeoutID: setTimeout(() => this.stopRecording(), 30000)
@@ -180,6 +186,9 @@ class WebcamCapture extends React.Component {
                 onUserMedia={() => {
                     if (this.props.studyPage === "introduction" || this.props.studyPage === 'speechTask') {
                         this.props.webcamCallback(this.webcamRef.current.stream);
+                    }
+                    if (this.props.studyPage === "introduction") {
+                        this.faceCropController = prepareFaceCropCaptureSession({webcam: this.webcamRef.current, props: this.props});
                     }
                     if (this.props.studyPage === "mathTask" || this.props.studyPage === "speechTask") {
                         this.startRecording();

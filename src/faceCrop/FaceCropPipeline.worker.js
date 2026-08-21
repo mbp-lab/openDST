@@ -385,6 +385,11 @@ export class FaceCropPipeline {
         }
     }
 
+    warmup({frame, timestampUs}) {
+        this.detector.detectForVideo(frame, timestampUs / 1000);
+        return {};
+    }
+
     finish() { return {parts: this.segmenter.finish()}; }
     close() { if (this.detector) this.detector.close(); this.detector = null; }
 }
@@ -397,6 +402,7 @@ if (typeof self !== 'undefined') {
     const handlers = {
         initialize: payload => pipeline.initialize(payload).then(() => ({})),
         processFrame: payload => pipeline.processFrame(payload),
+        warmup: payload => pipeline.warmup(payload),
         finish: () => pipeline.finish(),
         close: () => { pipeline.close(); return {}; }
     };

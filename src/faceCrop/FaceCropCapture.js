@@ -18,6 +18,7 @@ export const DEFAULT_FACE_DETECTION_MIN_CONFIDENCE = 0.5;
 export const DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD = 0.3;
 export const FACE_DETECTION_DELEGATES = ['CPU', 'GPU'];
 export const DEFAULT_FACE_DETECTION_DELEGATE = 'CPU';
+export const FACE_DETECTION_WARMUP_FRAMES = 3;
 
 function boundedNumber(value, minimum, maximum, fallback, integer = false) {
     const parsed = Number(value);
@@ -198,6 +199,7 @@ class PipelineWorker {
 
     initialize(payload) { return this.request('initialize', payload); }
     processFrame(payload) { return this.request('processFrame', payload, [payload.frame]); }
+    warmup(payload) { return this.request('warmup', payload, [payload.frame]); }
     finish() { return this.request('finish'); }
     async close() {
         if (this.closed) return;
@@ -232,6 +234,7 @@ export class FaceCropCaptureController {
         this.state = 'idle';
         this.status = FACE_CROP_STATUS.DISABLED;
         this.startPromise = null;
+        this.preparePromise = null;
         this.stopPromise = null;
         this.frameWait = null;
         this.captureLoop = null;
@@ -244,6 +247,7 @@ export class FaceCropCaptureController {
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
         this.frameTimings = createTimingMetrics();
+        this.detectorWarmup = {requested: FACE_DETECTION_WARMUP_FRAMES, completed: 0, totalMs: 0, meanMs: null};
         this.capability = {status: 'not-run', checks: {}};
         this.source = null;
         this.manifest = null;
@@ -254,8 +258,27 @@ export class FaceCropCaptureController {
         return this.startPromise;
     }
 
-    async startInternal() {
+    prepare() {
+        if (!this.preparePromise) this.preparePromise = this.prepareInternal();
+        return this.preparePromise;
+    }
+
+    waitForVideoReady() {
+        if (supportedDimensions(dimensions(this.video))) return Promise.resolve(true);
+        return new Promise(resolve => {
+            const callbackId = this.video.requestVideoFrameCallback(() => {
+                if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
+                this.frameWait = null;
+                resolve(true);
+            });
+            this.frameWait = {callbackId, resolve: () => resolve(false)};
+        });
+    }
+
+    async prepareInternal() {
+        if (this.state === 'prepared' || this.state === 'capturing') return this.status;
         this.state = 'starting';
+        if (!await this.waitForVideoReady() || this.state === 'stopping') return this.status;
         const capability = await probeFaceCropCapability(this.video);
         this.capability = capability.capability;
         this.source = capability.source;
@@ -305,6 +328,31 @@ export class FaceCropCaptureController {
             await this.closeWorker();
             return this.status;
         }
+        const warmupStartedAt = performance.now();
+        try {
+            for (let index = 0; index < this.detectorWarmup.requested; index += 1) {
+                const timestampUs = index * 1000 + Math.round((performance.now() - warmupStartedAt) * 1000);
+                const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
+                try {
+                    await this.worker.warmup({frame, width: frame.displayWidth || source.width,
+                        height: frame.displayHeight || source.height, timestampUs});
+                    this.detectorWarmup.completed += 1;
+                } finally {
+                    frame.close();
+                }
+            }
+        } finally {
+            this.detectorWarmup.totalMs = performance.now() - warmupStartedAt;
+            this.detectorWarmup.meanMs = this.detectorWarmup.completed
+                ? this.detectorWarmup.totalMs / this.detectorWarmup.completed : null;
+        }
+        this.state = 'prepared';
+        return this.status;
+    }
+
+    async startInternal() {
+        const status = await this.prepare();
+        if (this.state === 'stopping' || this.state === 'terminal' || status === FACE_CROP_STATUS.UNSUPPORTED) return status;
         this.state = 'capturing';
         this.setStatus(FACE_CROP_STATUS.CAPTURING);
         this.captureLoop = this.captureFrames();
@@ -450,7 +498,8 @@ export class FaceCropCaptureController {
             status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
                 : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings},
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings,
+                detectorWarmup: this.detectorWarmup},
             parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
                 segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, status: part.status}))
         };
@@ -506,7 +555,8 @@ export class FaceCropCaptureController {
                 aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', frameSize: 72,
                 extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings}
+                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameTimings: this.frameTimings,
+                detectorWarmup: this.detectorWarmup}
         };
     }
 
@@ -546,7 +596,7 @@ function reportStatus(props, status, reason) {
     }
 }
 
-export function startFaceCropCaptureSession({webcam, props}) {
+function createFaceCropCaptureController({webcam, props}) {
     const configuration = resolveFaceCropConfiguration();
     if (!shouldCaptureFaceCrop(configuration, props.studyPage)) {
         console.info('[face-crop] Capture disabled for this page', {mode: configuration.mode, studyPage: props.studyPage});
@@ -574,6 +624,20 @@ export function startFaceCropCaptureSession({webcam, props}) {
             if (typeof props.onFaceCropStatus === 'function') props.onFaceCropStatus(metadata);
         }
     });
+    return controller;
+}
+
+export function prepareFaceCropCaptureSession({webcam, props}) {
+    const controller = createFaceCropCaptureController({webcam, props});
+    if (!controller) return null;
+    controller.prepare().catch(error => reportStatus(props, FACE_CROP_STATUS.UNSUPPORTED,
+        error.message || 'Face-crop capture failed to prepare'));
+    return controller;
+}
+
+export function startFaceCropCaptureSession({webcam, props}) {
+    const controller = createFaceCropCaptureController({webcam, props});
+    if (!controller) return null;
     controller.start().catch(error => reportStatus(props, FACE_CROP_STATUS.UNSUPPORTED,
         error.message || 'Face-crop capture failed to start'));
     return controller;

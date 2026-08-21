@@ -76,6 +76,53 @@ describe('resolveFaceCropConfiguration', () => {
             .toBe(DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD);
     });
 
+    test('waits for the first presented frame before preparing an early webcam session', async () => {
+        const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
+        let callback;
+        const pipelineWorker = {
+            initialize: jest.fn(() => Promise.resolve()),
+            warmup: jest.fn(() => Promise.resolve()),
+            close: jest.fn(() => Promise.resolve())
+        };
+        const videoFrame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
+        const video = {
+            videoWidth: 0,
+            videoHeight: 0,
+            readyState: 0,
+            requestVideoFrameCallback: jest.fn(nextCallback => { callback = nextCallback; return 9; }),
+            cancelVideoFrameCallback: jest.fn()
+        };
+        window.VideoFrame = jest.fn(() => videoFrame);
+        window.CompressionStream = jest.fn();
+
+        try {
+            const controller = new FaceCropCaptureController({
+                video,
+                studyResultId: 'RESULT',
+                studyPage: 'introduction',
+                videoCounter: 1,
+                configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
+                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
+                uploadResultFile: jest.fn(),
+                createPipelineWorker: jest.fn(() => pipelineWorker)
+            });
+
+            const preparing = controller.prepare();
+            await Promise.resolve();
+            expect(pipelineWorker.initialize).not.toHaveBeenCalled();
+            video.videoWidth = 72;
+            video.videoHeight = 72;
+            callback(0, {mediaTime: 0, presentedFrames: 1});
+            await expect(preparing).resolves.toBe(FACE_CROP_STATUS.DISABLED);
+            expect(pipelineWorker.initialize).toHaveBeenCalledTimes(1);
+            expect(pipelineWorker.warmup).toHaveBeenCalledTimes(3);
+            expect(controller.state).toBe('prepared');
+        } finally {
+            window.VideoFrame = original.VideoFrame;
+            window.CompressionStream = original.CompressionStream;
+        }
+    });
+
     // Stopping must cancel scheduling but still await work already handed off.
     test('cancels the pending frame callback before finalizing a stopped capture', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
@@ -87,6 +134,7 @@ describe('resolveFaceCropConfiguration', () => {
         };
         const pipelineWorker = {
             initialize: jest.fn(() => Promise.resolve()),
+            warmup: jest.fn(() => Promise.resolve()),
             processFrame: jest.fn(),
             finish: jest.fn(() => Promise.resolve({parts: []})),
             close: jest.fn(() => Promise.resolve())
@@ -143,9 +191,11 @@ describe('resolveFaceCropConfiguration', () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         const copy = deferred();
         const probeFrame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
+        const warmupFrame = {displayWidth: 72, displayHeight: 72, close: jest.fn()};
         const captureFrame = {copyTo: jest.fn(() => copy.promise), close: jest.fn()};
         const pipelineWorker = {
             initialize: jest.fn(() => Promise.resolve()),
+            warmup: jest.fn(() => Promise.resolve()),
             processFrame: jest.fn(({frame}) => copy.promise.then(() => {
                 frame.close();
                 return {accepted: true, detectionState: 'largest', parts: [{
@@ -169,6 +219,9 @@ describe('resolveFaceCropConfiguration', () => {
         };
         window.VideoFrame = jest.fn()
             .mockImplementationOnce(() => probeFrame)
+            .mockImplementationOnce(() => warmupFrame)
+            .mockImplementationOnce(() => warmupFrame)
+            .mockImplementationOnce(() => warmupFrame)
             .mockImplementationOnce(() => captureFrame);
         window.CompressionStream = jest.fn();
 

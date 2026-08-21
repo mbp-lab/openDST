@@ -6,7 +6,7 @@ This directory contains the optional face-crop recording pipeline that runs besi
 
 ```text
 WebcamCapture
-  -> FaceCropCaptureController
+   -> FaceCropCaptureController (prepare on webcam readiness, capture on start)
   -> PipelineWorker
   -> FaceCropPipeline (worker)
      -> MediaPipe face detection
