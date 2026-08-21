@@ -7,10 +7,14 @@ const MAX_CHUNK_BYTES = 32768;
 const MAX_QUEUED_BYTES = 250000;
 const FLUSH_INTERVAL_MS = 5000;
 const FLUSH_ENTRY_COUNT = 25;
+const RETRY_DELAY_MS = 1000;
 const entries = [];
 let totalBytes = 0;
+const pendingChunks = [];
 let uploadQueue = Promise.resolve();
 let queuedBytes = 0;
+let draining = false;
+let retryTimer = null;
 let nextChunkNumber = 1;
 let uploadTimer = null;
 let uploadResultFile = null;
@@ -52,20 +56,53 @@ function captureEntry(level, args) {
     if (entries.length >= FLUSH_ENTRY_COUNT) flushConsoleLog();
 }
 
+function scheduleDrain() {
+    if (retryTimer || !uploadResultFile || pendingChunks.length === 0) return;
+    retryTimer = setTimeout(() => {
+        retryTimer = null;
+        drainConsoleLog();
+    }, RETRY_DELAY_MS);
+}
+
+function drainConsoleLog() {
+    if (draining || !uploadResultFile || pendingChunks.length === 0) return uploadQueue;
+    draining = true;
+    uploadQueue = (async () => {
+        while (pendingChunks.length > 0) {
+            const chunk = pendingChunks[0];
+            try {
+                await uploadResultFile(chunk.payload, chunk.filename);
+                pendingChunks.shift();
+                queuedBytes -= chunk.bytes;
+            } catch (error) {
+                // Keep the chunk until JATOS accepts it. The timer retries later so
+                // temporary upload failures cannot silently erase diagnostics.
+                chunk.attempts += 1;
+                scheduleDrain();
+                break;
+            }
+        }
+    })().finally(() => { draining = false; });
+    return uploadQueue;
+}
+
 function enqueueChunk(chunk) {
     const payload = JSON.stringify(chunk);
     const bytes = payload.length;
-    if (queuedBytes + bytes > MAX_QUEUED_BYTES) return;
-    const filename = studyResultId + '_consoleLog_' + String(nextChunkNumber++).padStart(6, '0') + '.json';
+    if (queuedBytes + bytes > MAX_QUEUED_BYTES) return false;
+    pendingChunks.push({
+        payload,
+        bytes,
+        attempts: 0,
+        filename: studyResultId + '_consoleLog_' + String(nextChunkNumber++).padStart(6, '0') + '.json'
+    });
     queuedBytes += bytes;
-    uploadQueue = uploadQueue
-        .then(() => uploadResultFile(payload, filename))
-        .catch(() => {})
-        .then(() => { queuedBytes -= bytes; });
+    drainConsoleLog();
+    return true;
 }
 
 export function flushConsoleLog() {
-    if (!uploadResultFile || entries.length === 0) return uploadQueue;
+    if (!uploadResultFile || entries.length === 0) return drainConsoleLog();
     while (entries.length > 0 && queuedBytes < MAX_QUEUED_BYTES) {
         const chunk = [];
         let chunkBytes = 2;
@@ -78,12 +115,24 @@ export function flushConsoleLog() {
             chunkBytes += candidateBytes;
             entryCount += 1;
         }
-        if (queuedBytes + JSON.stringify(chunk).length > MAX_QUEUED_BYTES) break;
+        if (!enqueueChunk(chunk)) break;
         const removedEntries = entries.splice(0, entryCount);
-        for (let index = 0; index < removedEntries.length; index += 1) totalBytes -= removedEntries[index].entryBytes;
-        enqueueChunk(chunk);
+        for (const removedEntry of removedEntries) totalBytes -= removedEntry.entryBytes;
     }
     return uploadQueue;
+}
+
+export function consoleLogUploadState() {
+    return {entries: entries.length, pendingChunks: pendingChunks.length, queuedBytes, draining};
+}
+
+export function resetConsoleLogUploadForTests() {
+    if (uploadTimer) clearInterval(uploadTimer);
+    if (retryTimer) clearTimeout(retryTimer);
+    entries.splice(0); pendingChunks.splice(0);
+    totalBytes = 0; queuedBytes = 0; nextChunkNumber = 1;
+    uploadTimer = null; retryTimer = null; uploadResultFile = null; studyResultId = null;
+    uploadQueue = Promise.resolve(); draining = false;
 }
 
 export function startConsoleLogUpload(uploadFunction, resultId) {

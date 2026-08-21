@@ -127,6 +127,17 @@ describe('resolveFaceCropConfiguration', () => {
         expect(resolved).toBe(true);
     });
 
+    test('creates a fresh controller identity for a second capture', () => {
+        const options = {video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()};
+        const first = new FaceCropCaptureController(options);
+        const second = new FaceCropCaptureController({...options, videoCounter: 2});
+
+        expect(first.captureId).not.toBe(second.captureId);
+        expect(first.captureId).toContain('introduction-1');
+        expect(second.captureId).toContain('introduction-2');
+    });
+
     test('uses the JATOS result ID while the React prop is still null', () => {
         expect(resolveStudyResultId({studyResultId: null}, {studyResultId: 163})).toBe(163);
         expect(resolveStudyResultId({studyResultId: 164}, {studyResultId: 163})).toBe(164);

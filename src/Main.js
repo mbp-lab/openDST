@@ -304,6 +304,22 @@ class Main extends React.Component {
         });
     }
 
+    componentDidMount() {
+        this.startConsoleLogUpload();
+    }
+
+    startConsoleLogUpload() {
+        if (process.env.NODE_ENV === 'development' || process.env.REACT_APP_UPLOAD_CONSOLE_LOG !== 'true') return;
+        if (typeof jatos === 'undefined') return; // eslint-disable-line no-undef
+        const start = () => {
+            if (typeof jatos.uploadResultFile === 'function' && jatos.studyResultId) { // eslint-disable-line no-undef
+                startConsoleLogUpload((payload, filename) => jatos.uploadResultFile(payload, filename), jatos.studyResultId); // eslint-disable-line no-undef
+            }
+        };
+        if (jatos.studyResultId) start(); // eslint-disable-line no-undef
+        else if (typeof jatos.onLoad === 'function') jatos.onLoad(start); // eslint-disable-line no-undef
+    }
+
     updateFaceCropCaptureStatus(metadata) {
         this.data.studyMetaTracker.faceCropCapture = metadata;
     }
@@ -333,9 +349,6 @@ class Main extends React.Component {
                     gender: null,
                     videosSubmitted: null,
                 };
-                if (process.env.REACT_APP_UPLOAD_CONSOLE_LOG === 'true') {
-                    startConsoleLogUpload((payload, filename) => jatos.uploadResultFile(payload, filename), jatos.studyResultId); // eslint-disable-line no-undef
-                }
             })
         }
     }

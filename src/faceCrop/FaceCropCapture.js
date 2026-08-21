@@ -271,6 +271,12 @@ export class FaceCropCaptureController {
         this.source = null;
         this.manifest = null;
         this.frameCallbacks = 0;
+        this.nextProgressLogFrame = 120;
+    }
+
+    diagnostic(event, details = {}) {
+        console.info('[face-crop] ' + event, {captureId: this.captureId, studyPage: this.studyPage,
+            videoCounter: this.videoCounter, ...details});
     }
 
     start() {
@@ -303,6 +309,7 @@ export class FaceCropCaptureController {
     async prepareInternal() {
         if (this.state === 'prepared' || this.state === 'capturing') return this.status;
         this.state = 'starting';
+        this.diagnostic('prepare-started', {analysisWorkerCount: this.configuration.analysisWorkerCount});
         if (!await this.waitForVideoReady() || this.state === 'stopping') return this.status;
         const capability = await probeFaceCropCapability(this.video);
         this.capability = capability.capability;
@@ -375,6 +382,7 @@ export class FaceCropCaptureController {
                 ? this.detectorWarmup.totalMs / this.detectorWarmup.completed : null;
         }
         this.state = 'prepared';
+        this.diagnostic('prepared', {source: this.source, detectorWarmup: this.detectorWarmup});
         return this.status;
     }
 
@@ -383,6 +391,7 @@ export class FaceCropCaptureController {
         if (this.state === 'stopping' || this.state === 'terminal' || status === FACE_CROP_STATUS.UNSUPPORTED) return status;
         this.state = 'capturing';
         this.setStatus(FACE_CROP_STATUS.CAPTURING);
+        this.diagnostic('capture-started');
         this.captureLoop = this.captureFrames();
         return this.status;
     }
@@ -396,6 +405,7 @@ export class FaceCropCaptureController {
         // Cancel the browser callback first, then drain the capture loop, then
         // flush the worker and sink. This prevents frames arriving during teardown.
         if (this.state !== 'terminal') this.state = 'stopping';
+        this.diagnostic('stop-requested', {frameCallbacks: this.frameCallbacks, inFlight: this.inFlight.size, assemblyBufferedResults: this.assemblyBufferedResults});
         this.cancelFrameWait();
         if (this.startPromise) await this.startPromise;
         if (this.captureLoop) await this.captureLoop;
@@ -426,6 +436,11 @@ export class FaceCropCaptureController {
                 if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
                 this.frameWait = null;
                 this.frameCallbacks += 1;
+                if (this.frameCallbacks >= this.nextProgressLogFrame) {
+                    this.diagnostic('progress', {frameCallbacks: this.frameCallbacks, acceptedFrames: this.acceptedFrames,
+                        skippedFrames: this.skippedFrames, inFlight: this.inFlight.size, assemblyBufferedResults: this.assemblyBufferedResults});
+                    this.nextProgressLogFrame += 120;
+                }
                 resolve({metadata, wallClockMs: Date.now()});
             });
             this.frameWait = {callbackId, resolve};
@@ -500,7 +515,10 @@ export class FaceCropCaptureController {
 
     async enqueueParts(parts = []) {
         if (!parts.length) return;
-        for (const part of parts) await this.sink.enqueuePart(part);
+        for (const part of parts) {
+            this.diagnostic('part-sealed', {partIndex: part.partIndex, segmentIndex: part.segmentIndex, frameCount: part.frameCount});
+            await this.sink.enqueuePart(part);
+        }
     }
 
     markIncomplete(reason) {
@@ -515,6 +533,7 @@ export class FaceCropCaptureController {
         // AVI and face-event sidecars are finalized together; either upload
         // failure makes the logical face-crop capture incomplete.
         let result = {parts: []};
+        this.diagnostic('finalization-started', {frameCallbacks: this.frameCallbacks, inFlight: this.inFlight.size});
         try {
             if (this.frameCallbacks === 0) {
                 this.incompleteReason = this.incompleteReason || 'No video frame callbacks were received during face-crop capture';
@@ -533,6 +552,7 @@ export class FaceCropCaptureController {
             await this.closeWorker();
         }
         await this.uploadManifest(result.parts);
+        this.diagnostic('finalization-finished', {parts: result.parts.length, incompleteReason: this.incompleteReason});
         return this.terminate(this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE, this.incompleteReason);
     }
 
@@ -593,6 +613,8 @@ export class FaceCropCaptureController {
 
     terminate(status, reason) {
         this.state = 'terminal';
+        this.diagnostic('terminal', {status, reason: reason || null, frameCallbacks: this.frameCallbacks,
+            acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames});
         this.setStatus(status, reason);
         return status;
     }
