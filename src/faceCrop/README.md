@@ -42,7 +42,7 @@ WebcamCapture
 
 ### Implemented behavior
 
-- Detection uses the vendored MediaPipe Tasks Vision `blaze_face_short_range.tflite` model in `VIDEO` mode with the CPU delegate. `minDetectionConfidence` and `minSuppressionThreshold` are configurable; the first controls eligibility, while the second is passed to MediaPipe's detector.
+- Detection uses the vendored MediaPipe Tasks Vision `blaze_face_short_range.tflite` model in `VIDEO` mode. The CPU delegate is the default; set `REACT_APP_FACE_DETECTION_DELEGATE=GPU` for a GPU comparison. The selected delegate is recorded in the capture manifest, and `minDetectionConfidence` and `minSuppressionThreshold` remain configurable.
 - Eligible detections are sorted deterministically by bounding-box area, confidence, left position, top position, and original result order. The largest eligible face is selected.
 - The selected box becomes a bounded square ROI. Before a face is detected, the largest square fitting the source is centered on the free axis. `faceRoiScale`, `faceRoiVerticalShiftRatio`, and the EMA time constant `faceRoiSmoothingTauMs` control detected-face size, vertical placement, and temporal smoothing. During detector misses, the last in-bounds ROI is held. Sidecar states are `default`, `largest`, `held`, and `reacquired`.
 - Each accepted ROI is area-resampled from sRGB RGBA source pixels to exactly 72x72 using pixel-overlap weights, with half-up rounding, and emitted as BGR24. This is deterministic and independent of browser image-scaling APIs.

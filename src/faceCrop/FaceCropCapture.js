@@ -16,6 +16,8 @@ export const DEFAULT_FACE_ROI_SCALE = 1.5;
 export const DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO = 0.15;
 export const DEFAULT_FACE_DETECTION_MIN_CONFIDENCE = 0.5;
 export const DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD = 0.3;
+export const FACE_DETECTION_DELEGATES = ['CPU', 'GPU'];
+export const DEFAULT_FACE_DETECTION_DELEGATE = 'CPU';
 
 function boundedNumber(value, minimum, maximum, fallback, integer = false) {
     const parsed = Number(value);
@@ -28,6 +30,8 @@ export function resolveFaceCropConfiguration(environment = process.env) {
     return {
         requestedMode,
         mode: FACE_CROP_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
+        faceDetectionDelegate: FACE_DETECTION_DELEGATES.includes(environment.REACT_APP_FACE_DETECTION_DELEGATE)
+            ? environment.REACT_APP_FACE_DETECTION_DELEGATE : DEFAULT_FACE_DETECTION_DELEGATE,
         faceRoiSmoothingTauMs: boundedNumber(
             environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS,
             0,
@@ -283,7 +287,8 @@ export class FaceCropCaptureController {
                     faceRoiScale: config.faceRoiScale,
                     faceRoiVerticalShiftRatio: config.faceRoiVerticalShiftRatio,
                     faceDetectionMinConfidence: config.faceDetectionMinConfidence,
-                    faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold
+                    faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
+                    faceDetectionDelegate: config.faceDetectionDelegate
                 },
                 identity: {
                     studyResultId: this.studyResultId,
@@ -477,7 +482,8 @@ export class FaceCropCaptureController {
         const config = this.configuration;
         return {requestedMode: config.requestedMode, appliedMode: config.mode,
             roi: {smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale, verticalShiftRatio: config.faceRoiVerticalShiftRatio},
-            detector: {minConfidence: config.faceDetectionMinConfidence, minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold},
+            detector: {delegate: config.faceDetectionDelegate, minConfidence: config.faceDetectionMinConfidence,
+                minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold},
             selectionPolicy: 'largest-eligible-bounding-box-v1'};
     }
 

@@ -1,6 +1,30 @@
 import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropPipeline} from './FaceCropPipeline.worker';
 import {FaceCropProcessor, BGR24_FRAME_BYTES, processFaceCropFrame} from './FaceCropPipeline.worker';
 
+describe('MediaPipe detector configuration', () => {
+    test('passes the selected delegate to MediaPipe options', async () => {
+        const originalVision = global.importScripts;
+        const createFromOptions = jest.fn(() => Promise.resolve('detector'));
+        global.importScripts = jest.fn(() => {
+            global.Vision = {
+                FaceDetector: {createFromOptions},
+                FilesetResolver: {forVisionTasks: jest.fn(() => Promise.resolve('fileset'))}
+            };
+        });
+        global.fetch = jest.fn(() => Promise.resolve({ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(1))}));
+
+        try {
+            const {createMediaPipeFaceDetector} = require('./FaceCropPipeline.worker');
+            await expect(createMediaPipeFaceDetector({delegate: 'GPU'})).resolves.toBe('detector');
+            expect(createFromOptions).toHaveBeenCalledWith('fileset', expect.objectContaining({
+                baseOptions: expect.objectContaining({delegate: 'GPU'})
+            }));
+        } finally {
+            global.importScripts = originalVision;
+        }
+    });
+});
+
 // Worker tests cover deterministic ROI selection and pixel conversion without
 // loading MediaPipe, so algorithm changes remain cheap to validate in Jest.
 function setPixel(rgbx, width, x, y, color) {

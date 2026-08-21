@@ -43,7 +43,7 @@ function initializationError(stage, error) {
     return wrapped;
 }
 
-export async function createMediaPipeFaceDetector({minDetectionConfidence = 0.5, minSuppressionThreshold = 0.3} = {}) {
+export async function createMediaPipeFaceDetector({minDetectionConfidence = 0.5, minSuppressionThreshold = 0.3, delegate = 'CPU'} = {}) {
     const {FaceDetector, FilesetResolver} = loadVisionTasks();
     let fileset;
     let modelAssetBuffer;
@@ -61,7 +61,7 @@ export async function createMediaPipeFaceDetector({minDetectionConfidence = 0.5,
     }
     try {
         return await FaceDetector.createFromOptions(fileset, {
-            baseOptions: {modelAssetBuffer, delegate: 'CPU'},
+            baseOptions: {modelAssetBuffer, delegate},
             runningMode: 'VIDEO', minDetectionConfidence, minSuppressionThreshold
         });
     } catch (error) {
@@ -348,7 +348,7 @@ export class FaceCropSegmenter {
 export class FaceCropPipeline {
     async initialize({configuration, identity}) {
         this.detector = await createMediaPipeFaceDetector({minDetectionConfidence: configuration.faceDetectionMinConfidence,
-            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold});
+            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold, delegate: configuration.faceDetectionDelegate});
         this.roi = new FaceRoiProvider({smoothingTauMs: configuration.faceRoiSmoothingTauMs, scale: configuration.faceRoiScale,
             verticalShiftRatio: configuration.faceRoiVerticalShiftRatio, minDetectionConfidence: configuration.faceDetectionMinConfidence});
         this.segmenter = new FaceCropSegmenter({...identity, selectionConfiguration: {

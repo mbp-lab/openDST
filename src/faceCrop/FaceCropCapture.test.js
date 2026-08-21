@@ -4,6 +4,7 @@ import {
     DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO,
     DEFAULT_FACE_DETECTION_MIN_CONFIDENCE,
     DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD,
+    DEFAULT_FACE_DETECTION_DELEGATE,
     FACE_CROP_STATUS,
     FaceCropCaptureController,
     resolveFaceCropConfiguration
@@ -24,6 +25,12 @@ function deferred() {
 // Configuration is an external contract: values are build-time strings, so
 // bounds and defaults must be enforced before they reach the worker.
 describe('resolveFaceCropConfiguration', () => {
+    test('defaults detector execution to the CPU delegate and accepts GPU', () => {
+        expect(resolveFaceCropConfiguration({}).faceDetectionDelegate).toBe(DEFAULT_FACE_DETECTION_DELEGATE);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_DETECTION_DELEGATE: 'GPU'}).faceDetectionDelegate).toBe('GPU');
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_DETECTION_DELEGATE: 'invalid'}).faceDetectionDelegate)
+            .toBe(DEFAULT_FACE_DETECTION_DELEGATE);
+    });
     test('uses the default face ROI time constant in milliseconds', () => {
         expect(resolveFaceCropConfiguration({}).faceRoiSmoothingTauMs).toBe(DEFAULT_FACE_ROI_SMOOTHING_TAU_MS);
     });
@@ -113,6 +120,7 @@ describe('resolveFaceCropConfiguration', () => {
             await expect(controller.start()).resolves.toBe(FACE_CROP_STATUS.CAPTURING);
             expect(pipelineWorker.initialize).toHaveBeenCalledWith(expect.objectContaining({
                 configuration: {
+                    faceDetectionDelegate: DEFAULT_FACE_DETECTION_DELEGATE,
                     faceRoiSmoothingTauMs: DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
                     faceRoiScale: DEFAULT_FACE_ROI_SCALE,
                     faceRoiVerticalShiftRatio: DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO,
