@@ -187,8 +187,7 @@ function sealedPart(partIndex) {
         filename,
         faceEventsFilename,
         frameCount: 1,
-        byteLength: 3,
-        bytes: new Uint8Array([partIndex, partIndex + 1, partIndex + 2]),
+        gzipBytes: new Uint8Array([partIndex + 1]).buffer,
         faceEvents: {aviFilename: filename, frameCount: 1, frames: []}
     };
 }
@@ -205,12 +204,11 @@ describe('FaceCropSink', () => {
     // settles every artifact independently while returning one logical result.
     test('owns at most one active and one queued part, then finalizes after parts settle', async () => {
         const encoding = deferred();
-        const uploads = jest.fn(() => Promise.resolve());
+        const uploads = jest.fn((payload, filename) => filename.endsWith('.avi.gz') ? encoding.promise : Promise.resolve());
         const uploadTracker = tracker();
         const sink = new FaceCropSink({
             uploadResultFile: uploads,
             uploadTracker,
-            encode: jest.fn(() => encoding.promise),
             sleep: jest.fn(() => Promise.resolve())
         });
         const first = sealedPart(0);
@@ -224,20 +222,20 @@ describe('FaceCropSink', () => {
         const thirdAdmission = sink.enqueuePart(third).then(() => { thirdAdmitted = true; });
         await Promise.resolve();
         expect(thirdAdmitted).toBe(false);
-        expect(first.bytes).toBeInstanceOf(Uint8Array);
-        expect(second.bytes).toBeInstanceOf(Uint8Array);
+        expect(first.gzipBytes).toBeInstanceOf(ArrayBuffer);
+        expect(second.gzipBytes).toBeInstanceOf(ArrayBuffer);
 
-        expect(uploads).not.toHaveBeenCalled();
+        expect(uploads).toHaveBeenCalledTimes(1);
 
-        encoding.resolve(new Uint8Array([31]));
+        encoding.resolve();
 
         await thirdAdmission;
         expect(thirdAdmitted).toBe(true);
         await sink.finalize();
 
-        expect(first.bytes).toBeNull();
-        expect(second.bytes).toBeNull();
-        expect(third.bytes).toBeNull();
+        expect(first.gzipBytes).toBeNull();
+        expect(second.gzipBytes).toBeNull();
+        expect(third.gzipBytes).toBeNull();
         expect(uploads.mock.calls.map(call => call[1])).toEqual([
             'RESULT_introduction_1_patch_s000_p000.avi.gz',
             'RESULT_introduction_1_patch_s000_p000.face-events.json',
@@ -264,7 +262,6 @@ describe('FaceCropSink', () => {
         const sink = new FaceCropSink({
             uploadResultFile: uploads,
             uploadTracker,
-            encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
             sleep: jest.fn(() => Promise.resolve())
         });
 
@@ -285,7 +282,6 @@ describe('FaceCropSink', () => {
         const sink = new FaceCropSink({
             uploadResultFile: uploads,
             uploadTracker,
-            encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
             sleep: jest.fn(() => Promise.resolve())
         });
 
@@ -310,7 +306,6 @@ describe('FaceCropSink', () => {
         const secondTracker = tracker();
         const options = {
             uploadResultFile: jest.fn(() => Promise.resolve()),
-            encode: jest.fn(() => Promise.resolve(new Uint8Array([31]))),
             sleep: jest.fn(() => Promise.resolve())
         };
         const firstSink = new FaceCropSink({...options, uploadTracker: firstTracker});

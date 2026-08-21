@@ -1,6 +1,5 @@
 import {UPLOAD_STATUS} from '../uploadState';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
-import {FaceRoiProvider, FaceCropSegmenter, processFaceCropFrame} from './FaceCropPipeline.worker';
 
 // Face-crop capture is an optional companion to MediaRecorder. It must fail
 // closed so unsupported browsers never affect the participant-facing recording.
@@ -20,7 +19,7 @@ export const DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD = 0.3;
 export const FACE_DETECTION_DELEGATES = ['CPU', 'GPU'];
 export const DEFAULT_FACE_DETECTION_DELEGATE = 'CPU';
 export const FACE_DETECTION_WARMUP_FRAMES = 3;
-export const DEFAULT_FACE_CROP_WORKER_COUNT = 1;
+export const DEFAULT_FACE_CROP_ANALYSIS_WORKER_COUNT = 1;
 
 function boundedNumber(value, minimum, maximum, fallback, integer = false) {
     const parsed = Number(value);
@@ -61,7 +60,7 @@ export function resolveFaceCropConfiguration(environment = process.env) {
             1,
             DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD
         ),
-        workerCount: boundedNumber(environment.REACT_APP_FACE_CROP_WORKER_COUNT, 1, 2, DEFAULT_FACE_CROP_WORKER_COUNT, true)
+        analysisWorkerCount: boundedNumber(environment.REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT, 1, 2, DEFAULT_FACE_CROP_ANALYSIS_WORKER_COUNT, true)
     };
 }
 
@@ -89,7 +88,7 @@ function videoHasCurrentFrame(video) {
     return supportedDimensions(source) && Number.isInteger(source.readyState) && source.readyState >= 2;
 }
 
-const FRAME_TIMING_STAGES = ['workerRoundTripMs', 'analysisMs', 'commitMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs', 'pipelineTotalMs', 'enqueuePartsMs', 'totalMs'];
+const FRAME_TIMING_STAGES = ['workerRoundTripMs', 'analysisMs', 'assemblyMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs', 'encodingMs', 'enqueuePartsMs', 'totalMs'];
 
 function createTimingMetrics() {
     return FRAME_TIMING_STAGES.reduce((metrics, stage) => {
@@ -161,6 +160,7 @@ class PipelineWorker {
         }
         this.worker = new WorkerConstructor();
         this.pending = null;
+        this.queue = [];
         this.closed = false;
         this.worker.onmessage = event => this.receive(event.data);
         this.worker.onerror = event => this.fail(new Error(event.message || 'Face-crop worker crashed'));
@@ -177,36 +177,42 @@ class PipelineWorker {
             if (message.error.stack) error.stack = message.error.stack;
             pending.reject(error);
         } else pending.resolve(message && message.result);
+        this.pump();
     }
 
     fail(error) {
         console.error('[face-crop] Worker failure', error);
         this.closed = true;
         this.worker.terminate();
-        if (this.pending) {
-            this.pending.reject(error);
-            this.pending = null;
-        }
+        if (this.pending) this.pending.reject(error);
+        this.pending = null;
+        this.queue.splice(0).forEach(request => request.reject(error));
     }
 
     request(type, payload = {}, transfer = []) {
-        // The worker protocol allows one in-flight request so frame buffers and
-        // responses stay ordered and the browser cannot build an unbounded queue.
         if (this.closed) return Promise.reject(new Error('Face-crop worker is closed'));
-        if (this.pending) return Promise.reject(new Error('Face-crop worker already has a request in flight'));
         return new Promise((resolve, reject) => {
-            this.pending = {resolve, reject};
-            try {
-                this.worker.postMessage({type, payload}, transfer);
-            } catch (error) {
-                this.pending = null;
-                reject(error);
-            }
+            this.queue.push({type, payload, transfer, resolve, reject});
+            this.pump();
         });
+    }
+
+    pump() {
+        if (this.pending || this.closed || !this.queue.length) return;
+        const pending = this.queue.shift();
+        this.pending = pending;
+        try {
+            this.worker.postMessage({type: pending.type, payload: pending.payload}, pending.transfer);
+        } catch (error) {
+            this.pending = null;
+            pending.reject(error);
+            this.pump();
+        }
     }
 
     initialize(payload) { return this.request('initialize', payload); }
     processFrame(payload) { return this.request('processFrame', payload, [payload.frame]); }
+    processAnalysisResult(payload) { return this.request('processAnalysisResult', payload, [payload.rgbx.buffer]); }
     warmup(payload) { return this.request('warmup', payload, [payload.frame]); }
     finish() { return this.request('finish'); }
     async close() {
@@ -246,15 +252,12 @@ export class FaceCropCaptureController {
         this.stopPromise = null;
         this.frameWait = null;
         this.captureLoop = null;
-        this.worker = null;
-        this.workers = [];
+        this.analysisWorkers = [];
+        this.assemblyWorker = null;
         this.inFlight = new Map();
-        this.analysisResults = new Map();
+        this.assemblyBufferedResults = 0;
         this.nextSequence = 0;
-        this.nextCommitSequence = 0;
         this.nextWorker = 0;
-        this.roi = null;
-        this.segmenter = null;
         this.incompleteReason = null;
         this.captureId = providedCaptureId || createCaptureId(studyPage, videoCounter);
         this.acceptedFrames = 0;
@@ -324,36 +327,22 @@ export class FaceCropCaptureController {
             sourceDimensions: {status: 'passed', width: source.width, height: source.height, maxPixels: MAX_SOURCE_PIXELS}
         }};
         try {
-            this.worker = this.createPipelineWorker();
-            this.workers = this.configuration.workerCount === 2 ? [this.worker, this.createPipelineWorker()] : [this.worker];
             const config = this.configuration;
-            const initializePayload = {
-                configuration: {
-                    faceRoiSmoothingTauMs: config.faceRoiSmoothingTauMs,
-                    faceRoiScale: config.faceRoiScale,
-                    faceRoiVerticalShiftRatio: config.faceRoiVerticalShiftRatio,
-                    faceDetectionMinConfidence: config.faceDetectionMinConfidence,
-                    faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
-                    faceDetectionDelegate: config.faceDetectionDelegate
-                },
-                identity: {
-                    studyResultId: this.studyResultId,
-                    studyPage: this.studyPage,
-                    videoCounter: this.videoCounter,
-                    captureId: this.captureId
-                }
+            const workerConfiguration = {
+                faceRoiSmoothingTauMs: config.faceRoiSmoothingTauMs,
+                faceRoiScale: config.faceRoiScale,
+                faceRoiVerticalShiftRatio: config.faceRoiVerticalShiftRatio,
+                faceDetectionMinConfidence: config.faceDetectionMinConfidence,
+                faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
+                faceDetectionDelegate: config.faceDetectionDelegate,
+                analysisWorkerCount: config.analysisWorkerCount
             };
-            if (config.workerCount === 2) initializePayload.configuration.analysisOnly = true;
-            await Promise.all(this.workers.map(worker => worker.initialize(initializePayload)));
-            if (config.workerCount === 2) {
-                this.roi = new FaceRoiProvider({smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale,
-                    verticalShiftRatio: config.faceRoiVerticalShiftRatio, minDetectionConfidence: config.faceDetectionMinConfidence});
-                this.segmenter = new FaceCropSegmenter({studyResultId: this.studyResultId, studyPage: this.studyPage,
-                    videoCounter: this.videoCounter, captureId: this.captureId, selectionConfiguration: {
-                        minDetectionConfidence: config.faceDetectionMinConfidence,
-                        minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
-                        policy: 'largest-eligible-bounding-box-v1'}});
-            }
+            const identity = {studyResultId: this.studyResultId, studyPage: this.studyPage,
+                videoCounter: this.videoCounter, captureId: this.captureId};
+            this.analysisWorkers = Array.from({length: config.analysisWorkerCount}, () => this.createPipelineWorker());
+            this.assemblyWorker = this.createPipelineWorker();
+            await Promise.all(this.analysisWorkers.map(worker => worker.initialize({role: 'analysis', configuration: workerConfiguration})));
+            await this.assemblyWorker.initialize({role: 'assembly', configuration: workerConfiguration, identity});
         } catch (error) {
             await this.closeWorker();
             return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
@@ -368,8 +357,8 @@ export class FaceCropCaptureController {
                 const timestampUs = index * 1000 + Math.round((performance.now() - warmupStartedAt) * 1000);
                 const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
                 try {
-                    await Promise.all(this.workers.map(worker => {
-                        const warmupFrame = worker === this.worker ? frame : new window.VideoFrame(this.video, {timestamp: timestampUs});
+                    await Promise.all(this.analysisWorkers.map(worker => {
+                        const warmupFrame = worker === this.analysisWorkers[0] ? frame : new window.VideoFrame(this.video, {timestamp: timestampUs});
                         return worker.warmup({frame: warmupFrame, width: warmupFrame.displayWidth || source.width,
                             height: warmupFrame.displayHeight || source.height, timestampUs}).finally(() => {
                             if (warmupFrame !== frame) warmupFrame.close();
@@ -460,50 +449,20 @@ export class FaceCropCaptureController {
     }
 
     async processFrame(metadata, wallClockMs = Date.now()) {
-        if (this.configuration.workerCount === 2) return this.processAnalysisFrame(metadata, wallClockMs);
-        let frame;
-        const startedAt = performance.now();
-        try {
-            const source = dimensions(this.video);
-            this.source = source;
-            if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
-            const timestampUs = Math.round(metadata.mediaTime * 1000000);
-            frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
-            const frameSource = {width: frame.displayWidth, height: frame.displayHeight};
-            const workerStartedAt = performance.now();
-            const result = await this.worker.processFrame({frame, ...frameSource, timestampUs, wallClockMs});
-            addTiming(this.frameTimings, 'workerRoundTripMs', performance.now() - workerStartedAt);
-            frame = null;
-            const enqueueStartedAt = performance.now();
-            await this.enqueueParts(result.parts);
-            addTiming(this.frameTimings, 'enqueuePartsMs', performance.now() - enqueueStartedAt);
-            Object.keys(result.timings || {}).forEach(stage => addTiming(this.frameTimings, stage, result.timings[stage]));
-            addTiming(this.frameTimings, 'totalMs', performance.now() - startedAt);
-            if (!result.accepted) {
-                this.faceDetectionMisses += 1;
-                return;
-            }
-            if (result.detectionState === 'largest' || result.detectionState === 'reacquired') this.faceDetections += 1;
-            else this.faceDetectionMisses += 1;
-            this.acceptedFrames += 1;
-        } catch (error) {
-            this.markIncomplete(error.message || 'Face-crop frame processing failed');
-        } finally {
-            if (frame) frame.close();
-        }
+        return this.processAnalysisFrame(metadata, wallClockMs);
     }
 
     async processAnalysisFrame(metadata, wallClockMs) {
-        while (this.inFlight.size + this.analysisResults.size >= 2) {
+        while (this.inFlight.size + this.assemblyBufferedResults >= this.configuration.analysisWorkerCount) {
             if (this.state !== 'capturing') return;
             if (!this.inFlight.size) {
-                this.markIncomplete('Face-crop analysis result sequence gap');
+                this.markIncomplete('Face-crop assembly result sequence gap');
                 return;
             }
             await Promise.race(this.inFlight.values());
         }
         const sequence = this.nextSequence++;
-        const worker = this.workers[this.nextWorker++ % this.workers.length];
+        const worker = this.analysisWorkers[this.nextWorker++ % this.analysisWorkers.length];
         const startedAt = performance.now();
         const source = dimensions(this.video);
         this.source = source;
@@ -511,37 +470,31 @@ export class FaceCropCaptureController {
         const timestampUs = Math.round(metadata.mediaTime * 1000000);
         const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
         const task = worker.processFrame({frame, width: frame.displayWidth, height: frame.displayHeight, timestampUs, wallClockMs, sequence})
-            .then(result => this.commitAnalysisResult({result, sequence, startedAt}))
+            .then(result => {
+                result.controllerStartedAt = startedAt;
+                return this.assemblyWorker.processAnalysisResult(result);
+            })
+            .then(result => this.commitAssemblyResult(result))
             .catch(error => this.markIncomplete(error.message || 'Face-crop frame processing failed'))
             .finally(() => this.inFlight.delete(sequence));
         this.inFlight.set(sequence, task);
     }
 
-    async commitAnalysisResult({result, sequence, startedAt}) {
-        this.analysisResults.set(sequence, result);
-        while (this.analysisResults.has(this.nextCommitSequence)) {
-            const current = this.analysisResults.get(this.nextCommitSequence);
-            this.analysisResults.delete(this.nextCommitSequence++);
-            const commitStartedAt = performance.now();
-            const selection = this.roi.getSelection({width: current.width, height: current.height,
-                detections: current.detections, timestampMs: current.timestampUs / 1000});
-            const parts = selection.roi ? this.segmenter.appendFrame({
-                writeBgr24: output => processFaceCropFrame({width: current.width, height: current.height, rgbx: current.rgbx, roi: selection.roi, output}),
-                sourceWidth: current.width, sourceHeight: current.height, roi: selection.roi, provenance: selection,
-                timestampUs: current.timestampUs, wallClockMs: current.wallClockMs}) : [];
+    async commitAssemblyResult(result) {
+        this.assemblyBufferedResults = result.bufferedResultCount;
+        for (const commit of result.commits) {
             const enqueueStartedAt = performance.now();
-            await this.enqueueParts(parts);
+            await this.enqueueParts(commit.artifacts);
             addTiming(this.frameTimings, 'enqueuePartsMs', performance.now() - enqueueStartedAt);
-            addTiming(this.frameTimings, 'detectionMs', current.timings.detectionMs);
-            addTiming(this.frameTimings, 'rgbaCopyMs', current.timings.rgbaCopyMs);
-            addTiming(this.frameTimings, 'analysisMs', current.timings.analysisMs);
-            const commitDurationMs = performance.now() - commitStartedAt;
-            addTiming(this.frameTimings, 'commitMs', commitDurationMs);
-            addTiming(this.frameTimings, 'workerRoundTripMs', performance.now() - startedAt);
-            addTiming(this.frameTimings, 'totalMs', performance.now() - startedAt);
-            if (selection.state === 'largest' || selection.state === 'reacquired') this.faceDetections += 1;
-            else this.faceDetectionMisses += 1;
-            this.acceptedFrames += 1;
+            Object.keys(commit.timings || {}).forEach(stage => addTiming(this.frameTimings, stage, commit.timings[stage]));
+            const elapsedMs = performance.now() - commit.controllerStartedAt;
+            addTiming(this.frameTimings, 'workerRoundTripMs', elapsedMs);
+            addTiming(this.frameTimings, 'totalMs', elapsedMs);
+            if (commit.accepted) {
+                if (commit.detectionState === 'largest' || commit.detectionState === 'reacquired') this.faceDetections += 1;
+                else this.faceDetectionMisses += 1;
+                this.acceptedFrames += 1;
+            } else this.faceDetectionMisses += 1;
         }
     }
 
@@ -566,10 +519,10 @@ export class FaceCropCaptureController {
             if (this.frameCallbacks === 0) {
                 this.incompleteReason = this.incompleteReason || 'No video frame callbacks were received during face-crop capture';
             }
-            if (this.configuration.workerCount === 2) {
-                await Promise.all(this.inFlight.values());
-                await this.enqueueParts(this.segmenter.finish());
-            } else if (this.worker) await this.enqueueParts((await this.worker.finish()).parts);
+            await Promise.all(this.inFlight.values());
+            const assemblyResult = await this.assemblyWorker.finish();
+            this.assemblyBufferedResults = assemblyResult.bufferedResultCount;
+            await this.enqueueParts(assemblyResult.artifacts);
             result = await this.sink.finalize();
             if (result.parts.some(part => part.status !== UPLOAD_STATUS.SUCCEEDED)) {
                 this.incompleteReason = 'One or more patch-video uploads failed';
@@ -631,7 +584,8 @@ export class FaceCropCaptureController {
         const config = this.configuration;
         return {requestedMode: config.requestedMode, appliedMode: config.mode,
             roi: {smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale, verticalShiftRatio: config.faceRoiVerticalShiftRatio},
-            workerCount: config.workerCount,
+            analysisWorkerCount: config.analysisWorkerCount,
+            pipeline: {assemblyWorker: true, artifactEncoding: 'worker-gzip-avi-v1'},
             detector: {delegate: config.faceDetectionDelegate, minConfidence: config.faceDetectionMinConfidence,
                 minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold},
             selectionPolicy: 'largest-eligible-bounding-box-v1'};
@@ -675,10 +629,10 @@ export class FaceCropCaptureController {
     }
 
     async closeWorker() {
-        if (!this.workers.length) return;
-        const workers = this.workers;
-        this.worker = null;
-        this.workers = [];
+        const workers = [...this.analysisWorkers, this.assemblyWorker].filter(Boolean);
+        this.analysisWorkers = [];
+        this.assemblyWorker = null;
+        if (!workers.length) return;
         try {
             await Promise.all(workers.map(worker => worker.close()));
         } catch (error) {

@@ -1,8 +1,8 @@
 /* global globalThis */
-import {createFaceEventsFilename, createPatchVideoFilename, FACE_EVENTS_FORMAT_VERSION} from './FaceCropOutput';
+import {createFaceEventsFilename, createPatchVideoFilename, encodePatchArtifact, FACE_EVENTS_FORMAT_VERSION} from './FaceCropOutput';
 
-// The worker contains all MediaPipe and pixel processing so the main thread only
-// schedules VideoFrames and hands sealed upload parts to FaceCropSink.
+// Analysis and assembly workers contain MediaPipe and patch production so the
+// main thread only schedules VideoFrames and hands encoded artifacts to FaceCropSink.
 export const PATCH_SIZE = 72;
 export const BGR24_FRAME_BYTES = PATCH_SIZE * PATCH_SIZE * 3;
 export const MAX_FRAMES_PER_PART = 539;
@@ -346,60 +346,12 @@ export class FaceCropSegmenter {
         const bytes = this.part.bytes.subarray(0, frameCount * BGR24_FRAME_BYTES);
         this.part = null;
         this.partIndex += 1;
-        return {segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, filename,
+        return {captureId: identity.captureId, segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, filename,
             faceEventsFilename: createFaceEventsFilename(identity), frameCount, byteLength: bytes.byteLength, bytes,
             faceEvents: {formatVersion: FACE_EVENTS_FORMAT_VERSION, captureId: identity.captureId, aviFilename: filename,
                 segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, frameCount,
                 selectionConfiguration: {...this.selectionConfiguration}, frames: events}};
     }
-}
-
-export class FaceCropPipeline {
-    async initialize({configuration, identity}) {
-        this.detector = await createMediaPipeFaceDetector({minDetectionConfidence: configuration.faceDetectionMinConfidence,
-            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold, delegate: configuration.faceDetectionDelegate});
-        this.roi = new FaceRoiProvider({smoothingTauMs: configuration.faceRoiSmoothingTauMs, scale: configuration.faceRoiScale,
-            verticalShiftRatio: configuration.faceRoiVerticalShiftRatio, minDetectionConfidence: configuration.faceDetectionMinConfidence});
-        this.segmenter = new FaceCropSegmenter({...identity, selectionConfiguration: {
-            minDetectionConfidence: configuration.faceDetectionMinConfidence,
-            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold,
-            policy: 'largest-eligible-bounding-box-v1'}});
-    }
-
-    async processFrame({frame, width, height, timestampUs, wallClockMs}) {
-        const startedAt = timingNow();
-        const timings = {};
-        try {
-            // MediaPipe consumes the VideoFrame directly; CPU RGBA is materialized
-            // separately because the deterministic resampler needs pixel bytes.
-            let stageStartedAt = timingNow();
-            const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
-            timings.detectionMs = timingNow() - stageStartedAt;
-            stageStartedAt = timingNow();
-            const selection = this.roi.getSelection({width, height, detections: detected.detections, timestampMs: timestampUs / 1000});
-            timings.roiSelectionMs = timingNow() - stageStartedAt;
-            if (!selection.roi) return {accepted: false, detectionState: 'skipped', parts: [], timings: {...timings, pipelineTotalMs: timingNow() - startedAt}};
-            const sourceRoi = selection.roi;
-            stageStartedAt = timingNow();
-            const rgba = await copyPackedRgba(frame, width, height);
-            timings.rgbaCopyMs = timingNow() - stageStartedAt;
-            stageStartedAt = timingNow();
-            const parts = this.segmenter.appendFrame({
-                writeBgr24: output => processFaceCropFrame({width, height, rgbx: rgba, roi: sourceRoi, output}),
-                sourceWidth: width, sourceHeight: height, roi: sourceRoi, provenance: selection, timestampUs, wallClockMs});
-            timings.cropAndSegmentMs = timingNow() - stageStartedAt;
-            return {accepted: true, detectionState: selection.state, parts, timings: {...timings, pipelineTotalMs: timingNow() - startedAt}};
-        } finally {
-            frame.close();
-        }
-    }
-
-    warmup({frame, timestampUs}) {
-        return warmupDetector(this.detector, frame, timestampUs);
-    }
-
-    finish() { return {parts: this.segmenter.finish()}; }
-    close() { if (this.detector) this.detector.close(); this.detector = null; }
 }
 
 export class FaceCropAnalysisPipeline {
@@ -431,30 +383,117 @@ export class FaceCropAnalysisPipeline {
     close() { if (this.detector) this.detector.close(); this.detector = null; }
 }
 
+export class FaceCropAssemblyPipeline {
+    constructor({encodePart = encodePatchArtifact} = {}) {
+        this.encodePart = encodePart;
+        this.pending = new Map();
+        this.nextSequence = 0;
+    }
+
+    async initialize({configuration, identity}) {
+        if (typeof Blob !== 'function' || typeof CompressionStream !== 'function' || typeof Response !== 'function') {
+            throw new Error('Worker-side Blob, Response, and CompressionStream APIs are required');
+        }
+        this.maxPendingResults = configuration.analysisWorkerCount;
+        this.roi = new FaceRoiProvider({smoothingTauMs: configuration.faceRoiSmoothingTauMs, scale: configuration.faceRoiScale,
+            verticalShiftRatio: configuration.faceRoiVerticalShiftRatio, minDetectionConfidence: configuration.faceDetectionMinConfidence});
+        this.segmenter = new FaceCropSegmenter({...identity, selectionConfiguration: {
+            minDetectionConfidence: configuration.faceDetectionMinConfidence,
+            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold,
+            policy: 'largest-eligible-bounding-box-v1'}});
+    }
+
+    async processAnalysisResult(result) {
+        if (!result || !Number.isSafeInteger(result.sequence) || !(result.rgbx instanceof Uint8Array)) {
+            throw new Error('Analysis result is invalid');
+        }
+        if (this.pending.has(result.sequence) || this.pending.size >= this.maxPendingResults) {
+            throw new Error('Assembly result buffer is invalid');
+        }
+        this.pending.set(result.sequence, result);
+        const commits = [];
+        while (this.pending.has(this.nextSequence)) {
+            const current = this.pending.get(this.nextSequence);
+            this.pending.delete(this.nextSequence++);
+            const startedAt = timingNow();
+            const roiStartedAt = timingNow();
+            const selection = this.roi.getSelection({width: current.width, height: current.height,
+                detections: current.detections, timestampMs: current.timestampUs / 1000});
+            const roiSelectionMs = timingNow() - roiStartedAt;
+            let artifacts = [];
+            let cropAndSegmentMs = 0;
+            let encodingMs = 0;
+            if (selection.roi) {
+                const cropStartedAt = timingNow();
+                const parts = this.segmenter.appendFrame({
+                    writeBgr24: output => processFaceCropFrame({width: current.width, height: current.height,
+                        rgbx: current.rgbx, roi: selection.roi, output}),
+                    sourceWidth: current.width, sourceHeight: current.height, roi: selection.roi, provenance: selection,
+                    timestampUs: current.timestampUs, wallClockMs: current.wallClockMs});
+                cropAndSegmentMs = timingNow() - cropStartedAt;
+                const encodingStartedAt = timingNow();
+                artifacts = await Promise.all(parts.map(part => this.encodePart(part)));
+                encodingMs = timingNow() - encodingStartedAt;
+            }
+            commits.push({sequence: current.sequence, accepted: Boolean(selection.roi), detectionState: selection.state,
+                controllerStartedAt: current.controllerStartedAt, artifacts, timings: {...current.timings, roiSelectionMs, cropAndSegmentMs, encodingMs,
+                    assemblyMs: timingNow() - startedAt}});
+        }
+        return {commits, bufferedResultCount: this.pending.size};
+    }
+
+    async finish() {
+        if (this.pending.size) throw new Error('Face-crop assembly result sequence gap');
+        const startedAt = timingNow();
+        const artifacts = await Promise.all(this.segmenter.finish().map(part => this.encodePart(part)));
+        return {commits: [], artifacts, bufferedResultCount: 0, timings: {encodingMs: timingNow() - startedAt}};
+    }
+
+    close() {
+        this.pending.clear();
+        this.roi = null;
+        this.segmenter = null;
+    }
+}
+
 /* eslint-disable no-restricted-globals */
 if (typeof self !== 'undefined' && typeof window === 'undefined') {
-    // Keep the protocol small and explicit: initialize, process frames in order,
-    // finish pending parts, then close the detector during teardown.
-    const pipeline = new FaceCropPipeline();
     const analysisPipeline = new FaceCropAnalysisPipeline();
-    let activePipeline = pipeline;
+    const assemblyPipeline = new FaceCropAssemblyPipeline();
+    let activePipeline = null;
     const handlers = {
         initialize: payload => {
-            activePipeline = payload.configuration && payload.configuration.analysisOnly ? analysisPipeline : pipeline;
+            activePipeline = payload.role === 'analysis' ? analysisPipeline : payload.role === 'assembly' ? assemblyPipeline : null;
+            if (!activePipeline) throw new Error('Face-crop worker role is invalid');
             return activePipeline.initialize(payload).then(() => ({}));
         },
-        processFrame: payload => activePipeline.processFrame(payload),
-        warmup: payload => activePipeline.warmup(payload),
-        finish: () => pipeline.finish(),
-        close: () => { pipeline.close(); analysisPipeline.close(); return {}; }
+        processFrame: payload => {
+            if (activePipeline !== analysisPipeline) throw new Error('Analysis worker is not initialized');
+            return analysisPipeline.processFrame(payload);
+        },
+        processAnalysisResult: payload => {
+            if (activePipeline !== assemblyPipeline) throw new Error('Assembly worker is not initialized');
+            return assemblyPipeline.processAnalysisResult(payload);
+        },
+        warmup: payload => {
+            if (activePipeline !== analysisPipeline) throw new Error('Analysis worker is not initialized');
+            return analysisPipeline.warmup(payload);
+        },
+        finish: () => {
+            if (activePipeline !== assemblyPipeline) throw new Error('Assembly worker is not initialized');
+            return assemblyPipeline.finish();
+        },
+        close: () => { analysisPipeline.close(); assemblyPipeline.close(); return {}; }
     };
     self.onmessage = async event => {
         const {type, payload = {}} = event.data || {};
         try {
             if (!handlers[type]) throw new Error('Unknown face-crop worker request: ' + type);
             const result = await handlers[type](payload);
-            const transfer = (result.parts || []).map(part => part.bytes.buffer);
+            const transfer = [];
             if (result.rgbx) transfer.push(result.rgbx.buffer);
+            (result.artifacts || []).forEach(artifact => transfer.push(artifact.gzipBytes));
+            (result.commits || []).forEach(commit => commit.artifacts.forEach(artifact => transfer.push(artifact.gzipBytes)));
             self.postMessage({result}, transfer);
         } catch (error) {
             console.error('[face-crop] Worker request failed', {type, error});

@@ -4,35 +4,33 @@ This directory contains the optional face-crop recording pipeline that runs besi
 
 ## Runtime flow
 
+`FaceCropCaptureController` keeps browser-facing work deliberately small: it schedules `VideoFrame` instances, distributes them to analysis workers, forwards their transferable results to one ordered assembly worker, and performs JATOS upload/retry work. It does not run ROI selection, pixel downsampling, AVI muxing, or gzip encoding.
+
+`REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT` controls the number of MediaPipe analysis workers and accepts only `1` or `2` (default `1`). Each configuration also starts exactly one assembly worker:
+
 ```text
-WebcamCapture
-   -> FaceCropCaptureController (prepare on webcam readiness, capture on start)
-  -> PipelineWorker
-  -> FaceCropPipeline (worker)
-     -> MediaPipe face detection
-     -> FaceRoiProvider
-     -> FaceCropProcessor
-     -> FaceCropSegmenter
-  -> FaceCropSink
-     -> AVI + gzip encoding
-     -> AVI and face-events sidecar uploads
+main thread
+  -> N analysis workers (MediaPipe detection + packed RGBX extraction)
+  -> 1 assembly worker (source-order buffer, ROI, crop/downsample, segmentation, AVI + gzip)
+  -> main-thread FaceCropSink (JATOS AVI upload, sidecar upload, retry)
 ```
 
-`FaceCropCaptureController` owns browser APIs, frame scheduling, lifecycle, and participant metadata. `PipelineWorker` is the ordered request bridge. With one worker, that worker performs the full pipeline. With two workers, each worker performs MediaPipe detection and RGBA extraction, while the controller commits their results in source order using the same ROI, conversion, provenance, and segmentation logic. `FaceCropSink` owns bounded transport, retries, upload tracking, and the coupling between each AVI part and its JSON sidecar.
+Analysis results include a source sequence and transferable RGBX bytes. The assembly worker buffers at most the analysis-worker count, processes only the next sequence, and returns sealed encoded artifacts as transferable gzip byte buffers plus their sidecars. Thus `analysisWorkerCount: 1` means one detector and one assembly worker; `analysisWorkerCount: 2` means two detectors and one assembly worker.
 
 ## Files
 
-- `FaceCropCapture.js`: optional capability probe, session start/stop, worker bridge, and status metadata.
-- `FaceCropPipeline.worker.js`: MediaPipe initialization, deterministic ROI selection, area resampling, frame provenance, and segmentation.
-- `FaceCropOutput.js`: deterministic filenames, uncompressed AVI construction, gzip encoding, bounded upload queue, and retries.
-- `FaceCropCapture.test.js`: configuration and lifecycle contracts.
-- `FaceCropPipeline.test.js`: ROI, pixel conversion, and worker frame ownership contracts.
-- `FaceCropOutput.test.js`: AVI byte layout, segmentation, queue limits, sidecar coupling, and retry contracts.
+- `FaceCropCapture.js`: capability probe, lifecycle, bounded routing, worker bridge, manifest metadata, and status reporting.
+- `FaceCropPipeline.worker.js`: separate MediaPipe analysis and ordered patch-assembly roles.
+- `FaceCropOutput.js`: deterministic filenames, AVI/gzip artifact encoding for the assembly worker, and the upload-only bounded JATOS sink.
+- `FaceCropCapture.test.js`: configuration and lifecycle/drain contracts.
+- `FaceCropPipeline.test.js`: ROI, pixel conversion, worker ownership, ordering, and segmentation contracts.
+- `FaceCropOutput.test.js`: AVI byte layout, encoded-artifact upload, sidecar coupling, and retry contracts.
 
 ## Invariants
 
-- Face-crop capture is optional and disabled by default; unsupported browser APIs must not block the main recording flow.
-- At most one request is in flight per worker and at most two frames are held across in-flight and reordered results, preserving commit order and bounding memory use.
+- Face-crop capture is optional and disabled by default; unsupported browser APIs must not block the main recording flow. Worker-side `Blob`, `Response`, and `CompressionStream` are required for face-crop capture; failure marks this optional path unsupported.
+- The controller holds at most `analysisWorkerCount` detector/assembly tasks. The assembly worker holds at most that many out-of-order analysis results and never commits a later source sequence first.
+- Analysis workers own MediaPipe and close their transferred `VideoFrame` inputs. The assembly worker owns ROI state, crop/downsample buffers, segment allocation, AVI muxing, and gzip encoding. The main thread owns no patch-image or encoder buffers.
 - Face selection is deterministic: the largest eligible detection wins, followed by stable tie-breakers; a centered largest-square fallback is used before the first detection, and a valid previous ROI is held through later detector misses.
 - A source-dimension change starts a new segment.
 - Each AVI upload has a matching `.face-events.json` sidecar, and each capture attempt has a manifest listing its parts. Either part artifact failing makes the logical part incomplete.

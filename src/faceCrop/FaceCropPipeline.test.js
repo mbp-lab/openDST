@@ -1,6 +1,7 @@
-import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropPipeline, FaceCropAnalysisPipeline} from './FaceCropPipeline.worker';
+import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropAnalysisPipeline, FaceCropAssemblyPipeline} from './FaceCropPipeline.worker';
 import {FaceCropProcessor, BGR24_FRAME_BYTES, processFaceCropFrame, FaceCropSegmenter} from './FaceCropPipeline.worker';
 import {buildUncompressedAvi} from './FaceCropOutput';
+import pako from 'pako';
 import {FaceCropCaptureController, resolveFaceCropConfiguration} from './FaceCropCapture';
 
 describe('MediaPipe detector configuration', () => {
@@ -27,89 +28,61 @@ describe('MediaPipe detector configuration', () => {
     });
 });
 
-describe('two-worker capture scheduling', () => {
-    test('fails instead of hanging when buffered results have no in-flight worker', async () => {
+describe('analysis and assembly scheduling', () => {
+    test('marks a rejected detector task incomplete and removes it from the in-flight set', async () => {
         const controller = new FaceCropCaptureController({
-            video: {cancelVideoFrameCallback: jest.fn()},
-            studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({
-                REACT_APP_FACE_CROP_RECORDING_MODE: 'all', REACT_APP_FACE_CROP_WORKER_COUNT: '2'
-            }),
-            uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
-            uploadResultFile: jest.fn()
-        });
-        controller.state = 'capturing';
-        controller.analysisResults.set(0, {});
-        controller.analysisResults.set(1, {});
-
-        await expect(controller.processAnalysisFrame({mediaTime: 1}, Date.now())).resolves.toBeUndefined();
-        expect(controller.state).toBe('stopping');
-        expect(controller.incompleteReason).toBe('Face-crop analysis result sequence gap');
-    });
-
-    test('marks a rejected worker task incomplete and removes it from the in-flight set', async () => {
-        const controller = new FaceCropCaptureController({
-            video: {videoWidth: 72, videoHeight: 72}, studyResultId: 'RESULT',
-            studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}),
+            video: {videoWidth: 72, videoHeight: 72}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '2'}),
             uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
         });
         controller.state = 'capturing';
-        controller.workers = [{processFrame: jest.fn(() => Promise.reject(new Error('analysis failed')))}];
+        controller.analysisWorkers = [{processFrame: jest.fn(() => Promise.reject(new Error('analysis failed')))}];
+        controller.assemblyWorker = {processAnalysisResult: jest.fn()};
         const originalVideoFrame = window.VideoFrame;
         window.VideoFrame = jest.fn(() => ({displayWidth: 72, displayHeight: 72}));
         try {
             await controller.processAnalysisFrame({mediaTime: 1}, Date.now());
-            await Promise.resolve();
-            await Promise.resolve();
+            await Promise.all([...controller.inFlight.values()]);
             expect(controller.incompleteReason).toBe('analysis failed');
             expect(controller.inFlight.size).toBe(0);
-        } finally {
-            window.VideoFrame = originalVideoFrame;
-        }
+        } finally { window.VideoFrame = originalVideoFrame; }
     });
 
-    test('drains active analysis before two-worker finalization', async () => {
+    test('drains active analysis before finalizing the assembly worker', async () => {
         let resolveAnalysis;
         const analysis = new Promise(resolve => { resolveAnalysis = resolve; });
         const controller = new FaceCropCaptureController({
             video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}),
+            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '2'}),
             uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
         });
         controller.inFlight.set(0, analysis);
-        controller.segmenter = {finish: jest.fn(() => [])};
+        controller.assemblyWorker = {finish: jest.fn(() => Promise.resolve({artifacts: [], bufferedResultCount: 0}))};
         controller.sink.finalize = jest.fn(() => Promise.resolve({parts: []}));
         controller.closeWorker = jest.fn(() => Promise.resolve());
         controller.uploadManifest = jest.fn(() => Promise.resolve());
-
         const finalizing = controller.finalize();
-        expect(controller.segmenter.finish).not.toHaveBeenCalled();
+        expect(controller.assemblyWorker.finish).not.toHaveBeenCalled();
         resolveAnalysis();
         await finalizing;
-
-        expect(controller.segmenter.finish).toHaveBeenCalledTimes(1);
+        expect(controller.assemblyWorker.finish).toHaveBeenCalledTimes(1);
         expect(controller.sink.finalize).toHaveBeenCalledTimes(1);
     });
 
-    test('keeps worker and result buffering bounded at two frames', async () => {
-        const first = {};
-        first.promise = new Promise(resolve => { first.resolve = resolve; });
-        const second = {};
-        second.promise = new Promise(resolve => { second.resolve = resolve; });
-        const worker = {processFrame: jest.fn()
-            .mockReturnValueOnce(first.promise)
-            .mockReturnValueOnce(second.promise)
+    test('keeps detector dispatch bounded by the analysis-worker count', async () => {
+        const first = {}; first.promise = new Promise(resolve => { first.resolve = resolve; });
+        const second = {}; second.promise = new Promise(resolve => { second.resolve = resolve; });
+        const worker = {processFrame: jest.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
             .mockReturnValueOnce(new Promise(() => {}))};
         const controller = new FaceCropCaptureController({
-            video: {videoWidth: 72, videoHeight: 72}, studyResultId: 'RESULT',
-            studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}),
+            video: {videoWidth: 72, videoHeight: 72}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '2'}),
             uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
         });
         controller.state = 'capturing';
-        controller.workers = [worker, worker];
-        controller.commitAnalysisResult = jest.fn(() => Promise.resolve());
+        controller.analysisWorkers = [worker, worker];
+        controller.assemblyWorker = {processAnalysisResult: jest.fn(result => Promise.resolve({commits: [{...result, accepted: false,
+            detectionState: 'default', artifacts: [], controllerStartedAt: result.controllerStartedAt, timings: {}}], bufferedResultCount: 0}))};
         const originalVideoFrame = window.VideoFrame;
         window.VideoFrame = jest.fn(() => ({displayWidth: 72, displayHeight: 72}));
         try {
@@ -117,12 +90,10 @@ describe('two-worker capture scheduling', () => {
             await controller.processAnalysisFrame({mediaTime: 2}, 2);
             const thirdDispatch = controller.processAnalysisFrame({mediaTime: 3}, 3);
             expect(worker.processFrame).toHaveBeenCalledTimes(2);
-            first.resolve({rgbx: new Uint8Array(4)});
+            first.resolve({sequence: 0, rgbx: new Uint8Array(4), timings: {}});
             await thirdDispatch;
             expect(worker.processFrame).toHaveBeenCalledTimes(3);
-        } finally {
-            window.VideoFrame = originalVideoFrame;
-        }
+        } finally { window.VideoFrame = originalVideoFrame; }
     });
 });
 
@@ -335,171 +306,71 @@ describe('FaceRoiProvider', () => {
 });
 
 
-describe('FaceCropPipeline worker input', () => {
-    test('warmup always closes transferred frames', () => {
-        [FaceCropPipeline, FaceCropAnalysisPipeline].forEach(Pipeline => {
-            const pipeline = new Pipeline();
-            const frame = {close: jest.fn()};
-            pipeline.detector = {detectForVideo: jest.fn()};
-            expect(pipeline.warmup({frame, timestampUs: 1000})).toEqual({});
-            expect(frame.close).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    test('warmup closes its frame when detection fails', () => {
-        const pipeline = new FaceCropAnalysisPipeline();
-        const error = new Error('warmup failed');
-        const frame = {close: jest.fn()};
-        pipeline.detector = {detectForVideo: jest.fn(() => { throw error; })};
-
-        expect(() => pipeline.warmup({frame, timestampUs: 1000})).toThrow(error);
-        expect(frame.close).toHaveBeenCalledTimes(1);
-    });
-
-    test('analysis returns packed pixels and closes its input frame', async () => {
+describe('worker roles', () => {
+    test('analysis warmup and processing always close transferred frames', async () => {
         const pipeline = new FaceCropAnalysisPipeline();
         pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(0, 0, 72, 72)]}))};
+        const warmupFrame = {close: jest.fn()};
+        expect(pipeline.warmup({frame: warmupFrame, timestampUs: 1000})).toEqual({});
+        expect(warmupFrame.close).toHaveBeenCalledTimes(1);
         const frame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
-
         const result = await pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1000, wallClockMs: 10, sequence: 4});
-
-        expect(result).toMatchObject({sequence: 4, width: 72, height: 72, timestampUs: 1000, wallClockMs: 10,
-            detections: expect.any(Array), rgbx: expect.any(Uint8Array)});
+        expect(result).toMatchObject({sequence: 4, rgbx: expect.any(Uint8Array)});
         expect(frame.close).toHaveBeenCalledTimes(1);
     });
 
-    test('commits out-of-order analysis results in sequence order', async () => {
-        const controller = new FaceCropCaptureController({
-            video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}),
-            uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
-        });
-        const committed = [];
-        controller.roi = {getSelection: jest.fn(({timestampMs}) => ({roi: {coordinateSystem: FACE_COORDINATE_SYSTEM,
-            transformType: DYNAMIC_FACE_SQUARE, samplingVersion: AREA_AVERAGE_V1, descriptorVersion: FACE_ROI_DESCRIPTOR_VERSION,
-            x: 0, y: 0, size: 72}, state: String(timestampMs), detection: {}}))};
-        controller.segmenter = {appendFrame: jest.fn(({timestampUs}) => { committed.push(timestampUs); return []; })};
-        const result = timestampUs => ({width: 72, height: 72, timestampUs, wallClockMs: timestampUs,
-            detections: [], rgbx: new Uint8Array(72 * 72 * 4), timings: {}});
-
-        await controller.commitAnalysisResult({result: result(2000), sequence: 1, startedAt: performance.now()});
-        expect(committed).toEqual([]);
-        await controller.commitAnalysisResult({result: result(1000), sequence: 0, startedAt: performance.now()});
-        expect(committed).toEqual([1000, 2000]);
-    });
-
-    test('uploads source-ordered AVI frames and event records after out-of-order analysis', async () => {
-        const uploadResultFile = jest.fn(() => Promise.resolve());
-        const controller = new FaceCropCaptureController({
-            video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}),
-            uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile
-        });
-        controller.roi = new FaceRoiProvider({smoothingTauMs: 0});
-        controller.segmenter = new FaceCropSegmenter({
-            studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1, maxFramesPerPart: 2
-        });
-        controller.sink.encode = part => Promise.resolve(buildUncompressedAvi(part));
-        const result = (timestampUs, color) => {
+    test('assembly commits 1 then 0 in source order and emits ordered AVI and events', async () => {
+        const encodePart = jest.fn(part => Promise.resolve({...part, gzipBytes: pako.gzip(buildUncompressedAvi(part)).buffer}));
+        const pipeline = new FaceCropAssemblyPipeline({encodePart});
+        pipeline.maxPendingResults = 2;
+        pipeline.roi = new FaceRoiProvider({smoothingTauMs: 0});
+        pipeline.segmenter = new FaceCropSegmenter({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            captureId: 'capture', maxFramesPerPart: 2, selectionConfiguration: {policy: 'test'}});
+        const input = (sequence, timestampUs, color) => {
             const rgbx = new Uint8Array(72 * 72 * 4);
             for (let offset = 0; offset < rgbx.byteLength; offset += 4) rgbx.set([...color, 255], offset);
-            return {width: 72, height: 72, timestampUs, wallClockMs: timestampUs, detections: [], rgbx,
-                timings: {detectionMs: 0, rgbaCopyMs: 0, analysisMs: 0}};
+            return {sequence, width: 72, height: 72, timestampUs, wallClockMs: timestampUs, detections: [], rgbx,
+                controllerStartedAt: sequence, timings: {analysisMs: 1}};
         };
-        const aviFramePixels = avi => {
-            const indexOffset = String.fromCharCode(...avi.subarray(0, 4)) === 'RIFF'
-                ? findChunk(avi, 'idx1') : -1;
-            const frames = [];
-            for (let offset = 0; offset < indexOffset; offset += 1) {
-                if (String.fromCharCode(...avi.subarray(offset, offset + 4)) === '00db') {
-                    frames.push(Array.from(avi.subarray(offset + 8, offset + 11)));
-                }
-            }
-            return frames;
-        };
-
-        await controller.commitAnalysisResult({result: result(2000, [40, 50, 60]), sequence: 1, startedAt: performance.now()});
-        await controller.commitAnalysisResult({result: result(1000, [10, 20, 30]), sequence: 0, startedAt: performance.now()});
-        await controller.enqueueParts(controller.segmenter.finish());
-        await controller.sink.finalize();
-
-        expect(uploadResultFile).toHaveBeenCalledTimes(2);
-        expect(aviFramePixels(uploadResultFile.mock.calls[0][0])).toEqual([[30, 20, 10], [60, 50, 40]]);
-        expect(JSON.parse(uploadResultFile.mock.calls[1][0]).frames.map(frame => frame.mediaTimeUs)).toEqual([1000, 2000]);
+        expect((await pipeline.processAnalysisResult(input(1, 2000, [40, 50, 60]))).commits).toEqual([]);
+        const result = await pipeline.processAnalysisResult(input(0, 1000, [10, 20, 30]));
+        expect(result.commits.map(commit => commit.sequence)).toEqual([0, 1]);
+        const artifact = result.commits[1].artifacts[0];
+        const avi = pako.ungzip(new Uint8Array(artifact.gzipBytes));
+        const frameOffsets = [];
+        const indexOffset = findChunk(avi, 'idx1');
+        for (let offset = 0; offset < indexOffset; offset += 1) {
+            if (String.fromCharCode(...avi.subarray(offset, offset + 4)) === '00db') frameOffsets.push(offset + 8);
+        }
+        expect(frameOffsets.map(offset => Array.from(avi.subarray(offset, offset + 3)))).toEqual([[30, 20, 10], [60, 50, 40]]);
+        expect(artifact.faceEvents.frames.map(frame => frame.mediaTimeUs)).toEqual([1000, 2000]);
+        expect(artifact).toMatchObject({captureId: 'capture', segmentIndex: 0, partIndex: 0});
     });
 
-    test('passes the VideoFrame directly and resamples the selected source ROI', async () => {
-        const pipeline = new FaceCropPipeline();
-        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(21, 21, 60, 60)]}))};
-        pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
-        let appendInput;
-        pipeline.segmenter = {appendFrame: jest.fn(input => { appendInput = input; return []; })};
-        const frame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
-
-        const result = await pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000});
-        expect(result).toMatchObject({accepted: true});
-        expect(result.timings).toEqual(expect.objectContaining({
-            detectionMs: expect.any(Number), roiSelectionMs: expect.any(Number), rgbaCopyMs: expect.any(Number),
-            cropAndSegmentMs: expect.any(Number), pipelineTotalMs: expect.any(Number)
-        }));
-        expect(pipeline.detector.detectForVideo).toHaveBeenCalledWith(frame, 1);
-        expect(frame.copyTo).toHaveBeenCalledTimes(1);
-        const [rgba, options] = frame.copyTo.mock.calls[0];
-        expect(rgba).toBeInstanceOf(Uint8Array);
-        expect(rgba.byteLength).toBe(100 * 120 * 4);
-        expect(options).toEqual({format: 'RGBA', colorSpace: 'srgb'});
-        expect(appendInput).toMatchObject({sourceWidth: 100, sourceHeight: 120, roi: {x: 15, y: 15, size: 72}});
-        expect(frame.close).toHaveBeenCalledTimes(1);
-
-        const output = new Uint8Array(BGR24_FRAME_BYTES);
-        appendInput.writeBgr24(output);
-        expect(output).toHaveLength(BGR24_FRAME_BYTES);
+    test('bounds out-of-order assembly buffering and fails finish on a sequence gap', async () => {
+        const pipeline = new FaceCropAssemblyPipeline();
+        pipeline.maxPendingResults = 1;
+        pipeline.roi = new FaceRoiProvider({smoothingTauMs: 0});
+        pipeline.segmenter = {finish: jest.fn(() => [])};
+        const result = {sequence: 1, width: 72, height: 72, timestampUs: 1, wallClockMs: 1, detections: [], rgbx: new Uint8Array(72 * 72 * 4), timings: {}};
+        await pipeline.processAnalysisResult(result);
+        await expect(pipeline.processAnalysisResult({...result, sequence: 2, rgbx: new Uint8Array(result.rgbx.byteLength)}))
+            .rejects.toThrow('Assembly result buffer is invalid');
+        await expect(pipeline.finish()).rejects.toThrow('sequence gap');
     });
 
-    test('closes the frame when detection fails', async () => {
-        const pipeline = new FaceCropPipeline();
-        const error = new Error('detector failed');
-        pipeline.detector = {detectForVideo: jest.fn(() => { throw error; })};
-        const frame = {copyTo: jest.fn(), close: jest.fn()};
-
-        await expect(pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000})).rejects.toBe(error);
-        expect(frame.copyTo).not.toHaveBeenCalled();
-        expect(frame.close).toHaveBeenCalledTimes(1);
-    });
-
-    test('repackages padded VideoFrame rows before resampling', async () => {
-        const pipeline = new FaceCropPipeline();
-        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(21, 21, 60, 60)]}))};
-        pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
-        let appendInput;
-        pipeline.segmenter = {appendFrame: jest.fn(input => { appendInput = input; return []; })};
-        const frame = {
-            allocationSize: jest.fn(() => 112 * 120 * 4),
-            copyTo: jest.fn(buffer => {
-                for (let row = 0; row < 120; row += 1) {
-                    for (let column = 0; column < 100; column += 1) buffer[row * 112 * 4 + column * 4] = 11;
-                }
-                return Promise.resolve([{offset: 0, stride: 112 * 4}]);
-            }),
-            close: jest.fn()
-        };
-
-        await pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000});
-        const output = new Uint8Array(BGR24_FRAME_BYTES);
-        appendInput.writeBgr24(output);
-        expect(output[2]).toBe(11);
-        expect(frame.close).toHaveBeenCalledTimes(1);
-    });
-
-    test('closes the frame when ROI extraction fails', async () => {
-        const pipeline = new FaceCropPipeline();
-        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(10, 20, 20, 20)]}))};
-        pipeline.roi = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 0});
-        pipeline.segmenter = {appendFrame: jest.fn()};
-        const error = new Error('copy failed');
-        const frame = {copyTo: jest.fn(() => Promise.reject(error)), close: jest.fn()};
-
-        await expect(pipeline.processFrame({frame, width: 100, height: 120, timestampUs: 1000, wallClockMs: 1000})).rejects.toBe(error);
-        expect(frame.close).toHaveBeenCalledTimes(1);
+    test('starts a new segment when ordered source dimensions change', async () => {
+        const encodePart = jest.fn(part => Promise.resolve({...part, gzipBytes: new ArrayBuffer(1)}));
+        const pipeline = new FaceCropAssemblyPipeline({encodePart});
+        pipeline.maxPendingResults = 1;
+        pipeline.roi = new FaceRoiProvider({smoothingTauMs: 0});
+        pipeline.segmenter = new FaceCropSegmenter({studyResultId: 'RESULT', studyPage: 'intro', videoCounter: 1,
+            captureId: 'capture', maxFramesPerPart: 10, selectionConfiguration: {}});
+        const result = (sequence, width) => ({sequence, width, height: 72, timestampUs: sequence, wallClockMs: sequence,
+            detections: [], rgbx: new Uint8Array(width * 72 * 4), timings: {}});
+        await pipeline.processAnalysisResult(result(0, 72));
+        const changed = await pipeline.processAnalysisResult(result(1, 73));
+        expect(changed.commits[0].artifacts[0]).toMatchObject({segmentIndex: 0, partIndex: 0});
+        expect((await pipeline.finish()).artifacts[0]).toMatchObject({segmentIndex: 1, partIndex: 0});
     });
 });

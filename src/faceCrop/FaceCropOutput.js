@@ -1,7 +1,8 @@
+/* global Blob, CompressionStream, Response */
 import {UPLOAD_STATUS} from '../uploadState';
 
-// This module is the transport boundary: the worker emits sealed BGR24 parts,
-// while this side owns AVI framing, gzip, retries, and JATOS upload tracking.
+// This module provides worker-safe artifact encoding and the main-thread
+// transport boundary for JATOS upload tracking and retries.
 export const PATCH_VIDEO_FORMAT_VERSION = 'patch-video-avi-gzip-bgr24-v1';
 export const PATCH_VIDEO_FRAME_RATE = 30;
 export const FACE_EVENTS_FORMAT_VERSION = 'face-events-json-v1';
@@ -148,38 +149,45 @@ export function buildUncompressedAvi({bytes, frameCount, frameRate = PATCH_VIDEO
 }
 
 export async function encodeGzipAvi(part) {
-    // Native CompressionStream keeps encoding off the worker protocol and avoids
-    // adding a WASM/FFmpeg dependency to the participant browser.
-    if (typeof window.CompressionStream !== 'function' || typeof window.Blob !== 'function' || typeof window.Response !== 'function') {
+    // This is deliberately worker-safe: the assembly worker owns AVI muxing and
+    // compression, while the main thread keeps only JATOS upload authority.
+    if (typeof Blob !== 'function' || typeof CompressionStream !== 'function' || typeof Response !== 'function') {
         throw new Error('Native Blob, Response, and CompressionStream APIs are required for gzip AVI encoding');
     }
-    const avi = new window.Blob([buildUncompressedAvi({...part, frameRate: resolveAviFrameRate(part)})], {type: 'video/avi'});
-    return new window.Response(avi.stream().pipeThrough(new window.CompressionStream('gzip'))).blob();
+    const avi = new Blob([buildUncompressedAvi({...part, frameRate: resolveAviFrameRate(part)})], {type: 'video/avi'});
+    return new Response(avi.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+}
+
+export async function encodePatchArtifact(part) {
+    const gzip = await encodeGzipAvi(part);
+    return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex,
+        filename: part.filename, faceEventsFilename: part.faceEventsFilename, frameCount: part.frameCount,
+        gzipBytes: await gzip.arrayBuffer(), faceEvents: part.faceEvents};
 }
 
 function delay(milliseconds) { return new Promise(resolve => setTimeout(resolve, milliseconds)); }
 function defaultTracker() { return {registerUpload() {}, settleUpload() {}}; }
 let nextUploadSessionId = 0;
 
-function validatePart(part) {
-    if (!part || !(part.bytes instanceof Uint8Array) || part.bytes.byteLength !== part.byteLength ||
-        !Number.isSafeInteger(part.frameCount) || part.frameCount < 1 || !part.filename.endsWith('.avi.gz') ||
-        !part.faceEventsFilename.endsWith('.face-events.json') || !part.faceEvents ||
-        part.faceEvents.aviFilename !== part.filename || part.faceEvents.frameCount !== part.frameCount) {
-        throw new Error('Sealed patch part is invalid');
+function validateArtifact(artifact) {
+    if (!artifact || !(artifact.gzipBytes instanceof ArrayBuffer) || artifact.gzipBytes.byteLength < 1 ||
+        !Number.isSafeInteger(artifact.frameCount) || artifact.frameCount < 1 || !artifact.filename.endsWith('.avi.gz') ||
+        !artifact.faceEventsFilename.endsWith('.face-events.json') || !artifact.faceEvents ||
+        artifact.faceEvents.aviFilename !== artifact.filename || artifact.faceEvents.frameCount !== artifact.frameCount) {
+        throw new Error('Encoded patch artifact is invalid');
     }
 }
 
 export class FaceCropSink {
-    constructor({uploadResultFile, uploadTracker = defaultTracker(), encode = encodeGzipAvi, sleep = delay,
+    constructor({uploadResultFile, uploadTracker = defaultTracker(), sleep = delay,
         maxPendingParts = MAX_PENDING_PATCH_PARTS, maxAttempts = MAX_UPLOAD_ATTEMPTS, retryDelayMs = 100}) {
         if (typeof uploadResultFile !== 'function' || !uploadTracker || typeof uploadTracker.registerUpload !== 'function' ||
-            typeof uploadTracker.settleUpload !== 'function' || typeof encode !== 'function' || typeof sleep !== 'function' ||
+            typeof uploadTracker.settleUpload !== 'function' || typeof sleep !== 'function' ||
             !Number.isSafeInteger(maxPendingParts) || maxPendingParts < 1 || maxPendingParts > MAX_PENDING_PATCH_PARTS ||
             !Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || !Number.isSafeInteger(retryDelayMs) || retryDelayMs < 0) {
             throw new Error('Patch sink configuration is invalid');
         }
-        Object.assign(this, {uploadResultFile, uploadTracker, encode, sleep, maxPendingParts, maxAttempts, retryDelayMs});
+        Object.assign(this, {uploadResultFile, uploadTracker, sleep, maxPendingParts, maxAttempts, retryDelayMs});
         this.uploadSessionId = nextUploadSessionId++;
         this.pending = [];
         this.tail = Promise.resolve();
@@ -191,7 +199,7 @@ export class FaceCropSink {
         // At most maxPendingParts are retained. Waiting here applies backpressure
         // to frame processing instead of allowing upload latency to grow memory.
         if (!this.accepting) throw new Error('Cannot enqueue a part after sink finalization begins');
-        validatePart(part);
+        validateArtifact(part);
         while (this.pending.length >= this.maxPendingParts) await this.pending[0];
         const completion = this.tail.then(() => this.uploadPart(part)).then(result => { this.results.push(result); return result; });
         this.tail = completion;
@@ -213,14 +221,12 @@ export class FaceCropSink {
         this.uploadTracker.registerUpload(aviId); this.uploadTracker.registerUpload(eventsId);
         let avi;
         try {
-            const encoded = await this.encode(part);
-            avi = await this.uploadWithRetry(encoded, part.filename, aviId);
+            avi = await this.uploadWithRetry(new Blob([part.gzipBytes], {type: 'application/gzip'}), part.filename, aviId);
         } catch (error) {
-            console.error('[face-crop] AVI encoding failed', error);
             this.uploadTracker.settleUpload(aviId, UPLOAD_STATUS.FAILED);
             avi = {uploadId: aviId, filename: part.filename, status: UPLOAD_STATUS.FAILED, attempts: 0, error};
         } finally {
-            part.bytes = null;
+            part.gzipBytes = null;
         }
         if (avi.status !== UPLOAD_STATUS.SUCCEEDED) {
             this.uploadTracker.settleUpload(eventsId, UPLOAD_STATUS.FAILED);

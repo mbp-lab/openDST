@@ -5,7 +5,7 @@ import {
     DEFAULT_FACE_DETECTION_MIN_CONFIDENCE,
     DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD,
     DEFAULT_FACE_DETECTION_DELEGATE,
-    DEFAULT_FACE_CROP_WORKER_COUNT,
+    DEFAULT_FACE_CROP_ANALYSIS_WORKER_COUNT,
     FACE_CROP_STATUS,
     FaceCropCaptureController,
     resolveFaceCropConfiguration,
@@ -65,10 +65,10 @@ describe('resolveFaceCropConfiguration', () => {
     });
 
     test('bounds the experimental analysis worker count to one or two', () => {
-        expect(resolveFaceCropConfiguration({}).workerCount).toBe(DEFAULT_FACE_CROP_WORKER_COUNT);
-        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '2'}).workerCount).toBe(2);
-        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '3'}).workerCount).toBe(1);
-        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_WORKER_COUNT: '1.5'}).workerCount).toBe(1);
+        expect(resolveFaceCropConfiguration({}).analysisWorkerCount).toBe(DEFAULT_FACE_CROP_ANALYSIS_WORKER_COUNT);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '2'}).analysisWorkerCount).toBe(2);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '3'}).analysisWorkerCount).toBe(1);
+        expect(resolveFaceCropConfiguration({REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '1.5'}).analysisWorkerCount).toBe(1);
     });
 
     test('resolves bounded detector thresholds and time-based face hold configuration', () => {
@@ -85,79 +85,45 @@ describe('resolveFaceCropConfiguration', () => {
             .toBe(DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD);
     });
 
-    test('waits for the first presented frame before preparing an early webcam session', async () => {
+    test('initializes detector and assembly workers after the first presented frame', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         let callback;
-        const pipelineWorker = {
-            initialize: jest.fn(() => Promise.resolve()),
-            warmup: jest.fn(() => Promise.resolve()),
-            close: jest.fn(() => Promise.resolve())
-        };
+        const analysis = {initialize: jest.fn(() => Promise.resolve()), warmup: jest.fn(() => Promise.resolve()), close: jest.fn(() => Promise.resolve())};
+        const assembly = {initialize: jest.fn(() => Promise.resolve()), close: jest.fn(() => Promise.resolve())};
         const videoFrame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
-        const video = {
-            videoWidth: 0,
-            videoHeight: 0,
-            readyState: 0,
-            requestVideoFrameCallback: jest.fn(nextCallback => { callback = nextCallback; return 9; }),
-            cancelVideoFrameCallback: jest.fn()
-        };
+        const video = {videoWidth: 0, videoHeight: 0, readyState: 0,
+            requestVideoFrameCallback: jest.fn(nextCallback => { callback = nextCallback; return 9; }), cancelVideoFrameCallback: jest.fn()};
         window.VideoFrame = jest.fn(() => videoFrame);
         window.CompressionStream = jest.fn();
-
         try {
-            const createPipelineWorker = jest.fn(() => pipelineWorker);
-            const controller = new FaceCropCaptureController({
-                video,
-                studyResultId: 'RESULT',
-                studyPage: 'introduction',
-                videoCounter: 1,
+            const createPipelineWorker = jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(assembly);
+            const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
                 configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
-                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
-                uploadResultFile: jest.fn(),
-                createPipelineWorker
-            });
-
+                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn(), createPipelineWorker});
             const preparing = controller.prepare();
             await Promise.resolve();
-            expect(pipelineWorker.initialize).not.toHaveBeenCalled();
-            video.videoWidth = 72;
-            video.videoHeight = 72;
-            video.readyState = 2;
+            expect(createPipelineWorker).not.toHaveBeenCalled();
+            video.videoWidth = 72; video.videoHeight = 72; video.readyState = 2;
             callback(0, {mediaTime: 0, presentedFrames: 1});
             await expect(preparing).resolves.toBe(FACE_CROP_STATUS.DISABLED);
-            expect(pipelineWorker.initialize).toHaveBeenCalledTimes(1);
-            expect(createPipelineWorker).toHaveBeenCalledTimes(1);
-            expect(pipelineWorker.initialize.mock.calls[0][0].configuration.analysisOnly).toBeUndefined();
-            expect(pipelineWorker.warmup).toHaveBeenCalledTimes(3);
-            expect(controller.state).toBe('prepared');
-        } finally {
-            window.VideoFrame = original.VideoFrame;
-            window.CompressionStream = original.CompressionStream;
-        }
+            expect(createPipelineWorker).toHaveBeenCalledTimes(2);
+            expect(analysis.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'analysis'}));
+            expect(assembly.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'assembly', identity: expect.objectContaining({studyResultId: 'RESULT'})}));
+            expect(analysis.warmup).toHaveBeenCalledTimes(3);
+        } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
     });
 
-    test('waits for current frame data when dimensions are populated before video readiness', async () => {
-        const video = {
-            videoWidth: 480, videoHeight: 640, readyState: 0,
-            requestVideoFrameCallback: jest.fn(), cancelVideoFrameCallback: jest.fn()
-        };
+    test('waits for current frame data when dimensions precede readiness', async () => {
         let callback;
-        video.requestVideoFrameCallback.mockImplementation(nextCallback => { callback = nextCallback; return 1; });
-        const controller = new FaceCropCaptureController({
-            video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-            configuration: resolveFaceCropConfiguration({}),
-            uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
-        });
-
+        const video = {videoWidth: 480, videoHeight: 640, readyState: 0,
+            requestVideoFrameCallback: jest.fn(nextCallback => { callback = nextCallback; return 1; }), cancelVideoFrameCallback: jest.fn()};
+        const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
         let resolved = false;
         const ready = controller.waitForVideoReady().then(value => { resolved = value; });
         await Promise.resolve();
         expect(resolved).toBe(false);
-        expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
-
-        video.readyState = 2;
-        callback();
-        await ready;
+        video.readyState = 2; callback(); await ready;
         expect(resolved).toBe(true);
     });
 
@@ -167,142 +133,39 @@ describe('resolveFaceCropConfiguration', () => {
         expect(resolveStudyResultId({}, null)).toBeNull();
     });
 
-    // Stopping must cancel scheduling but still await work already handed off.
-    test('cancels the pending frame callback before finalizing a stopped capture', async () => {
+    test('drains detector and assembly work before manifest finalization', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
-        const probeFrame = {
-            displayWidth: 72,
-            displayHeight: 72,
-            copyTo: jest.fn(() => Promise.resolve()),
-            close: jest.fn()
-        };
-        const pipelineWorker = {
-            initialize: jest.fn(() => Promise.resolve()),
-            warmup: jest.fn(() => Promise.resolve()),
-            processFrame: jest.fn(),
-            finish: jest.fn(() => Promise.resolve({parts: []})),
-            close: jest.fn(() => Promise.resolve())
-        };
-        const video = {
-            videoWidth: 72,
-            videoHeight: 72,
-            readyState: 2,
-            requestVideoFrameCallback: jest.fn(() => 7),
-            cancelVideoFrameCallback: jest.fn()
-        };
-        window.VideoFrame = jest.fn(() => probeFrame);
-        window.CompressionStream = jest.fn();
-
-        try {
-            const createPipelineWorker = jest.fn(() => pipelineWorker);
-            const controller = new FaceCropCaptureController({
-                video,
-                studyResultId: 'RESULT',
-                studyPage: 'introduction',
-                videoCounter: 1,
-                configuration: resolveFaceCropConfiguration({
-                    REACT_APP_FACE_CROP_RECORDING_MODE: 'all',
-                    REACT_APP_FACE_DETECTION_MIN_CONFIDENCE: '0.7',
-                    REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD: '0.2'
-                }),
-                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
-                uploadResultFile: jest.fn(),
-                createPipelineWorker
-            });
-
-            await expect(controller.start()).resolves.toBe(FACE_CROP_STATUS.CAPTURING);
-            expect(pipelineWorker.initialize).toHaveBeenCalledWith(expect.objectContaining({
-                configuration: {
-                    faceDetectionDelegate: DEFAULT_FACE_DETECTION_DELEGATE,
-                    faceRoiSmoothingTauMs: DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
-                    faceRoiScale: DEFAULT_FACE_ROI_SCALE,
-                    faceRoiVerticalShiftRatio: DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO,
-                    faceDetectionMinConfidence: 0.7,
-                    faceDetectionMinSuppressionThreshold: 0.2
-                },
-                identity: expect.objectContaining({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1})
-            }));
-            await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.INCOMPLETE);
-            expect(controller.incompleteReason).toBe('No video frame callbacks were received during face-crop capture');
-
-            expect(video.cancelVideoFrameCallback).toHaveBeenCalledWith(7);
-            expect(pipelineWorker.close).toHaveBeenCalledTimes(1);
-        } finally {
-            window.VideoFrame = original.VideoFrame;
-            window.CompressionStream = original.CompressionStream;
-        }
-    });
-
-    test('preserves a completed in-flight part when stop begins', async () => {
-        const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
-        const copy = deferred();
+        const gate = deferred();
         const probeFrame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
         const warmupFrame = {displayWidth: 72, displayHeight: 72, close: jest.fn()};
-        const captureFrame = {copyTo: jest.fn(() => copy.promise), close: jest.fn()};
-        const pipelineWorker = {
-            initialize: jest.fn(() => Promise.resolve()),
-            warmup: jest.fn(() => Promise.resolve()),
-            processFrame: jest.fn(({frame}) => copy.promise.then(() => {
-                frame.close();
-                return {accepted: true, detectionState: 'largest', parts: [{
-                    filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json', frameCount: 1, byteLength: 1,
-                    bytes: new Uint8Array([1]), faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1}}]};
-            })),
-            finish: jest.fn(() => Promise.resolve({parts: []})),
-            close: jest.fn(() => Promise.resolve())
-        };
-        let callback;
-        let callbackId = 0;
-        const video = {
-            videoWidth: 72,
-            videoHeight: 72,
-            readyState: 2,
-            requestVideoFrameCallback: jest.fn(nextCallback => {
-                callback = nextCallback;
-                callbackId += 1;
-                return callbackId;
-            }),
-            cancelVideoFrameCallback: jest.fn()
-        };
-        window.VideoFrame = jest.fn()
-            .mockImplementationOnce(() => probeFrame)
-            .mockImplementationOnce(() => warmupFrame)
-            .mockImplementationOnce(() => warmupFrame)
-            .mockImplementationOnce(() => warmupFrame)
-            .mockImplementationOnce(() => captureFrame);
+        const captureFrame = {displayWidth: 72, displayHeight: 72, close: jest.fn()};
+        const artifact = {captureId: 'capture', segmentIndex: 0, partIndex: 0, filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json',
+            frameCount: 1, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
+        const analysis = {initialize: jest.fn(() => Promise.resolve()), warmup: jest.fn(() => Promise.resolve()),
+            processFrame: jest.fn(({frame}) => gate.promise.then(() => { frame.close(); return {sequence: 0, rgbx: new Uint8Array(4), timings: {}}; })), close: jest.fn(() => Promise.resolve())};
+        const assembly = {initialize: jest.fn(() => Promise.resolve()), processAnalysisResult: jest.fn(() => Promise.resolve({commits: [{sequence: 0,
+            accepted: true, detectionState: 'largest', controllerStartedAt: 0, artifacts: [artifact], timings: {}}], bufferedResultCount: 0})),
+            finish: jest.fn(() => Promise.resolve({artifacts: [], bufferedResultCount: 0})), close: jest.fn(() => Promise.resolve())};
+        let callback; let callbackId = 0;
+        const video = {videoWidth: 72, videoHeight: 72, readyState: 2, requestVideoFrameCallback: jest.fn(nextCallback => { callback = nextCallback; return ++callbackId; }), cancelVideoFrameCallback: jest.fn()};
+        window.VideoFrame = jest.fn().mockImplementationOnce(() => probeFrame).mockImplementationOnce(() => warmupFrame)
+            .mockImplementationOnce(() => warmupFrame).mockImplementationOnce(() => warmupFrame).mockImplementationOnce(() => captureFrame);
         window.CompressionStream = jest.fn();
-
         try {
             const uploadResultFile = jest.fn(() => Promise.resolve());
-            const controller = new FaceCropCaptureController({
-                video,
-                studyResultId: 'RESULT',
-                studyPage: 'introduction',
-                videoCounter: 1,
-                configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
-                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
-                uploadResultFile,
-                createPipelineWorker: jest.fn(() => pipelineWorker)
-            });
-            controller.sink.encode = jest.fn(() => Promise.resolve(new Uint8Array([1])));
-
+            const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+                captureId: 'capture', configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
+                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile,
+                createPipelineWorker: jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(assembly)});
             await controller.start();
-            callback(0, {mediaTime: 1, presentedFrames: 1});
-            await Promise.resolve();
-            const stopping = controller.stop();
-            copy.resolve();
-            await stopping;
-
+            callback(0, {mediaTime: 1, presentedFrames: 1}); await Promise.resolve();
+            const stopping = controller.stop(); gate.resolve(); await stopping;
             expect(controller.acceptedFrames).toBe(1);
-            expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
-            await expect(controller.stop()).resolves.toBe(FACE_CROP_STATUS.COMPLETE);
+            expect(assembly.finish).toHaveBeenCalledTimes(1);
             expect(uploadResultFile).toHaveBeenCalledTimes(3);
-            expect(uploadResultFile.mock.calls[2][1]).toContain('_manifest.json');
             expect(JSON.parse(uploadResultFile.mock.calls[2][0]).statistics.frameCallbacks).toBe(1);
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
-        } finally {
-            window.VideoFrame = original.VideoFrame;
-            window.CompressionStream = original.CompressionStream;
-        }
+        } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
     });
+
 });

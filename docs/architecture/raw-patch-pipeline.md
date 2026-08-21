@@ -49,51 +49,23 @@ The build runs `scripts/vendor-mediapipe-assets.js` before development and produ
 
 ## Browser capture lifecycle
 
-The disabled-by-default browser integration lets `WebcamCapture` start
-and stop a face-crop capture session beside the existing `MediaRecorder` lifecycle;
-it does not alter the participant-facing UI or recorder configuration.
+The disabled-by-default browser integration lets `WebcamCapture` start and stop a face-crop capture session beside the existing `MediaRecorder` lifecycle; it does not alter the participant-facing UI or recorder configuration.
 
-Module map:
-`startFaceCropCaptureSession` resolves build-time configuration and adapts JATOS
-plus upload tracking; `FaceCropCaptureController` probes browser APIs and
-owns frame callbacks; the existing processor, segmenter, and sink retain
-their independent responsibilities.
+`FaceCropCaptureController` probes browser APIs and owns frame callbacks, bounded routing, JATOS upload/retry, manifests, and status. Each callback creates a transferable `VideoFrame` for one of the configured analysis workers. An analysis worker performs MediaPipe detection and packed RGBX extraction, closes the frame, and returns a source sequence with transferable RGBX bytes. One dedicated assembly worker accepts those results, buffers at most the configured analysis-worker count, processes only the next source sequence, and owns ROI selection, deterministic downsampling, segmentation, AVI muxing, and gzip encoding. It returns sealed gzip artifacts and sidecars to the main thread, which creates only a `Blob` wrapper for JATOS upload.
 
-Lifecycle: the controller probes `requestVideoFrameCallback`, `VideoFrame`
-RGBX/sRGB copying, and native `CompressionStream("gzip")`, then initializes a
-dedicated bundled worker and enters a cancellable sequential frame loop. Each
-iteration waits for one frame callback, creates a transferable `VideoFrame`, and
-hands ownership to the worker. MediaPipe initialization and synchronous detection,
-full-frame RGBX extraction, deterministic ROI selection/downsampling, and part
-segmentation all run in that worker. The controller awaits one result before
-requesting the next callback, so work remains bounded without blocking the UI
-thread; `presentedFrames` records frames skipped while the worker is busy. Sealed
-part buffers are transferred back without copying for bounded AVI encoding and
-JATOS upload. Stopping cancels any outstanding callback, finishes the worker's
-active part, closes the worker, and finalizes the sink.
+`REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT=1` means one analysis worker plus one assembly worker; `2` means two analysis workers plus one assembly worker. There is no main-thread crop/encoding fallback. The assembly worker requires worker-side `Blob`, `Response`, and `CompressionStream("gzip")`; absence of any marks optional face-crop capture unsupported without affecting ordinary recording. Stopping cancels callbacks, drains routed detector/assembly work, finishes assembly, queues sealed artifacts, finalizes uploads, then writes the manifest.
 
 ## Bounded JATOS sink
 
-`FaceCropSink` is the isolated best-effort transport boundary. It accepts
-sealed BGR24 parts, muxes each as an uncompressed AVI and wraps it in native
-gzip before calling the injected JATOS `uploadResultFile` adapter. It has no
-FFmpeg/Wasm or `SharedArrayBuffer` requirement, but does require native
-`CompressionStream("gzip")`.
+`FaceCropSink` is the isolated best-effort transport boundary. It accepts already encoded gzip AVI artifacts from the assembly worker and performs AVI-before-sidecar JATOS uploads with bounded retries and upload tracking. It neither crops pixels nor muxes/encodes output.
 
-The sealed-part state machine is:
+The artifact state machine is:
 
 ```text
-sealed -> queued -> AVI muxing -> gzip -> uploading/retrying -> succeeded | failed
+assembly encoded -> queued -> uploading/retrying -> succeeded | failed
 ```
 
-The upstream segmenter owns one active, unsealed part. The sink admits at
-most two sealed parts, including a part currently being muxed or uploaded.
-Admission returns without waiting for upload completion, so capture and transport
-can overlap. Accepted BGR24 bytes transfer to the sink and are released after
-muxing and gzip compression. When two parts are pending, admission of the next
-part waits for capacity, providing bounded backpressure without unbounded memory
-growth. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes face-crop capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
-
+The sink admits at most two sealed artifacts, including an artifact currently uploading. When both slots are occupied, admitting the next artifact waits for capacity, bounding transfer memory without coupling the main thread to crop or encoder work. Each uploaded `.avi.gz` has a required plain-JSON `.face-events.json` sidecar with per-frame selection provenance. Both artifacts are retried through the bounded sink; failure of either makes face-crop capture incomplete. Decompression of the AVI artifact still produces a self-contained AVI, and there is no tar archive or separate manifest upload.
 
 ## Frame timing
 
