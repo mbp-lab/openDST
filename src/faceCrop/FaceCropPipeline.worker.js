@@ -1,8 +1,9 @@
 /* global globalThis */
 import {createFaceEventsFilename, createPatchVideoFilename, encodePatchArtifact, FACE_EVENTS_FORMAT_VERSION} from './FaceCropOutput';
 
-// Analysis and assembly workers contain MediaPipe and patch production so the
-// main thread only schedules VideoFrames and hands encoded artifacts to FaceCropSink.
+// Analysis, assembly, and encoding workers keep CPU-heavy patch production off
+// the main thread. The main thread only schedules VideoFrames and hands encoded
+// artifacts to FaceCropSink.
 export const PATCH_SIZE = 72;
 export const BGR24_FRAME_BYTES = PATCH_SIZE * PATCH_SIZE * 3;
 export const MAX_FRAMES_PER_PART = 539;
@@ -384,16 +385,12 @@ export class FaceCropAnalysisPipeline {
 }
 
 export class FaceCropAssemblyPipeline {
-    constructor({encodePart = encodePatchArtifact} = {}) {
-        this.encodePart = encodePart;
+    constructor() {
         this.pending = new Map();
         this.nextSequence = 0;
     }
 
     async initialize({configuration, identity}) {
-        if (typeof Blob !== 'function' || typeof CompressionStream !== 'function' || typeof Response !== 'function') {
-            throw new Error('Worker-side Blob, Response, and CompressionStream APIs are required');
-        }
         this.maxPendingResults = configuration.analysisWorkerCount;
         this.roi = new FaceRoiProvider({smoothingTauMs: configuration.faceRoiSmoothingTauMs, scale: configuration.faceRoiScale,
             verticalShiftRatio: configuration.faceRoiVerticalShiftRatio, minDetectionConfidence: configuration.faceDetectionMinConfidence});
@@ -420,23 +417,19 @@ export class FaceCropAssemblyPipeline {
             const selection = this.roi.getSelection({width: current.width, height: current.height,
                 detections: current.detections, timestampMs: current.timestampUs / 1000});
             const roiSelectionMs = timingNow() - roiStartedAt;
-            let artifacts = [];
+            let parts = [];
             let cropAndSegmentMs = 0;
-            let encodingMs = 0;
             if (selection.roi) {
                 const cropStartedAt = timingNow();
-                const parts = this.segmenter.appendFrame({
+                parts = this.segmenter.appendFrame({
                     writeBgr24: output => processFaceCropFrame({width: current.width, height: current.height,
                         rgbx: current.rgbx, roi: selection.roi, output}),
                     sourceWidth: current.width, sourceHeight: current.height, roi: selection.roi, provenance: selection,
                     timestampUs: current.timestampUs, wallClockMs: current.wallClockMs});
                 cropAndSegmentMs = timingNow() - cropStartedAt;
-                const encodingStartedAt = timingNow();
-                artifacts = await Promise.all(parts.map(part => this.encodePart(part)));
-                encodingMs = timingNow() - encodingStartedAt;
             }
             commits.push({sequence: current.sequence, accepted: Boolean(selection.roi), detectionState: selection.state,
-                controllerStartedAt: current.controllerStartedAt, artifacts, timings: {...current.timings, roiSelectionMs, cropAndSegmentMs, encodingMs,
+                parts, timings: {...current.timings, roiSelectionMs, cropAndSegmentMs,
                     assemblyMs: timingNow() - startedAt}});
         }
         return {commits, bufferedResultCount: this.pending.size};
@@ -445,8 +438,7 @@ export class FaceCropAssemblyPipeline {
     async finish() {
         if (this.pending.size) throw new Error('Face-crop assembly result sequence gap');
         const startedAt = timingNow();
-        const artifacts = await Promise.all(this.segmenter.finish().map(part => this.encodePart(part)));
-        return {commits: [], artifacts, bufferedResultCount: 0, timings: {encodingMs: timingNow() - startedAt}};
+        return {commits: [], parts: this.segmenter.finish(), bufferedResultCount: 0, timings: {assemblyMs: timingNow() - startedAt}};
     }
 
     close() {
@@ -456,14 +448,36 @@ export class FaceCropAssemblyPipeline {
     }
 }
 
+export class FaceCropEncodingPipeline {
+    constructor({encodePart = encodePatchArtifact} = {}) {
+        this.encodePart = encodePart;
+    }
+
+    async initialize() {
+        if (typeof Blob !== 'function' || typeof CompressionStream !== 'function' || typeof Response !== 'function') {
+            throw new Error('Worker-side Blob, Response, and CompressionStream APIs are required');
+        }
+    }
+
+    async encode(part) {
+        const startedAt = timingNow();
+        const artifact = await this.encodePart(part);
+        return {artifact, timings: {encodingMs: timingNow() - startedAt}};
+    }
+
+    close() {}
+}
+
 /* eslint-disable no-restricted-globals */
 if (typeof self !== 'undefined' && typeof window === 'undefined') {
     const analysisPipeline = new FaceCropAnalysisPipeline();
     const assemblyPipeline = new FaceCropAssemblyPipeline();
+    const encodingPipeline = new FaceCropEncodingPipeline();
     let activePipeline = null;
     const handlers = {
         initialize: payload => {
-            activePipeline = payload.role === 'analysis' ? analysisPipeline : payload.role === 'assembly' ? assemblyPipeline : null;
+            activePipeline = payload.role === 'analysis' ? analysisPipeline : payload.role === 'assembly' ? assemblyPipeline
+                : payload.role === 'encoder' ? encodingPipeline : null;
             if (!activePipeline) throw new Error('Face-crop worker role is invalid');
             return activePipeline.initialize(payload).then(() => ({}));
         },
@@ -475,6 +489,10 @@ if (typeof self !== 'undefined' && typeof window === 'undefined') {
             if (activePipeline !== assemblyPipeline) throw new Error('Assembly worker is not initialized');
             return assemblyPipeline.processAnalysisResult(payload);
         },
+        encodePart: payload => {
+            if (activePipeline !== encodingPipeline) throw new Error('Encoding worker is not initialized');
+            return encodingPipeline.encode(payload);
+        },
         warmup: payload => {
             if (activePipeline !== analysisPipeline) throw new Error('Analysis worker is not initialized');
             return analysisPipeline.warmup(payload);
@@ -483,7 +501,7 @@ if (typeof self !== 'undefined' && typeof window === 'undefined') {
             if (activePipeline !== assemblyPipeline) throw new Error('Assembly worker is not initialized');
             return assemblyPipeline.finish();
         },
-        close: () => { analysisPipeline.close(); assemblyPipeline.close(); return {}; }
+        close: () => { analysisPipeline.close(); assemblyPipeline.close(); encodingPipeline.close(); return {}; }
     };
     self.onmessage = async event => {
         const {type, payload = {}} = event.data || {};
@@ -492,8 +510,9 @@ if (typeof self !== 'undefined' && typeof window === 'undefined') {
             const result = await handlers[type](payload);
             const transfer = [];
             if (result.rgbx) transfer.push(result.rgbx.buffer);
-            (result.artifacts || []).forEach(artifact => transfer.push(artifact.gzipBytes));
-            (result.commits || []).forEach(commit => commit.artifacts.forEach(artifact => transfer.push(artifact.gzipBytes)));
+            if (result.artifact) transfer.push(result.artifact.gzipBytes);
+            (result.parts || []).forEach(part => transfer.push(part.bytes.buffer));
+            (result.commits || []).forEach(commit => (commit.parts || []).forEach(part => transfer.push(part.bytes.buffer)));
             self.postMessage({result}, transfer);
         } catch (error) {
             console.error('[face-crop] Worker request failed', {type, error});

@@ -1,8 +1,13 @@
-import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropAnalysisPipeline, FaceCropAssemblyPipeline} from './FaceCropPipeline.worker';
+import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropAnalysisPipeline, FaceCropAssemblyPipeline, FaceCropEncodingPipeline} from './FaceCropPipeline.worker';
 import {FaceCropProcessor, BGR24_FRAME_BYTES, processFaceCropFrame, FaceCropSegmenter} from './FaceCropPipeline.worker';
 import {buildUncompressedAvi} from './FaceCropOutput';
 import pako from 'pako';
 import {FaceCropCaptureController, resolveFaceCropConfiguration} from './FaceCropCapture';
+
+function deferred() {
+    let resolve;
+    return {promise: new Promise(nextResolve => { resolve = nextResolve; }), resolve};
+}
 
 describe('MediaPipe detector configuration', () => {
     test('passes the selected delegate to MediaPipe options', async () => {
@@ -57,7 +62,7 @@ describe('analysis and assembly scheduling', () => {
             uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()
         });
         controller.inFlight.set(0, analysis);
-        controller.assemblyWorker = {finish: jest.fn(() => Promise.resolve({artifacts: [], bufferedResultCount: 0}))};
+        controller.assemblyWorker = {finish: jest.fn(() => Promise.resolve({parts: [], bufferedResultCount: 0}))};
         controller.sink.finalize = jest.fn(() => Promise.resolve({parts: []}));
         controller.closeWorker = jest.fn(() => Promise.resolve());
         controller.uploadManifest = jest.fn(() => Promise.resolve());
@@ -67,6 +72,82 @@ describe('analysis and assembly scheduling', () => {
         await finalizing;
         expect(controller.assemblyWorker.finish).toHaveBeenCalledTimes(1);
         expect(controller.sink.finalize).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not wait for encoder completion before committing later assembly results', async () => {
+        const encoded = deferred();
+        const artifact = {captureId: 'capture', segmentIndex: 0, partIndex: 0, filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json',
+            frameCount: 1, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
+        const rawPart = {...artifact, bytes: new Uint8Array([1])};
+        const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
+        controller.encoderWorker = {encodePart: jest.fn(() => encoded.promise)};
+        controller.sink.enqueuePart = jest.fn(() => Promise.resolve());
+
+        await controller.commitAssemblyResult({bufferedResultCount: 0, commits: [{sequence: 0, accepted: false, detectionState: 'default',
+            parts: [rawPart], timings: {}}]});
+        await controller.commitAssemblyResult({bufferedResultCount: 0, commits: [{sequence: 1, accepted: false, detectionState: 'default',
+            parts: [], timings: {}}]});
+
+        expect(controller.encoderWorker.encodePart).toHaveBeenCalledWith(rawPart);
+        expect(controller.encodingJobs.size).toBe(1);
+        encoded.resolve({artifact, timings: {encodingMs: 1}});
+        await Promise.all(controller.encodingJobs.values());
+        expect(controller.sink.enqueuePart).toHaveBeenCalledWith(artifact);
+    });
+
+    test('waits for the final encoder job before finalizing uploads and the manifest', async () => {
+        const encoded = deferred();
+        const artifact = {captureId: 'capture', segmentIndex: 0, partIndex: 0, filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json',
+            frameCount: 1, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
+        const rawPart = {...artifact, bytes: new Uint8Array([1])};
+        const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
+        controller.assemblyWorker = {finish: jest.fn(() => Promise.resolve({parts: [rawPart], bufferedResultCount: 0}))};
+        controller.encoderWorker = {encodePart: jest.fn(() => encoded.promise)};
+        controller.sink.enqueuePart = jest.fn(() => Promise.resolve());
+        controller.sink.finalize = jest.fn(() => Promise.resolve({parts: []}));
+        controller.closeWorker = jest.fn(() => Promise.resolve());
+        controller.uploadManifest = jest.fn(() => Promise.resolve());
+
+        const finalizing = controller.finalize();
+        await Promise.resolve();
+        expect(controller.sink.finalize).not.toHaveBeenCalled();
+        encoded.resolve({artifact, timings: {encodingMs: 1}});
+        await finalizing;
+        expect(controller.sink.finalize).toHaveBeenCalledTimes(1);
+        expect(controller.uploadManifest).toHaveBeenCalledWith([]);
+    });
+
+    test('bounds raw parts waiting for the encoder', async () => {
+        const firstEncoding = deferred();
+        const artifact = partIndex => ({captureId: 'capture', segmentIndex: 0, partIndex, filename: 'part-' + partIndex + '.avi.gz',
+            faceEventsFilename: 'part-' + partIndex + '.face-events.json', frameCount: 1, gzipBytes: new Uint8Array([partIndex + 1]).buffer,
+            faceEvents: {aviFilename: 'part-' + partIndex + '.avi.gz', frameCount: 1, frames: []}});
+        const raw = partIndex => ({...artifact(partIndex), bytes: new Uint8Array([partIndex + 1])});
+        const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
+        controller.encoderWorker = {encodePart: jest.fn().mockReturnValueOnce(firstEncoding.promise).mockResolvedValueOnce({artifact: artifact(1), timings: {encodingMs: 1}})};
+        controller.sink.enqueuePart = jest.fn(() => Promise.resolve());
+
+        await controller.enqueueEncodingPart(raw(0));
+        const secondAdmission = controller.enqueueEncodingPart(raw(1));
+        await Promise.resolve();
+        expect(controller.encoderWorker.encodePart).toHaveBeenCalledTimes(1);
+        firstEncoding.resolve({artifact: artifact(0), timings: {encodingMs: 1}});
+        await secondAdmission;
+        expect(controller.encoderWorker.encodePart).toHaveBeenCalledTimes(2);
+    });
+
+    test('marks capture incomplete when encoder work fails', async () => {
+        const rawPart = {segmentIndex: 0, partIndex: 0, frameCount: 1, bytes: new Uint8Array([1])};
+        const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
+        controller.encoderWorker = {encodePart: jest.fn(() => Promise.reject(new Error('gzip unavailable')))};
+
+        await controller.enqueueEncodingPart(rawPart);
+        await Promise.all(controller.encodingJobs.values());
+        expect(controller.incompleteReason).toBe('Face-crop encoding failed: gzip unavailable');
     });
 
     test('keeps detector dispatch bounded by the analysis-worker count', async () => {
@@ -82,7 +163,7 @@ describe('analysis and assembly scheduling', () => {
         controller.state = 'capturing';
         controller.analysisWorkers = [worker, worker];
         controller.assemblyWorker = {processAnalysisResult: jest.fn(result => Promise.resolve({commits: [{...result, accepted: false,
-            detectionState: 'default', artifacts: [], controllerStartedAt: result.controllerStartedAt, timings: {}}], bufferedResultCount: 0}))};
+            detectionState: 'default', parts: [], timings: {}}], bufferedResultCount: 0}))};
         const originalVideoFrame = window.VideoFrame;
         window.VideoFrame = jest.fn(() => ({displayWidth: 72, displayHeight: 72}));
         try {
@@ -319,23 +400,25 @@ describe('worker roles', () => {
         expect(frame.close).toHaveBeenCalledTimes(1);
     });
 
-    test('assembly commits 1 then 0 in source order and emits ordered AVI and events', async () => {
-        const encodePart = jest.fn(part => Promise.resolve({...part, gzipBytes: pako.gzip(buildUncompressedAvi(part)).buffer}));
-        const pipeline = new FaceCropAssemblyPipeline({encodePart});
-        pipeline.maxPendingResults = 2;
-        pipeline.roi = new FaceRoiProvider({smoothingTauMs: 0});
-        pipeline.segmenter = new FaceCropSegmenter({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+    test('assembly commits 1 then 0 in source order before the encoder builds ordered AVI and events', async () => {
+        const assembly = new FaceCropAssemblyPipeline();
+        assembly.maxPendingResults = 2;
+        assembly.roi = new FaceRoiProvider({smoothingTauMs: 0});
+        assembly.segmenter = new FaceCropSegmenter({studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
             captureId: 'capture', maxFramesPerPart: 2, selectionConfiguration: {policy: 'test'}});
         const input = (sequence, timestampUs, color) => {
             const rgbx = new Uint8Array(72 * 72 * 4);
             for (let offset = 0; offset < rgbx.byteLength; offset += 4) rgbx.set([...color, 255], offset);
             return {sequence, width: 72, height: 72, timestampUs, wallClockMs: timestampUs, detections: [], rgbx,
-                controllerStartedAt: sequence, timings: {analysisMs: 1}};
+                timings: {analysisMs: 1}};
         };
-        expect((await pipeline.processAnalysisResult(input(1, 2000, [40, 50, 60]))).commits).toEqual([]);
-        const result = await pipeline.processAnalysisResult(input(0, 1000, [10, 20, 30]));
+        expect((await assembly.processAnalysisResult(input(1, 2000, [40, 50, 60]))).commits).toEqual([]);
+        const result = await assembly.processAnalysisResult(input(0, 1000, [10, 20, 30]));
         expect(result.commits.map(commit => commit.sequence)).toEqual([0, 1]);
-        const artifact = result.commits[1].artifacts[0];
+        const part = result.commits[1].parts[0];
+        expect(part.faceEvents.frames.map(frame => frame.mediaTimeUs)).toEqual([1000, 2000]);
+        const encoder = new FaceCropEncodingPipeline({encodePart: item => Promise.resolve({...item, gzipBytes: pako.gzip(buildUncompressedAvi(item)).buffer})});
+        const artifact = (await encoder.encode(part)).artifact;
         const avi = pako.ungzip(new Uint8Array(artifact.gzipBytes));
         const frameOffsets = [];
         const indexOffset = findChunk(avi, 'idx1');
@@ -343,7 +426,6 @@ describe('worker roles', () => {
             if (String.fromCharCode(...avi.subarray(offset, offset + 4)) === '00db') frameOffsets.push(offset + 8);
         }
         expect(frameOffsets.map(offset => Array.from(avi.subarray(offset, offset + 3)))).toEqual([[30, 20, 10], [60, 50, 40]]);
-        expect(artifact.faceEvents.frames.map(frame => frame.mediaTimeUs)).toEqual([1000, 2000]);
         expect(artifact).toMatchObject({captureId: 'capture', segmentIndex: 0, partIndex: 0});
     });
 
@@ -360,8 +442,7 @@ describe('worker roles', () => {
     });
 
     test('starts a new segment when ordered source dimensions change', async () => {
-        const encodePart = jest.fn(part => Promise.resolve({...part, gzipBytes: new ArrayBuffer(1)}));
-        const pipeline = new FaceCropAssemblyPipeline({encodePart});
+        const pipeline = new FaceCropAssemblyPipeline();
         pipeline.maxPendingResults = 1;
         pipeline.roi = new FaceRoiProvider({smoothingTauMs: 0});
         pipeline.segmenter = new FaceCropSegmenter({studyResultId: 'RESULT', studyPage: 'intro', videoCounter: 1,
@@ -370,7 +451,7 @@ describe('worker roles', () => {
             detections: [], rgbx: new Uint8Array(width * 72 * 4), timings: {}});
         await pipeline.processAnalysisResult(result(0, 72));
         const changed = await pipeline.processAnalysisResult(result(1, 73));
-        expect(changed.commits[0].artifacts[0]).toMatchObject({segmentIndex: 0, partIndex: 0});
-        expect((await pipeline.finish()).artifacts[0]).toMatchObject({segmentIndex: 1, partIndex: 0});
+        expect(changed.commits[0].parts[0]).toMatchObject({segmentIndex: 0, partIndex: 0});
+        expect((await pipeline.finish()).parts[0]).toMatchObject({segmentIndex: 1, partIndex: 0});
     });
 });
