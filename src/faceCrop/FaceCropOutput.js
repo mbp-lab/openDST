@@ -62,7 +62,7 @@ function chunk(type, payload) {
 
 function list(type, chunks) { return chunk('LIST', concat([fourCC(type), ...chunks])); }
 
-function resolveAviFrameRate(part) {
+export function resolveAviFrameRate(part) {
     const frames = part && part.faceEvents && Array.isArray(part.faceEvents.frames) ? part.faceEvents.frames : null;
     if (!frames || frames.length < 2) return PATCH_VIDEO_FRAME_RATE;
     let totalDeltaUs = 0;
@@ -148,20 +148,21 @@ export function buildUncompressedAvi({bytes, frameCount, frameRate = PATCH_VIDEO
     return avi;
 }
 
-export async function encodeGzipAvi(part) {
-    // This is deliberately worker-safe: the assembly worker owns AVI muxing and
+export async function encodeGzipAvi(part, frameRate = resolveAviFrameRate(part)) {
+    // This is deliberately worker-safe: the encoding worker owns AVI muxing and
     // compression, while the main thread keeps only JATOS upload authority.
     if (typeof Blob !== 'function' || typeof CompressionStream !== 'function' || typeof Response !== 'function') {
         throw new Error('Native Blob, Response, and CompressionStream APIs are required for gzip AVI encoding');
     }
-    const avi = new Blob([buildUncompressedAvi({...part, frameRate: resolveAviFrameRate(part)})], {type: 'video/avi'});
+    const avi = new Blob([buildUncompressedAvi({...part, frameRate})], {type: 'video/avi'});
     return new Response(avi.stream().pipeThrough(new CompressionStream('gzip'))).blob();
 }
 
 export async function encodePatchArtifact(part) {
-    const gzip = await encodeGzipAvi(part);
+    const frameRate = resolveAviFrameRate(part);
+    const gzip = await encodeGzipAvi(part, frameRate);
     return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex,
-        filename: part.filename, faceEventsFilename: part.faceEventsFilename, frameCount: part.frameCount,
+        filename: part.filename, faceEventsFilename: part.faceEventsFilename, frameCount: part.frameCount, frameRate,
         gzipBytes: await gzip.arrayBuffer(), faceEvents: part.faceEvents};
 }
 
@@ -171,7 +172,9 @@ let nextUploadSessionId = 0;
 
 function validateArtifact(artifact) {
     if (!artifact || !(artifact.gzipBytes instanceof ArrayBuffer) || artifact.gzipBytes.byteLength < 1 ||
-        !Number.isSafeInteger(artifact.frameCount) || artifact.frameCount < 1 || !artifact.filename.endsWith('.avi.gz') ||
+        !Number.isSafeInteger(artifact.frameCount) || artifact.frameCount < 1 ||
+        !Number.isSafeInteger(artifact.frameRate) || artifact.frameRate < MIN_PATCH_VIDEO_FRAME_RATE || artifact.frameRate > MAX_PATCH_VIDEO_FRAME_RATE ||
+        !artifact.filename.endsWith('.avi.gz') ||
         !artifact.faceEventsFilename.endsWith('.face-events.json') || !artifact.faceEvents ||
         artifact.faceEvents.aviFilename !== artifact.filename || artifact.faceEvents.frameCount !== artifact.frameCount) {
         throw new Error('Encoded patch artifact is invalid');
@@ -230,12 +233,12 @@ export class FaceCropSink {
         }
         if (avi.status !== UPLOAD_STATUS.SUCCEEDED) {
             this.uploadTracker.settleUpload(eventsId, UPLOAD_STATUS.FAILED);
-            return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount,
+            return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, frameRate: part.frameRate,
                 filename: part.filename, faceEventsFilename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, avi,
                 faceEvents: {uploadId: eventsId, filename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, attempts: 0}};
         }
         const faceEvents = await this.uploadWithRetry(JSON.stringify(part.faceEvents), part.faceEventsFilename, eventsId);
-        return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount,
+        return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, frameRate: part.frameRate,
             filename: part.filename, faceEventsFilename: part.faceEventsFilename,
             status: faceEvents.status === UPLOAD_STATUS.SUCCEEDED ? UPLOAD_STATUS.SUCCEEDED : UPLOAD_STATUS.FAILED, avi, faceEvents};
     }

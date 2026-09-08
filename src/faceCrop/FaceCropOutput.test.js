@@ -1,5 +1,5 @@
 import {createPatchVideoFilename, PATCH_VIDEO_FORMAT_VERSION, FaceCropSink} from './FaceCropOutput';
-import {buildUncompressedAvi, encodeGzipAvi} from './FaceCropOutput';
+import {buildUncompressedAvi, encodeGzipAvi, encodePatchArtifact, resolveAviFrameRate} from './FaceCropOutput';
 import {BGR24_FRAME_BYTES} from './FaceCropPipeline.worker';
 import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION} from './FaceCropPipeline.worker';
 import {UPLOAD_STATUS} from '../uploadState';
@@ -65,6 +65,32 @@ describe('uncompressed AVI patch video', () => {
 
         expect(view.getUint32(avih + 8, true)).toBe(Math.round(1000000 / 15));
         expect(view.getUint32(strh + 32, true)).toBe(15);
+    });
+
+    test('derives each AVI rate from its face-event timestamps', () => {
+        expect(resolveAviFrameRate({faceEvents: {frames: [
+            {mediaTimeUs: 1000}, {mediaTimeUs: 41000}, {mediaTimeUs: 81000}
+        ]}})).toBe(25);
+        expect(resolveAviFrameRate({faceEvents: {frames: [{mediaTimeUs: 1000}]}})).toBe(30);
+    });
+
+    test('reports the timestamp-derived rate with the encoded artifact', async () => {
+        const original = {Blob: window.Blob, CompressionStream: window.CompressionStream, Response: window.Response};
+        const gzipBytes = new Uint8Array([1]).buffer;
+        window.Blob = jest.fn(() => ({stream: () => ({pipeThrough: jest.fn()})}));
+        window.CompressionStream = jest.fn();
+        window.Response = jest.fn(() => ({blob: () => Promise.resolve({arrayBuffer: () => Promise.resolve(gzipBytes)})}));
+        try {
+            const artifact = await encodePatchArtifact({captureId: 'capture', segmentIndex: 0, partIndex: 0,
+                filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json', frameCount: 2,
+                bytes: new Uint8Array(BGR24_FRAME_BYTES * 2), faceEvents: {frames: [{mediaTimeUs: 0}, {mediaTimeUs: 40000}]}});
+            expect(artifact.frameRate).toBe(25);
+            expect(artifact.gzipBytes).toBe(gzipBytes);
+        } finally {
+            window.Blob = original.Blob;
+            window.CompressionStream = original.CompressionStream;
+            window.Response = original.Response;
+        }
     });
 
     test('wraps the AVI payload in native gzip for upload', async () => {
@@ -187,6 +213,7 @@ function sealedPart(partIndex) {
         filename,
         faceEventsFilename,
         frameCount: 1,
+        frameRate: 30,
         gzipBytes: new Uint8Array([partIndex + 1]).buffer,
         faceEvents: {aviFilename: filename, frameCount: 1, frames: []}
     };

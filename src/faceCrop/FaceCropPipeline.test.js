@@ -77,7 +77,7 @@ describe('analysis and assembly scheduling', () => {
     test('does not wait for encoder completion before committing later assembly results', async () => {
         const encoded = deferred();
         const artifact = {captureId: 'capture', segmentIndex: 0, partIndex: 0, filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json',
-            frameCount: 1, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
+            frameCount: 1, frameRate: 30, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
         const rawPart = {...artifact, bytes: new Uint8Array([1])};
         const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
             configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
@@ -99,7 +99,7 @@ describe('analysis and assembly scheduling', () => {
     test('waits for the final encoder job before finalizing uploads and the manifest', async () => {
         const encoded = deferred();
         const artifact = {captureId: 'capture', segmentIndex: 0, partIndex: 0, filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json',
-            frameCount: 1, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
+            frameCount: 1, frameRate: 30, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
         const rawPart = {...artifact, bytes: new Uint8Array([1])};
         const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
             configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
@@ -122,7 +122,7 @@ describe('analysis and assembly scheduling', () => {
     test('bounds raw parts waiting for the encoder', async () => {
         const firstEncoding = deferred();
         const artifact = partIndex => ({captureId: 'capture', segmentIndex: 0, partIndex, filename: 'part-' + partIndex + '.avi.gz',
-            faceEventsFilename: 'part-' + partIndex + '.face-events.json', frameCount: 1, gzipBytes: new Uint8Array([partIndex + 1]).buffer,
+            faceEventsFilename: 'part-' + partIndex + '.face-events.json', frameCount: 1, frameRate: 30, gzipBytes: new Uint8Array([partIndex + 1]).buffer,
             faceEvents: {aviFilename: 'part-' + partIndex + '.avi.gz', frameCount: 1, frames: []}});
         const raw = partIndex => ({...artifact(partIndex), bytes: new Uint8Array([partIndex + 1])});
         const controller = new FaceCropCaptureController({video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,

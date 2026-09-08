@@ -584,15 +584,15 @@ export class FaceCropCaptureController {
             source: this.sourceMetadata(),
             capability: this.capability,
             configuration: this.configurationMetadata(),
-            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', frameRate: PATCH_VIDEO_FRAME_RATE,
-                aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', frameSize: 72},
+            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz',
+                aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', aviHeaderFrameRateFallback: PATCH_VIDEO_FRAME_RATE, frameSize: 72},
             status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
                 : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
                 acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,
                 frameTimings: this.frameTimings, encodingTimings: this.encodingTimings, detectorWarmup: this.detectorWarmup},
             parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
-                segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, status: part.status}))
+                segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, frameRate: part.frameRate, status: part.status}))
         };
         this.manifest = {filename, status: 'pending'};
         this.uploadTracker.registerUpload(uploadId);
@@ -646,8 +646,8 @@ export class FaceCropCaptureController {
             source: this.sourceMetadata(),
             manifest: this.manifest,
             configuration: this.configurationMetadata(),
-            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24', frameRate: PATCH_VIDEO_FRAME_RATE,
-                aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', frameSize: 72,
+            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24',
+                aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', aviHeaderFrameRateFallback: PATCH_VIDEO_FRAME_RATE, frameSize: 72,
                 extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
                 acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,

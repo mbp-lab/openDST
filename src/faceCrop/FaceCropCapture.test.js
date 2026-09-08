@@ -153,7 +153,7 @@ describe('resolveFaceCropConfiguration', () => {
         const warmupFrame = {displayWidth: 72, displayHeight: 72, close: jest.fn()};
         const captureFrame = {displayWidth: 72, displayHeight: 72, close: jest.fn()};
         const artifact = {captureId: 'capture', segmentIndex: 0, partIndex: 0, filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json',
-            frameCount: 1, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
+            frameCount: 1, frameRate: 30, gzipBytes: new Uint8Array([1]).buffer, faceEvents: {aviFilename: 'part.avi.gz', frameCount: 1, frames: []}};
         const analysis = {initialize: jest.fn(() => Promise.resolve()), warmup: jest.fn(() => Promise.resolve()),
             processFrame: jest.fn(({frame}) => gate.promise.then(() => { frame.close(); return {sequence: 0, rgbx: new Uint8Array(4), timings: {}}; })), close: jest.fn(() => Promise.resolve())};
         const assembly = {initialize: jest.fn(() => Promise.resolve()), processAnalysisResult: jest.fn(() => Promise.resolve({commits: [{sequence: 0,
@@ -184,6 +184,10 @@ describe('resolveFaceCropConfiguration', () => {
             ].sort());
             expect(statistics.encodingTimings.encodingMs.count).toBe(1);
             expect(statistics).not.toHaveProperty('artifactTimings');
+            const manifest = JSON.parse(uploadResultFile.mock.calls[2][0]);
+            expect(manifest.output).not.toHaveProperty('frameRate');
+            expect(manifest.output.aviHeaderFrameRateFallback).toBe(30);
+            expect(manifest.parts[0].frameRate).toBe(30);
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
         } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
     });
