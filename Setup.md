@@ -128,6 +128,8 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
 | `REACT_APP_UPLOAD_CONSOLE_LOG` | `'true'` / `'false'` | `'false'` | Opt-in diagnostic upload. When enabled together with `REACT_APP_LOGGING`, new browser-console entries are uploaded in bounded sequential chunks named `<studyResultId>_consoleLog_000001.json`. |
 | `REACT_APP_FACE_CROP_RECORDING_MODE` | `off` / `calibration` / `all` | `off` | `off` disables face-crop recording. `calibration` captures only the introduction feedback recording; `all` captures every recording session. |
+| `REACT_APP_FACE_DETECTION_DELEGATE` | `CPU` / `GPU` | `CPU` | MediaPipe execution backend. Test `GPU` on every target device before deployment. |
+| `REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT` | `1` / `2` | `1` | Number of face-detection workers. Use `2` only after measuring target-device responsiveness and resource use. |
 | `REACT_APP_FACE_CROP_SMOOTHING_TAU_MS` | Integer milliseconds (`0`–`10000`) | `100` | Time constant (τ) of the face-crop exponential moving average. `0` disables smoothing; after one τ the crop completes 63.2% of a position change. |
 | `REACT_APP_FACE_CROP_SCALE` | Decimal multiplier (`1`–`3`) | `1.5` | Square crop side length as a multiplier of the largest dimension of the MediaPipe detected face-box proposal. Increase it to retain more head and surroundings. |
 | `REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO` | Signed decimal fraction (`-1`–`1`) | `0.15` | Shifts the proposal-derived square crop vertically by this fraction of its side length: positive values move it upward, negative values downward, and `0` centers it on the detected face-box proposal. |
@@ -663,6 +665,34 @@ All files are uploaded to JATOS using the JATOS JavaScript API. File names follo
 | `{id}_speechTask_1.webm` | Video | Speech task recording |
 
 > **Note:** Video format depends on the participant's browser. Most modern mobile browsers produce `.webm` files. Some may produce `.mp4`.
+
+#### Optional face-crop recordings
+
+`REACT_APP_FACE_CROP_RECORDING_MODE` can create an additional, analysis-oriented
+recording alongside the ordinary browser video. The feature is disabled by
+default and is best effort: an unsupported browser or a face-crop failure does
+not interrupt the study or the ordinary recording.
+
+Each recording produces one or more gzip-compressed, lossless 72 x 72 AVI files,
+matching JSON sidecars, and a manifest:
+
+```text
+{id}_{page}_{counter}_{captureId}_patch_s{segment}_p{part}.avi.gz
+{id}_{page}_{counter}_{captureId}_patch_s{segment}_p{part}.face-events.json
+{id}_{page}_{counter}_{captureId}_manifest.json
+```
+
+Decompress an `.avi.gz` file before opening it. The sidecar maps AVI frames to
+their source timestamps and records the detected face and crop used for each
+frame. Selection follows the largest eligible face and does not track identity;
+during a detection gap, the last valid crop is retained. Use the sidecar's
+`mediaTimeUs` values for scientific timing because source frames may be skipped
+under processing load.
+
+This mode requires `requestVideoFrameCallback`, `VideoFrame`, web workers, and
+worker-side gzip support. Before enabling it in a study, test the target devices
+and browsers and ensure that the JATOS and reverse-proxy upload size and file-count
+limits cover the additional AVI, sidecar, and manifest files.
 
 ### Data Storage Configuration
 
