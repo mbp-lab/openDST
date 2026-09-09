@@ -7,7 +7,7 @@ Keep stable design contracts in `README.md`; this file tracks open work only.
 - [ ] Add a configurable, mobile-friendly analysis FPS limit and evaluate adaptive throttling.
 - [ ] Profile sustained CPU, memory, battery, dropped frames, and thermal behavior on Chrome Android and Safari iOS.
 - [ ] Record effective FPS, end-to-end latency, backpressure time, and distinct frame-skip reasons in capture manifests.
-- [ ] Add real-browser tests for MediaPipe initialization, `VideoFrame` transfer/copy, worker loading, and finalization.
+- [ ] Add real-browser tests for BlazeFace/TFJS WASM initialization, `VideoFrame` transfer/copy, worker loading, and finalization.
 
 ## Follow-up
 

@@ -9,7 +9,8 @@ import {
     FACE_CROP_STATUS,
     FaceCropCaptureController,
     resolveFaceCropConfiguration,
-    resolveStudyResultId
+    resolveStudyResultId,
+    probeFaceCropCapability
 } from './FaceCropCapture';
 
 // These tests protect the browser-side lifecycle boundary: unsupported capture
@@ -85,6 +86,24 @@ describe('resolveFaceCropConfiguration', () => {
             .toBe(DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD);
     });
 
+    test('uses valid NV12 rotation metadata without pixel-distance calibration', async () => {
+        const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
+        const createElement = jest.spyOn(document, 'createElement');
+        const bytes = new Uint8Array(12);
+        const frame = {format: 'NV12', codedWidth: 4, codedHeight: 2, displayWidth: 4, displayHeight: 2, rotation: 90, flip: false,
+            colorSpace: {fullRange: true, primaries: 'bt709', transfer: 'bt709', matrix: null}, allocationSize: jest.fn(() => bytes.length),
+            copyTo: jest.fn(destination => { destination.set(bytes); return Promise.resolve([{offset: 0, stride: 4}, {offset: 8, stride: 4}]); }), close: jest.fn()};
+        window.VideoFrame = jest.fn(() => frame);
+        window.CompressionStream = jest.fn();
+        const video = {videoWidth: 2, videoHeight: 4, readyState: 4, requestVideoFrameCallback: jest.fn(), cancelVideoFrameCallback: jest.fn()};
+        try {
+            await expect(probeFaceCropCapability(video)).resolves.toMatchObject({supported: true, frameNormalization: {
+                mode: 'nv12-bt709-full', rotation: 90, method: 'frame-metadata-v1', clockwiseDistance: null, counterclockwiseDistance: null}});
+            expect(createElement).not.toHaveBeenCalled();
+            expect(frame.close).toHaveBeenCalledTimes(1);
+        } finally { createElement.mockRestore(); window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
+    });
+
     test('initializes detector and assembly workers after the first presented frame', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         let callback;
@@ -97,9 +116,10 @@ describe('resolveFaceCropConfiguration', () => {
         window.VideoFrame = jest.fn(() => videoFrame);
         window.CompressionStream = jest.fn();
         try {
-            const createPipelineWorker = jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(assembly).mockReturnValueOnce(encoder);
+            const createPipelineWorker = jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(analysis)
+                .mockReturnValueOnce(assembly).mockReturnValueOnce(encoder);
             const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-                configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
+                configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all', REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '2'}),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn(), createPipelineWorker});
             const preparing = controller.prepare();
             await Promise.resolve();
@@ -107,11 +127,14 @@ describe('resolveFaceCropConfiguration', () => {
             video.videoWidth = 72; video.videoHeight = 72; video.readyState = 2;
             callback(0, {mediaTime: 0, presentedFrames: 1});
             await expect(preparing).resolves.toBe(FACE_CROP_STATUS.DISABLED);
-            expect(createPipelineWorker).toHaveBeenCalledTimes(3);
+            expect(createPipelineWorker).toHaveBeenCalledTimes(4);
+            expect(analysis.initialize).toHaveBeenCalledTimes(2);
+            const normalizations = analysis.initialize.mock.calls.map(call => call[0].configuration.frameNormalization);
+            expect(normalizations[0]).toBe(normalizations[1]);
             expect(analysis.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'analysis'}));
             expect(assembly.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'assembly', identity: expect.objectContaining({studyResultId: 'RESULT'})}));
             expect(encoder.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'encoder'}));
-            expect(analysis.warmup).toHaveBeenCalledTimes(3);
+            expect(analysis.warmup).toHaveBeenCalledTimes(6);
         } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
     });
 

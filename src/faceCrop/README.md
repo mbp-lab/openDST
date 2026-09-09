@@ -13,7 +13,7 @@ worker, and coordinates JATOS uploads and retries:
 
 ```text
 main thread
-  -> N analysis workers (MediaPipe detection + packed RGBA extraction)
+  -> N analysis workers (native-frame normalization + BlazeFace detection on TensorFlow.js WASM)
   -> 1 assembly worker (source ordering, ROI, downsampling, AVI + gzip)
   -> main-thread FaceCropSink (JATOS AVI and sidecar uploads, retries)
 ```
@@ -27,7 +27,7 @@ AVI muxing, and gzip encoding do not run on the main thread.
 
 - `FaceCropCapture.js`: capability probing, lifecycle, worker routing, upload
   coordination, manifest metadata, and status reporting.
-- `FaceCropPipeline.worker.js`: MediaPipe analysis and ordered patch assembly.
+- `FaceCropPipeline.worker.js`: BlazeFace/TFJS WASM analysis and ordered patch assembly.
 - `FaceCropOutput.js`: deterministic filenames, AVI encoding, gzip support, and
   the bounded JATOS upload sink.
 - The corresponding `*.test.js` files define lifecycle, ordering, pixel-layout,
@@ -51,9 +51,7 @@ AVI muxing, and gzip encoding do not run on the main thread.
 
 ## Scientific contract
 
-- Detection uses the vendored MediaPipe Tasks Vision
-  `blaze_face_short_range.tflite` model in `VIDEO` mode. The selected delegate and
-  detection thresholds are recorded in the manifest.
+- Detection uses vendored TensorFlow.js and BlazeFace browser bundles with the WASM backend. A one-frame main-thread preflight recovers missing quarter-turn orientation by comparing 32×32 presented luminance with native NV12 Y-plane samples. Analysis workers then normalize supported full-range BT.709 NV12 (honoring plane offsets and strides) directly into rotated packed RGBA; genuine packed RGBA remains a direct path. Normalized pixels are converted directly to RGB tensors without continuous canvas/WebGL processing, and detector assets are loaded from `PUBLIC_URL`-relative `/tfjs/4.22.0/` assets. The confidence threshold is applied by BlazeFace and recorded in the manifest; legacy delegate and suppression settings remain recorded but are not applied.
 - Selected bounding boxes become bounded square ROIs using the configured scale,
   vertical shift, and time-based exponential smoothing. Sidecar selection states
   are `default`, `largest`, `held`, and `reacquired`.

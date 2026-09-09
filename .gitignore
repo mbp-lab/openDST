@@ -13,7 +13,7 @@
 
 # production
 /build
-/public/mediapipe
+/public/tfjs
 
 # misc
 .DS_Store

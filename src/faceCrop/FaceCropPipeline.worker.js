@@ -1,4 +1,5 @@
 /* global globalThis */
+import {convertFullRangeBt709Nv12ToRgba} from './FrameNormalization';
 import {
     createFaceEventsFilename,
     createPatchVideoFilename,
@@ -22,129 +23,97 @@ export const AREA_AVERAGE_V1 = 'area-average-v1';
 export const FACE_ROI_DESCRIPTOR_VERSION = 2;
 
 const PUBLIC_ASSET_ROOT = process.env.PUBLIC_URL || '';
-const MEDIAPIPE_WASM_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/wasm';
-const FACE_DETECTOR_MODEL_URL = PUBLIC_ASSET_ROOT + '/mediapipe/models/blaze_face_short_range.tflite';
-const MEDIAPIPE_VISION_BUNDLE_URL =
-    PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/vision_bundle.js';
+const TFJS_ASSET_ROOT = PUBLIC_ASSET_ROOT + '/tfjs/4.22.0';
+const TFJS_RUNTIME_URL = TFJS_ASSET_ROOT + '/tf.min.js';
+const TFJS_WASM_BACKEND_URL = TFJS_ASSET_ROOT + '/tf-backend-wasm.min.js';
+const BLAZEFACE_BUNDLE_URL = TFJS_ASSET_ROOT + '/blazeface.min.umd.js';
+const BLAZEFACE_MODEL_URL = TFJS_ASSET_ROOT + '/model/model.json';
 
-let visionTasks;
+let tensorFlowRuntime;
 
-function diagnostic(stage, details = {}) {
-    globalThis.postMessage({
-        diagnostic: {
-            stage,
-            ...details
-        }
-    });
-}
-
-function loadVisionTasks() {
-    if (visionTasks) return visionTasks;
-
-    const previousDocument = globalThis.document;
-
-    if (typeof globalThis.document === 'undefined') {
-        globalThis.document = {
-            currentScript: {
-                src: MEDIAPIPE_VISION_BUNDLE_URL
-            }
-        };
+function loadTensorFlowScripts() {
+    if (tensorFlowRuntime) return tensorFlowRuntime;
+    if (typeof globalThis.importScripts !== 'function') {
+        throw new Error('importScripts is unavailable in the capture worker');
     }
-
-    try {
-        if (typeof globalThis.importScripts !== 'function') {
-            throw new Error('importScripts is unavailable in the capture worker');
-        }
-        globalThis.importScripts(MEDIAPIPE_VISION_BUNDLE_URL);
-    } finally {
-        if (previousDocument === undefined) {
-            delete globalThis.document;
-        } else {
-            globalThis.document = previousDocument;
-        }
+    globalThis.importScripts(TFJS_RUNTIME_URL);
+    if (!globalThis.tf) throw new Error('TensorFlow.js runtime did not initialize');
+    globalThis.importScripts(TFJS_WASM_BACKEND_URL);
+    if (!globalThis.tf.wasm || typeof globalThis.tf.wasm.setWasmPaths !== 'function') {
+        throw new Error('TensorFlow.js WASM backend did not initialize');
     }
-
-    if (!globalThis.Vision) {
-        throw new Error('MediaPipe vision bundle did not initialize');
+    globalThis.importScripts(BLAZEFACE_BUNDLE_URL);
+    if (!globalThis.blazeface || typeof globalThis.blazeface.load !== 'function') {
+        throw new Error('BlazeFace bundle did not initialize');
     }
-
-    visionTasks = globalThis.Vision;
-    return visionTasks;
+    tensorFlowRuntime = {tf: globalThis.tf, blazeface: globalThis.blazeface};
+    return tensorFlowRuntime;
 }
 
 function timingNow() {
     return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
 }
 
-function warmupDetector(detector, frame, timestampUs) {
-    try {
-        diagnostic('before-warmup-detect');
-
-        const result = detector.detectForVideo(frame, timestampUs / 1000);
-
-        diagnostic('after-warmup-detect');
-        return {};
-    } finally {
-        frame.close();
-    }
-}
-
 function initializationError(stage, error) {
-    const wrapped = new Error('MediaPipe ' + stage + ' failed: ' + (error && error.message ? error.message : String(error)));
+    const wrapped = new Error('BlazeFace ' + stage + ' failed: ' + (error && error.message ? error.message : String(error)));
     wrapped.stack = error && error.stack ? wrapped.message + '\nCaused by: ' + error.stack : wrapped.stack;
     return wrapped;
 }
 
-export async function createMediaPipeFaceDetector({
-    minDetectionConfidence = 0.5,
-    minSuppressionThreshold = 0.3,
-    delegate = 'CPU'
-} = {}) {
-    const {FaceDetector, FilesetResolver} = loadVisionTasks();
-
-    let fileset;
-    let modelAssetBuffer;
-
+export async function createBlazeFaceDetector({minDetectionConfidence = 0.5} = {}) {
+    let runtime;
     try {
-        fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
+        runtime = loadTensorFlowScripts();
     } catch (error) {
-        throw initializationError('Wasm fileset loading', error);
+        throw initializationError('script loading', error);
     }
-
     try {
-        const response = await fetch(FACE_DETECTOR_MODEL_URL);
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ' for face detector model');
-        }
-        modelAssetBuffer = new Uint8Array(await response.arrayBuffer());
+        runtime.tf.wasm.setWasmPaths(TFJS_ASSET_ROOT + '/');
+        const selected = await runtime.tf.setBackend('wasm');
+        if (!selected || runtime.tf.getBackend() !== 'wasm') throw new Error('WASM backend could not be selected');
+        await runtime.tf.ready();
+    } catch (error) {
+        throw initializationError('WASM backend initialization', error);
+    }
+    try {
+        const model = await runtime.blazeface.load({modelUrl: BLAZEFACE_MODEL_URL, scoreThreshold: minDetectionConfidence});
+        return {tf: runtime.tf, model};
     } catch (error) {
         throw initializationError('model loading', error);
     }
+}
 
+export function convertBlazeFacePredictions(predictions, width, height) {
+    return (predictions || []).map(prediction => {
+        const topLeft = prediction.topLeft || [];
+        const bottomRight = prediction.bottomRight || [];
+        const left = Math.max(0, Math.min(width, Number(topLeft[0])));
+        const top = Math.max(0, Math.min(height, Number(topLeft[1])));
+        const right = Math.max(left, Math.min(width, Number(bottomRight[0])));
+        const bottom = Math.max(top, Math.min(height, Number(bottomRight[1])));
+        const probability = Array.isArray(prediction.probability) ? prediction.probability[0] : prediction.probability;
+        return {boundingBox: {originX: left, originY: top, width: right - left, height: bottom - top},
+            categories: [{score: Number(probability)}]};
+    });
+}
+
+function rgbaToRgb(rgba, width, height) {
+    const rgb = new Uint8Array(width * height * 3);
+    for (let source = 0, destination = 0; source < rgba.length; source += 4) {
+        rgb[destination++] = rgba[source];
+        rgb[destination++] = rgba[source + 1];
+        rgb[destination++] = rgba[source + 2];
+    }
+    return rgb;
+}
+
+async function detectFaces(detector, rgba, width, height) {
+    const input = detector.tf.tensor3d(rgbaToRgb(rgba, width, height), [height, width, 3], 'int32');
     try {
-        const canvas = new OffscreenCanvas(1, 1);
-        const gl = canvas.getContext('webgl2');
-
-        if (!gl) {
-            throw new Error('WebGL2 is unavailable on OffscreenCanvas in this worker');
-        }
-
-        if (gl.isContextLost()) {
-            throw new Error('WebGL2 context is already lost');
-        }
-
-        return await FaceDetector.createFromOptions(fileset, {
-            baseOptions: {
-                modelAssetBuffer,
-                delegate
-            },
-            canvas,
-            runningMode: 'VIDEO',
-            minDetectionConfidence,
-            minSuppressionThreshold
-        });
-    } catch (error) {
-        throw initializationError('FaceDetector construction', error);
+        const predictions = await detector.model.estimateFaces(input, false, false, true);
+        return convertBlazeFacePredictions(predictions, width, height);
+    } finally {
+        input.dispose();
     }
 }
 
@@ -323,33 +292,46 @@ export class FaceCropProcessor {
     process(input) { return processFaceCropFrame(input); }
 }
 
-async function copyPackedRgba(frame, width, height) {
-    // Keep extraction full-frame for browser compatibility. Cropped VideoFrame
-    // copyTo() is unreliable on some I420-backed camera implementations.
-    const options = {format: 'RGBA', colorSpace: 'srgb'};
-    const rect = {x: 0, y: 0, width, height};
-    const rowBytes = rect.width * 4;
-    const allocationSize = typeof frame.allocationSize === 'function'
-        ? frame.allocationSize(options) : rowBytes * rect.height;
-    if (!Number.isSafeInteger(allocationSize) || allocationSize < rowBytes * rect.height) {
-        throw new Error('VideoFrame RGBA allocation is smaller than the requested frame');
+function frameDimensions(frame) {
+    const rect = frame.visibleRect;
+    return {width: rect && rect.width ? rect.width : frame.codedWidth || frame.displayWidth,
+        height: rect && rect.height ? rect.height : frame.codedHeight || frame.displayHeight};
+}
+
+function validateCurrentNv12Frame(frame, normalization) {
+    const dimensions = frameDimensions(frame);
+    const colorSpace = frame.colorSpace;
+    if (frame.format !== 'NV12' || dimensions.width !== normalization.nativeWidth ||
+        dimensions.height !== normalization.nativeHeight) {
+        throw new Error('VideoFrame no longer matches the NV12 normalization preflight');
     }
-    const allocated = new Uint8Array(allocationSize);
-    const layouts = await frame.copyTo(allocated, options);
-    const plane = Array.isArray(layouts) ? layouts[0] : null;
-    const offset = plane && Number.isSafeInteger(plane.offset) ? plane.offset : 0;
-    const stride = plane && Number.isSafeInteger(plane.stride) ? plane.stride : rowBytes;
-    if (stride < rowBytes || offset < 0 || offset + stride * (rect.height - 1) + rowBytes > allocated.byteLength) {
-        throw new Error('VideoFrame RGBA layout cannot represent the requested frame');
+    if (!colorSpace || colorSpace.fullRange !== true || colorSpace.primaries !== 'bt709' || colorSpace.transfer !== 'bt709' ||
+        (colorSpace.matrix !== null && colorSpace.matrix !== 'bt709')) {
+        throw new Error('VideoFrame no longer matches full-range BT.709 normalization');
     }
-    if (offset === 0 && stride === rowBytes && allocated.byteLength === rowBytes * rect.height) return allocated;
-    // VideoFrame.copyTo() may return padded rows. Normalize the layout before
-    // pixel indexing assumes tightly packed width * 4 RGBA rows.
-    const packed = new Uint8Array(rowBytes * rect.height);
-    for (let row = 0; row < rect.height; row += 1) {
-        packed.set(allocated.subarray(offset + row * stride, offset + row * stride + rowBytes), row * rowBytes);
+}
+
+async function normalizeFrame(frame, normalization, fallbackWidth, fallbackHeight) {
+    if (!normalization || normalization.mode === 'rgba-copy') {
+        const width = normalization ? normalization.presentedWidth : frame.displayWidth || fallbackWidth;
+        const height = normalization ? normalization.presentedHeight : frame.displayHeight || fallbackHeight;
+        const rgbx = new Uint8Array(width * height * 4);
+        const layouts = await frame.copyTo(rgbx, {format: 'RGBA', colorSpace: 'srgb'});
+        if (Array.isArray(layouts) && layouts.length && (layouts.length !== 1 || layouts[0].offset !== 0 || layouts[0].stride !== width * 4)) {
+            throw new Error('VideoFrame did not return packed RGBA');
+        }
+        return {rgbx, width, height};
     }
-    return packed;
+    if (normalization.mode !== 'nv12-bt709-full') throw new Error('Frame normalization mode is unsupported');
+    validateCurrentNv12Frame(frame, normalization);
+    const bytes = new Uint8Array(frame.allocationSize());
+    const layouts = await frame.copyTo(bytes);
+    const converted = convertFullRangeBt709Nv12ToRgba({bytes, width: normalization.nativeWidth,
+        height: normalization.nativeHeight, layouts, rotation: normalization.rotation});
+    if (converted.width !== normalization.presentedWidth || converted.height !== normalization.presentedHeight) {
+        throw new Error('Normalized frame dimensions do not match the presented video');
+    }
+    return converted;
 }
 
 function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi, sourceWidth, sourceHeight) {
@@ -426,33 +408,40 @@ export class FaceCropSegmenter {
 
 export class FaceCropAnalysisPipeline {
     async initialize({configuration}) {
-        this.detector = await createMediaPipeFaceDetector({minDetectionConfidence: configuration.faceDetectionMinConfidence,
-            minSuppressionThreshold: configuration.faceDetectionMinSuppressionThreshold, delegate: configuration.faceDetectionDelegate});
+        this.normalization = configuration.frameNormalization || null;
+        this.detector = await createBlazeFaceDetector({minDetectionConfidence: configuration.faceDetectionMinConfidence});
     }
 
     async processFrame({frame, width, height, timestampUs, wallClockMs, sequence}) {
         const startedAt = timingNow();
         try {
-            const detectionStartedAt = timingNow();
-            diagnostic('before frame detectForVideo', {sequence});
-            const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
-            diagnostic('after frame detectForVideo', {sequence});
-            const detectionMs = timingNow() - detectionStartedAt;
             const copyStartedAt = timingNow();
-            const rgbx = await copyPackedRgba(frame, width, height);
+            const normalized = await normalizeFrame(frame, this.normalization, width, height);
             const rgbaCopyMs = timingNow() - copyStartedAt;
-            return {sequence, width, height, timestampUs, wallClockMs, detections: detected.detections, rgbx,
+            width = normalized.width;
+            height = normalized.height;
+            const rgbx = normalized.rgbx;
+            const detectionStartedAt = timingNow();
+            const detections = await detectFaces(this.detector, rgbx, width, height);
+            const detectionMs = timingNow() - detectionStartedAt;
+            return {sequence, width, height, timestampUs, wallClockMs, detections, rgbx,
                 timings: {detectionMs, rgbaCopyMs, analysisMs: timingNow() - startedAt}};
         } finally {
             frame.close();
         }
     }
 
-    warmup({frame, timestampUs}) {
-        return warmupDetector(this.detector, frame, timestampUs);
+    async warmup({frame, width, height}) {
+        try {
+            const normalized = await normalizeFrame(frame, this.normalization);
+            await detectFaces(this.detector, normalized.rgbx, normalized.width, normalized.height);
+            return {};
+        } finally {
+            frame.close();
+        }
     }
 
-    close() { if (this.detector) this.detector.close(); this.detector = null; }
+    close() { if (this.detector && this.detector.model.dispose) this.detector.model.dispose(); this.detector = null; this.normalization = null; }
 }
 
 export class FaceCropAssemblyPipeline {

@@ -1,4 +1,4 @@
-import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, FaceRoiProvider, FaceCropAnalysisPipeline, FaceCropAssemblyPipeline, FaceCropEncodingPipeline} from './FaceCropPipeline.worker';
+import {AREA_AVERAGE_V1, DYNAMIC_FACE_SQUARE, FACE_COORDINATE_SYSTEM, FACE_ROI_DESCRIPTOR_VERSION, PATCH_SIZE, validateFaceRoiDescriptor, convertBlazeFacePredictions, FaceRoiProvider, FaceCropAnalysisPipeline, FaceCropAssemblyPipeline, FaceCropEncodingPipeline} from './FaceCropPipeline.worker';
 import {FaceCropProcessor, BGR24_FRAME_BYTES, processFaceCropFrame, FaceCropSegmenter} from './FaceCropPipeline.worker';
 import {buildUncompressedAvi} from './FaceCropOutput';
 import pako from 'pako';
@@ -9,56 +9,48 @@ function deferred() {
     return {promise: new Promise(nextResolve => { resolve = nextResolve; }), resolve};
 }
 
-describe('MediaPipe detector configuration', () => {
-    test('passes the selected delegate to MediaPipe options', async () => {
-        const originalVision = global.importScripts;
-        const createFromOptions = jest.fn(() => Promise.resolve('detector'));
-        global.importScripts = jest.fn(() => {
-            global.Vision = {
-                FaceDetector: {createFromOptions},
-                FilesetResolver: {forVisionTasks: jest.fn(() => Promise.resolve('fileset'))}
-            };
-        });
-        global.fetch = jest.fn(() => Promise.resolve({ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(1))}));
-
-        try {
-            const {createMediaPipeFaceDetector} = require('./FaceCropPipeline.worker');
-            await expect(createMediaPipeFaceDetector({delegate: 'GPU'})).resolves.toBe('detector');
-            expect(createFromOptions).toHaveBeenCalledWith('fileset', expect.objectContaining({
-                baseOptions: expect.objectContaining({delegate: 'GPU'})
-            }));
-        } finally {
-            global.importScripts = originalVision;
-        }
+describe('BlazeFace detector configuration', () => {
+    afterEach(() => {
+        delete global.tf;
+        delete global.blazeface;
+        jest.resetModules();
     });
 
-    test('initializes MediaPipe even when the runtime does not expose document', async () => {
-        jest.resetModules();
-        const originalVision = global.importScripts;
-        const originalDocument = global.document;
-
-        delete global.document;
-        const createFromOptions = jest.fn(() => Promise.resolve('detector'));
-        global.importScripts = jest.fn(() => {
-            if (typeof document === 'undefined') {
-                throw new Error("Can't find variable: document");
-            }
-            global.Vision = {
-                FaceDetector: {createFromOptions},
-                FilesetResolver: {forVisionTasks: jest.fn(() => Promise.resolve('fileset'))}
-            };
+    function installRuntime({load = jest.fn(() => Promise.resolve('model')), setBackend = jest.fn(() => Promise.resolve(true))} = {}) {
+        const tf = {wasm: {setWasmPaths: jest.fn()}, setBackend, getBackend: jest.fn(() => 'wasm'),
+            ready: jest.fn(() => Promise.resolve())};
+        global.importScripts = jest.fn(url => {
+            if (url.endsWith('/tf.min.js')) global.tf = tf;
+            if (url.endsWith('/blazeface.min.umd.js')) global.blazeface = {load};
         });
-        global.fetch = jest.fn(() => Promise.resolve({ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(1))}));
+        return {tf, load};
+    }
 
-        try {
-            const {createMediaPipeFaceDetector} = require('./FaceCropPipeline.worker');
-            await expect(createMediaPipeFaceDetector()).resolves.toBe('detector');
-            expect(global.document).toBeTruthy();
-        } finally {
-            global.importScripts = originalVision;
-            if (originalDocument === undefined) delete global.document; else global.document = originalDocument;
-            jest.resetModules();
-        }
+    test('selects only the WASM backend and loads the local model with the configured confidence', async () => {
+        const {tf, load} = installRuntime();
+        const {createBlazeFaceDetector} = require('./FaceCropPipeline.worker');
+        await expect(createBlazeFaceDetector({minDetectionConfidence: 0.65})).resolves.toMatchObject({model: 'model'});
+        expect(tf.setBackend).toHaveBeenCalledTimes(1);
+        expect(tf.setBackend).toHaveBeenCalledWith('wasm');
+        expect(tf.setBackend).not.toHaveBeenCalledWith('webgl');
+        expect(tf.wasm.setWasmPaths.mock.calls[0][0]).toContain('/tfjs/4.22.0/');
+        expect(load).toHaveBeenCalledWith(expect.objectContaining({modelUrl: expect.stringContaining('/model/model.json'),
+            scoreThreshold: 0.65}));
+        expect(global.importScripts.mock.calls.map(call => call[0])).toEqual(expect.arrayContaining([
+            expect.stringMatching(/tf\.min\.js$/), expect.stringMatching(/tf-backend-wasm\.min\.js$/),
+            expect.stringMatching(/blazeface\.min\.umd\.js$/)
+        ]));
+    });
+
+    test('reports the initialization stage when WASM selection fails', async () => {
+        installRuntime({setBackend: jest.fn(() => Promise.reject(new Error('compile failed')))});
+        const {createBlazeFaceDetector} = require('./FaceCropPipeline.worker');
+        await expect(createBlazeFaceDetector()).rejects.toThrow('BlazeFace WASM backend initialization failed: compile failed');
+    });
+
+    test('maps BlazeFace predictions into clamped internal detections', () => {
+        expect(convertBlazeFacePredictions([{topLeft: [-5, 10], bottomRight: [110, 90], probability: [0.87]}], 100, 80))
+            .toEqual([{boundingBox: {originX: 0, originY: 10, width: 100, height: 70}, categories: [{score: 0.87}]}]);
     });
 });
 
@@ -215,7 +207,7 @@ function findChunk(bytes, type) {
 }
 
 // Worker tests cover deterministic ROI selection and pixel conversion without
-// loading MediaPipe, so algorithm changes remain cheap to validate in Jest.
+// loading the real TFJS/WASM runtime, so algorithm changes remain cheap to validate in Jest.
 function setPixel(rgbx, width, x, y, color) {
     const offset = (y * width + x) * 4;
     rgbx[offset] = color[0];
@@ -296,7 +288,7 @@ describe('FaceCropProcessor', () => {
 describe('FaceRoiProvider', () => {
     // ROI tests protect deterministic selection, smoothing, bounds, and the
     // policy of holding a valid crop through temporary detector misses.
-    test('creates a padded, bounded MediaPipe face crop in source pixels', () => {
+    test('creates a padded, bounded detector face crop in source pixels', () => {
         const provider = new FaceRoiProvider({smoothingTauMs: 0});
         const roi = provider.getRoi({
             width: 640,
@@ -315,7 +307,7 @@ describe('FaceRoiProvider', () => {
         expect(roi.size % PATCH_SIZE).not.toBe(0);
     });
 
-    test('selects the largest eligible face independently of MediaPipe result order', () => {
+    test('selects the largest eligible face independently of detector result order', () => {
         const provider = new FaceRoiProvider({scale: 1, smoothingTauMs: 0, minDetectionConfidence: 0.5});
         const selection = provider.getSelection({
             width: 640,
@@ -417,15 +409,70 @@ describe('FaceRoiProvider', () => {
 
 
 describe('worker roles', () => {
+    test('assembly and encoder initialization do not load the detector runtime', async () => {
+        const originalImportScripts = global.importScripts;
+        global.importScripts = jest.fn();
+        try {
+            const assembly = new FaceCropAssemblyPipeline();
+            await assembly.initialize({configuration: {...resolveFaceCropConfiguration({}), analysisWorkerCount: 1}, identity: {}});
+            const encoder = new FaceCropEncodingPipeline();
+            expect(encoder).toBeTruthy();
+            expect(global.importScripts).not.toHaveBeenCalled();
+        } finally { global.importScripts = originalImportScripts; }
+    });
+
+    test('uses the default packed RGBA layout without consulting allocationSize', async () => {
+        const pipeline = new FaceCropAnalysisPipeline();
+        const dispose = jest.fn();
+        pipeline.detector = {tf: {tensor3d: jest.fn(() => ({dispose}))},
+            model: {estimateFaces: jest.fn(() => Promise.resolve([]))}};
+        const frame = {allocationSize: jest.fn(), copyTo: jest.fn((destination, options) => {
+            expect(destination.byteLength).toBe(72 * 72 * 4);
+            expect(options).toEqual({format: 'RGBA', colorSpace: 'srgb'});
+            return Promise.resolve([{offset: 0, stride: 72 * 4}]);
+        }), close: jest.fn()};
+        await expect(pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1, wallClockMs: 1, sequence: 0}))
+            .resolves.toMatchObject({width: 72, height: 72, rgbx: expect.any(Uint8Array)});
+        expect(frame.allocationSize).not.toHaveBeenCalled();
+        expect(dispose).toHaveBeenCalledTimes(1);
+        expect(frame.close).toHaveBeenCalledTimes(1);
+    });
+
+    test('normalizes padded NV12 into rotated RGBA before BlazeFace', async () => {
+        const pipeline = new FaceCropAnalysisPipeline();
+        const dispose = jest.fn();
+        const tensor3d = jest.fn(() => ({dispose}));
+        pipeline.detector = {tf: {tensor3d}, model: {estimateFaces: jest.fn(() => Promise.resolve([]))}};
+        pipeline.normalization = {mode: 'nv12-bt709-full', nativeWidth: 4, nativeHeight: 2,
+            presentedWidth: 2, presentedHeight: 4, rotation: 90};
+        const bytes = new Uint8Array(24);
+        bytes.set([10, 20, 30, 40], 1);
+        bytes.set([50, 60, 70, 80], 7);
+        bytes.set([128, 128, 128, 128], 16);
+        const frame = {format: 'NV12', codedWidth: 4, codedHeight: 2, colorSpace: {fullRange: true, primaries: 'bt709', transfer: 'bt709', matrix: null},
+            allocationSize: jest.fn(() => bytes.length), copyTo: jest.fn(destination => { destination.set(bytes); return Promise.resolve([{offset: 1, stride: 6}, {offset: 16, stride: 6}]); }), close: jest.fn()};
+        const result = await pipeline.processFrame({frame, width: 2, height: 4, timestampUs: 1, wallClockMs: 1, sequence: 0});
+        expect(result).toMatchObject({width: 2, height: 4});
+        expect(Array.from(result.rgbx.filter((_, index) => index % 4 === 0))).toEqual([50, 10, 60, 20, 70, 30, 80, 40]);
+        expect(tensor3d).toHaveBeenCalledWith(expect.any(Uint8Array), [4, 2, 3], 'int32');
+        expect(frame.copyTo).toHaveBeenCalledWith(expect.any(Uint8Array));
+        expect(frame.close).toHaveBeenCalledTimes(1);
+    });
+
     test('analysis warmup and processing always close transferred frames', async () => {
         const pipeline = new FaceCropAnalysisPipeline();
-        pipeline.detector = {detectForVideo: jest.fn(() => ({detections: [detection(0, 0, 72, 72)]}))};
-        const warmupFrame = {close: jest.fn()};
-        expect(pipeline.warmup({frame: warmupFrame, timestampUs: 1000})).toEqual({});
+        const dispose = jest.fn();
+        const tensor3d = jest.fn(() => ({dispose}));
+        const estimateFaces = jest.fn(() => Promise.resolve([{topLeft: [0, 0], bottomRight: [72, 72], probability: [0.9]}]));
+        pipeline.detector = {tf: {tensor3d}, model: {estimateFaces}};
+        const warmupFrame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
+        await expect(pipeline.warmup({frame: warmupFrame, width: 72, height: 72})).resolves.toEqual({});
         expect(warmupFrame.close).toHaveBeenCalledTimes(1);
         const frame = {copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
         const result = await pipeline.processFrame({frame, width: 72, height: 72, timestampUs: 1000, wallClockMs: 10, sequence: 4});
-        expect(result).toMatchObject({sequence: 4, rgbx: expect.any(Uint8Array)});
+        expect(result).toMatchObject({sequence: 4, rgbx: expect.any(Uint8Array), detections: [detection(0, 0, 72, 72, 0.9)]});
+        expect(tensor3d).toHaveBeenCalledWith(expect.any(Uint8Array), [72, 72, 3], 'int32');
+        expect(dispose).toHaveBeenCalledTimes(2);
         expect(frame.close).toHaveBeenCalledTimes(1);
     });
 

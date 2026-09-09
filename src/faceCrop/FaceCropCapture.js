@@ -1,5 +1,6 @@
 import {UPLOAD_STATUS} from '../uploadState';
 import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
+import {ORIENTATION_REFERENCE_SIZE, rotatedDimensions, selectQuarterTurnByLuminance} from './FrameNormalization';
 
 // Face-crop capture is an optional companion to MediaRecorder. It must fail
 // closed so unsupported browsers never affect the participant-facing recording.
@@ -108,16 +109,92 @@ function addTiming(metrics, stage, durationMs) {
     current.maxMs = current.maxMs === null ? durationMs : Math.max(current.maxMs, durationMs);
 }
 
+function rectangleMetadata(rectangle) {
+    if (!rectangle) return null;
+    return {x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height};
+}
+
+function colorSpaceMetadata(colorSpace) {
+    if (!colorSpace) return null;
+    return {primaries: colorSpace.primaries, transfer: colorSpace.transfer, matrix: colorSpace.matrix,
+        fullRange: colorSpace.fullRange};
+}
+
+function renderedReferenceLuminance(video) {
+    const canvas = document.createElement('canvas');
+    canvas.width = ORIENTATION_REFERENCE_SIZE;
+    canvas.height = ORIENTATION_REFERENCE_SIZE;
+    const context = canvas.getContext('2d', {willReadFrequently: true});
+    if (!context) throw new Error('2D canvas is unavailable for orientation preflight');
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const luminance = new Uint8Array(canvas.width * canvas.height);
+    for (let source = 0, destination = 0; source < rgba.length; source += 4) {
+        luminance[destination++] = Math.round(0.2126 * rgba[source] + 0.7152 * rgba[source + 1] + 0.0722 * rgba[source + 2]);
+    }
+    return luminance;
+}
+
+function nv12ColorSpace(colorSpace) {
+    const metadata = colorSpaceMetadata(colorSpace);
+    if (!metadata || metadata.fullRange !== true || metadata.primaries !== 'bt709' || metadata.transfer !== 'bt709' ||
+        (metadata.matrix !== null && metadata.matrix !== 'bt709')) {
+        throw new Error('Only full-range BT.709 NV12 camera frames are supported');
+    }
+    return metadata;
+}
+
+async function normalizationPreflight(frame, video, source) {
+    const format = frame.format || null;
+    const visibleRect = rectangleMetadata(frame.visibleRect);
+    const nativeWidth = visibleRect ? visibleRect.width : frame.codedWidth || frame.displayWidth;
+    const nativeHeight = visibleRect ? visibleRect.height : frame.codedHeight || frame.displayHeight;
+    if (format === 'NV12') {
+        if (frame.flip) throw new Error('Flipped NV12 VideoFrames are unsupported');
+        const colorSpace = nv12ColorSpace(frame.colorSpace);
+        const nativeSize = frame.allocationSize();
+        const bytes = new Uint8Array(nativeSize);
+        const layouts = await frame.copyTo(bytes);
+        let rotation = frame.rotation || 0;
+        let calibration = {method: 'frame-metadata-v1', clockwiseDistance: null, counterclockwiseDistance: null};
+        if (rotation === 0 && nativeWidth === source.height && nativeHeight === source.width && source.width !== source.height) {
+            const selected = selectQuarterTurnByLuminance({bytes, width: nativeWidth, height: nativeHeight, layouts,
+                reference: renderedReferenceLuminance(video)});
+            rotation = selected.rotation;
+            calibration = {method: 'presented-luminance-distance-v1', clockwiseDistance: selected.clockwiseDistance,
+                counterclockwiseDistance: selected.counterclockwiseDistance};
+        }
+        const output = rotatedDimensions(nativeWidth, nativeHeight, rotation);
+        if (output.width !== source.width || output.height !== source.height) {
+            throw new Error('Native VideoFrame geometry cannot be normalized to the presented video dimensions');
+        }
+        return {mode: 'nv12-bt709-full', nativeFormat: format, nativeWidth, nativeHeight,
+            presentedWidth: source.width, presentedHeight: source.height, rotation, flip: Boolean(frame.flip), colorSpace,
+            layouts: layouts.map(layout => ({offset: layout.offset, stride: layout.stride})), nativeAllocationSize: nativeSize,
+            ...calibration};
+    }
+    const options = {format: 'RGBA', colorSpace: 'srgb'};
+    const packedSize = frame.displayWidth * frame.displayHeight * 4;
+    const allocationSize = typeof frame.allocationSize === 'function' ? frame.allocationSize(options) : packedSize;
+    if (allocationSize !== packedSize) throw new Error('VideoFrame RGBA conversion is unavailable for format ' + (format || 'unknown'));
+    const layouts = await frame.copyTo(new Uint8Array(packedSize), options);
+    if (Array.isArray(layouts) && layouts.length && (layouts.length !== 1 || layouts[0].offset !== 0 || layouts[0].stride !== frame.displayWidth * 4)) {
+        throw new Error('VideoFrame did not return packed RGBA');
+    }
+    if (frame.displayWidth !== source.width || frame.displayHeight !== source.height) {
+        throw new Error('RGBA VideoFrame dimensions do not match the presented video');
+    }
+    return {mode: 'rgba-copy', nativeFormat: format, nativeWidth: frame.displayWidth, nativeHeight: frame.displayHeight,
+        presentedWidth: source.width, presentedHeight: source.height, rotation: 0, flip: false,
+        colorSpace: colorSpaceMetadata(frame.colorSpace), layouts: [{offset: 0, stride: frame.displayWidth * 4}],
+        nativeAllocationSize: allocationSize, method: 'native-presentation-v1', clockwiseDistance: null, counterclockwiseDistance: null};
+}
+
 export async function probeFaceCropCapability(video) {
     const source = dimensions(video);
     const checks = {};
-    const failed = (reason, stage, error) => ({
-        supported: false,
-        capability: {status: 'failed', checks, failedStage: stage},
-        source,
-        reason,
-        error: error ? {name: error.name || 'Error', message: error.message || String(error)} : null
-    });
+    const failed = (reason, stage, error) => ({supported: false, capability: {status: 'failed', checks, failedStage: stage},
+        source, reason, error: error ? {name: error.name || 'Error', message: error.message || String(error)} : null});
     if (!video || typeof video.requestVideoFrameCallback !== 'function' || typeof video.cancelVideoFrameCallback !== 'function') {
         checks.requestVideoFrameCallback = {status: 'failed'};
         checks.cancelVideoFrameCallback = {status: 'failed'};
@@ -125,27 +202,25 @@ export async function probeFaceCropCapability(video) {
     }
     checks.requestVideoFrameCallback = {status: 'passed'};
     checks.cancelVideoFrameCallback = {status: 'passed'};
-    if (typeof window.VideoFrame !== 'function') {
-        checks.videoFrame = {status: 'failed', stage: 'available'};
-        return failed('VideoFrame is unavailable', 'videoFrame');
-    }
+    if (typeof window.VideoFrame !== 'function') return failed('VideoFrame is unavailable', 'videoFrame');
     checks.videoFrame = {status: 'available'};
-    if (typeof window.CompressionStream !== 'function') {
-        checks.compressionStream = {status: 'failed'};
-        return failed('Native CompressionStream is unavailable', 'compressionStream');
-    }
+    if (typeof window.CompressionStream !== 'function') return failed('Native CompressionStream is unavailable', 'compressionStream');
     checks.compressionStream = {status: 'passed'};
     let frame;
     try {
         frame = new window.VideoFrame(video);
-        checks.videoFrame.construct = {status: 'passed', width: frame.displayWidth, height: frame.displayHeight};
-        await frame.copyTo(new Uint8Array(frame.displayWidth * frame.displayHeight * 4), {format: 'RGBA', colorSpace: 'srgb'});
-        checks.videoFrame.copyTo = {status: 'passed', format: 'RGBA', colorSpace: 'srgb'};
-        return {supported: true, capability: {status: 'passed', checks}, source};
+        checks.videoFrame.construct = {status: 'passed', format: frame.format || null,
+            codedWidth: frame.codedWidth || null, codedHeight: frame.codedHeight || null,
+            displayWidth: frame.displayWidth, displayHeight: frame.displayHeight,
+            visibleRect: rectangleMetadata(frame.visibleRect), rotation: frame.rotation || 0, flip: Boolean(frame.flip),
+            colorSpace: colorSpaceMetadata(frame.colorSpace)};
+        const frameNormalization = await normalizationPreflight(frame, video, source);
+        checks.videoFrame.copyTo = {status: 'passed', returnedLayouts: frameNormalization.layouts};
+        return {supported: true, capability: {status: 'passed', checks}, source, frameNormalization};
     } catch (error) {
         if (!checks.videoFrame.construct) checks.videoFrame.construct = {status: 'failed'};
         else checks.videoFrame.copyTo = {status: 'failed'};
-        return failed(error.message || 'VideoFrame RGBA/sRGB extraction failed',
+        return failed(error.message || 'VideoFrame normalization preflight failed',
             checks.videoFrame.construct.status === 'failed' ? 'videoFrame.construct' : 'videoFrame.copyTo', error);
     } finally {
         if (frame) frame.close();
@@ -285,6 +360,7 @@ export class FaceCropCaptureController {
         this.detectorWarmup = {requested: FACE_DETECTION_WARMUP_FRAMES, completed: 0, totalMs: 0, meanMs: null};
         this.capability = {status: 'not-run', checks: {}};
         this.source = null;
+        this.frameNormalization = null;
         this.manifest = null;
         this.frameCallbacks = 0;
         this.nextProgressLogFrame = 120;
@@ -330,6 +406,20 @@ export class FaceCropCaptureController {
         const capability = await probeFaceCropCapability(this.video);
         this.capability = capability.capability;
         this.source = capability.source;
+        this.frameNormalization = capability.frameNormalization || null;
+        const frameCheck = this.capability.checks && this.capability.checks.videoFrame;
+        const construct = frameCheck && frameCheck.construct;
+        const copy = frameCheck && frameCheck.copyTo;
+        if (construct && typeof construct === 'object') {
+            this.diagnostic('frame-layout', {format: construct.format, codedWidth: construct.codedWidth,
+                codedHeight: construct.codedHeight, displayWidth: construct.displayWidth, displayHeight: construct.displayHeight,
+                visibleRect: JSON.stringify(construct.visibleRect), rotation: construct.rotation, flip: construct.flip,
+                colorSpace: JSON.stringify(construct.colorSpace), normalizationMode: this.frameNormalization && this.frameNormalization.mode,
+                selectedRotation: this.frameNormalization && this.frameNormalization.rotation,
+                clockwiseDistance: this.frameNormalization && this.frameNormalization.clockwiseDistance,
+                counterclockwiseDistance: this.frameNormalization && this.frameNormalization.counterclockwiseDistance,
+                returnedLayouts: JSON.stringify(copy && copy.returnedLayouts)});
+        }
         if (this.state === 'stopping') return this.status;
         if (!capability.supported) {
             await this.uploadManifest([], FACE_CROP_STATUS.UNSUPPORTED);
@@ -358,7 +448,8 @@ export class FaceCropCaptureController {
                 faceDetectionMinConfidence: config.faceDetectionMinConfidence,
                 faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
                 faceDetectionDelegate: config.faceDetectionDelegate,
-                analysisWorkerCount: config.analysisWorkerCount
+                analysisWorkerCount: config.analysisWorkerCount,
+                frameNormalization: this.frameNormalization
             };
             const identity = {studyResultId: this.studyResultId, studyPage: this.studyPage,
                 videoCounter: this.videoCounter, captureId: this.captureId};
@@ -372,7 +463,7 @@ export class FaceCropCaptureController {
             ]);
         } catch (error) {
             await this.closeWorker();
-            return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, error.message || 'MediaPipe face detector initialization failed');
+            return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, error.message || 'BlazeFace detector initialization failed');
         }
         if (this.state === 'stopping') {
             await this.closeWorker();
@@ -382,19 +473,11 @@ export class FaceCropCaptureController {
         try {
             for (let index = 0; index < this.detectorWarmup.requested; index += 1) {
                 const timestampUs = index * 1000 + Math.round((performance.now() - warmupStartedAt) * 1000);
-                const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
-                try {
-                    await Promise.all(this.analysisWorkers.map(worker => {
-                        const warmupFrame = worker === this.analysisWorkers[0] ? frame : new window.VideoFrame(this.video, {timestamp: timestampUs});
-                        return worker.warmup({frame: warmupFrame, width: warmupFrame.displayWidth || source.width,
-                            height: warmupFrame.displayHeight || source.height, timestampUs}).finally(() => {
-                            if (warmupFrame !== frame) warmupFrame.close();
-                        });
-                    }));
-                    this.detectorWarmup.completed += 1;
-                } finally {
-                    frame.close();
-                }
+                await Promise.all(this.analysisWorkers.map(worker => {
+                    const warmupFrame = new window.VideoFrame(this.video, {timestamp: timestampUs});
+                    return worker.warmup({frame: warmupFrame, width: source.width, height: source.height, timestampUs});
+                }));
+                this.detectorWarmup.completed += 1;
             }
         } finally {
             this.detectorWarmup.totalMs = performance.now() - warmupStartedAt;
@@ -503,7 +586,7 @@ export class FaceCropCaptureController {
         if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
         const timestampUs = Math.round(metadata.mediaTime * 1000000);
         const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
-        const task = worker.processFrame({frame, width: frame.displayWidth, height: frame.displayHeight, timestampUs, wallClockMs, sequence})
+        const task = worker.processFrame({frame, width: this.source.width, height: this.source.height, timestampUs, wallClockMs, sequence})
             .then(result => this.assemblyWorker.processAnalysisResult(result))
             .then(result => this.commitAssemblyResult(result))
             .catch(error => this.markIncomplete(error.message || 'Face-crop frame processing failed'))
@@ -634,8 +717,10 @@ export class FaceCropCaptureController {
             roi: {smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale, verticalShiftRatio: config.faceRoiVerticalShiftRatio},
             analysisWorkerCount: config.analysisWorkerCount,
             pipeline: {assemblyWorker: true, encodingWorker: true, artifactEncoding: 'worker-gzip-avi-v1'},
-            detector: {delegate: config.faceDetectionDelegate, minConfidence: config.faceDetectionMinConfidence,
-                minSuppressionThreshold: config.faceDetectionMinSuppressionThreshold},
+            frameNormalization: this.frameNormalization ? {...this.frameNormalization, layouts: this.frameNormalization.layouts.map(layout => ({...layout}))} : null,
+            detector: {implementation: 'blazeface', backend: 'wasm', minConfidence: config.faceDetectionMinConfidence,
+                legacyRequestedDelegate: config.faceDetectionDelegate,
+                legacyMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold, suppressionThresholdApplied: false},
             selectionPolicy: 'largest-eligible-bounding-box-v1'};
     }
 
@@ -658,7 +743,8 @@ export class FaceCropCaptureController {
             configuration: this.configurationMetadata(),
             output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24',
                 aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', aviHeaderFrameRateFallback: PATCH_VIDEO_FRAME_RATE, frameSize: 72,
-                extraction: {api: 'VideoFrame.copyTo', format: 'RGBA', colorSpace: 'srgb'}},
+                extraction: {api: 'VideoFrame.copyTo', normalizationMode: this.frameNormalization && this.frameNormalization.mode,
+                    nativeFormat: this.frameNormalization && this.frameNormalization.nativeFormat, outputFormat: 'RGBA'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
                 acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,
                 frameTimings: this.frameTimings, encodingTimings: this.encodingTimings, detectorWarmup: this.detectorWarmup}
