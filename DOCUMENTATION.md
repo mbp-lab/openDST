@@ -687,7 +687,9 @@ their source timestamps and records the detected face and crop used for each
 frame. Selection follows the largest eligible face and does not track identity;
 during a detection gap, the last valid crop is retained. Use the sidecar's
 `presentationTimeUs` values for scientific timing because source frames may be skipped
-under processing load.
+under processing load. Every part after the first also stores
+`precedingFramePresentationTimeUs` as non-video timing metadata, allowing its AVI
+cadence to include the observed interval across the part boundary.
 
 This mode requires `requestVideoFrameCallback`, `VideoFrame`, web workers, and
 worker-side gzip support. Before enabling it in a study, test the target devices

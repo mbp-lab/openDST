@@ -356,6 +356,7 @@ export class FaceCropSegmenter {
         this.segmentIndex = -1;
         this.partIndex = 0;
         this.part = null;
+        this.previousPresentationTimeUs = null;
     }
 
     appendFrame({bgr24, writeBgr24, sourceWidth, sourceHeight, roi, provenance, timestampUs, wallClockMs}) {
@@ -369,7 +370,8 @@ export class FaceCropSegmenter {
             this.segmentIndex += 1;
             this.partIndex = 0;
         }
-        if (!this.part) this.part = {bytes: new Uint8Array(this.maxFrames * BGR24_FRAME_BYTES), frameCount: 0, events: []};
+        if (!this.part) this.part = {bytes: new Uint8Array(this.maxFrames * BGR24_FRAME_BYTES), frameCount: 0, events: [],
+            precedingFramePresentationTimeUs: this.previousPresentationTimeUs};
         const output = this.part.bytes.subarray(this.part.frameCount * BGR24_FRAME_BYTES,
             (this.part.frameCount + 1) * BGR24_FRAME_BYTES);
         if (writeBgr24 !== undefined) {
@@ -380,6 +382,7 @@ export class FaceCropSegmenter {
             output.set(bgr24);
         }
         this.part.events.push(copyEvent(provenance, this.part.frameCount, timestampUs, wallClockMs, roi, sourceWidth, sourceHeight));
+        this.previousPresentationTimeUs = timestampUs;
         this.part.frameCount += 1;
         const full = this.part.frameCount === this.maxFrames ? this.seal() : null;
         return [sealed, full].filter(Boolean);
@@ -392,7 +395,7 @@ export class FaceCropSegmenter {
 
     seal() {
         if (!this.part) return null;
-        const {frameCount, events} = this.part;
+        const {frameCount, events, precedingFramePresentationTimeUs} = this.part;
         const identity = {...this.identity, segmentIndex: this.segmentIndex, partIndex: this.partIndex};
         const filename = createPatchVideoFilename(identity);
         const bytes = this.part.bytes.subarray(0, frameCount * BGR24_FRAME_BYTES);
@@ -401,7 +404,7 @@ export class FaceCropSegmenter {
         return {captureId: identity.captureId, segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, filename,
             faceEventsFilename: createFaceEventsFilename(identity), frameCount, byteLength: bytes.byteLength, bytes,
             faceEvents: {formatVersion: FACE_EVENTS_FORMAT_VERSION, captureId: identity.captureId, aviFilename: filename,
-                segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, frameCount,
+                segmentIndex: identity.segmentIndex, partIndex: identity.partIndex, frameCount, precedingFramePresentationTimeUs,
                 selectionConfiguration: {...this.selectionConfiguration}, frames: events}};
     }
 }

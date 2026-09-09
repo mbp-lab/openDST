@@ -71,6 +71,8 @@ describe('uncompressed AVI patch video', () => {
         expect(resolveAviFrameRate({faceEvents: {frames: [
             {presentationTimeUs: 1000}, {presentationTimeUs: 41000}, {presentationTimeUs: 81000}
         ]}})).toBe(25);
+        expect(resolveAviFrameRate({faceEvents: {precedingFramePresentationTimeUs: -39000,
+            frames: [{presentationTimeUs: 1000}]}})).toBe(25);
         expect(() => resolveAviFrameRate({faceEvents: {frames: [{presentationTimeUs: 1000}]}}))
             .toThrow('requires at least two');
         expect(() => resolveAviFrameRate({faceEvents: {frames: [
@@ -142,12 +144,14 @@ describe('uncompressed AVI patch video', () => {
 
         expect(sealedParts[0]).toMatchObject({frameCount: 539, byteLength: 8382528, filename: 'RESULT_introduction_1_patch_s000_p000.avi.gz', faceEventsFilename: 'RESULT_introduction_1_patch_s000_p000.face-events.json'});
         expect(sealedParts[0].faceEvents.frames).toHaveLength(MAX_FRAMES_PER_PART);
+        expect(sealedParts[0].faceEvents.precedingFramePresentationTimeUs).toBeNull();
         expect(sealedParts[0].faceEvents.frames[0]).toMatchObject({frameIndex: 0, presentationTimeUs: 0, wallClockMs: 1700000000000});
         const secondRoi = firstRoi;
         expect(segmenter.appendFrame({
             bgr24: new Uint8Array(BGR24_FRAME_BYTES).fill(8), sourceWidth: 73, sourceHeight: 72, roi: secondRoi, provenance: provenance(), timestampUs: MAX_FRAMES_PER_PART * 1000, wallClockMs: 1700000000000 + MAX_FRAMES_PER_PART
         })).toEqual([]);
-        expect(segmenter.finish()[0]).toMatchObject({segmentIndex: 1, partIndex: 0, frameCount: 1});
+        expect(segmenter.finish()[0]).toMatchObject({segmentIndex: 1, partIndex: 0, frameCount: 1,
+            faceEvents: {precedingFramePresentationTimeUs: (MAX_FRAMES_PER_PART - 1) * 1000}});
     });
 
     test('writes a frame directly into the active part buffer', () => {
@@ -191,7 +195,8 @@ describe('uncompressed AVI patch video', () => {
         const frame = new Uint8Array(BGR24_FRAME_BYTES);
 
         const first = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi, provenance: provenance(), timestampUs: 0, wallClockMs: 1700000000000})[0];
-        const second = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi, provenance: provenance(), timestampUs: 0, wallClockMs: 1700000000000})[0];
+        const second = segmenter.appendFrame({bgr24: frame, sourceWidth: 72, sourceHeight: 72, roi, provenance: provenance(), timestampUs: 1000, wallClockMs: 1700000000001})[0];
+        expect(second.faceEvents.precedingFramePresentationTimeUs).toBe(0);
 
         expect([first.filename, second.filename]).toEqual([
             'RESULT_introduction_1_patch_s000_p000.avi.gz',

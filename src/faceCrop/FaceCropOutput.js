@@ -63,24 +63,26 @@ function chunk(type, payload) {
 function list(type, chunks) { return chunk('LIST', concat([fourCC(type), ...chunks])); }
 
 export function resolveAviFrameRate(part) {
-    const frames = part && part.faceEvents && Array.isArray(part.faceEvents.frames) ? part.faceEvents.frames : null;
-    if (!frames || frames.length < 2) throw new Error('AVI frame rate requires at least two presentation timestamps');
+    const faceEvents = part && part.faceEvents;
+    const frames = faceEvents && Array.isArray(faceEvents.frames) ? faceEvents.frames : null;
+    if (!frames || !frames.length) throw new Error('AVI frame rate requires presentation timestamps');
+    const preceding = faceEvents.precedingFramePresentationTimeUs;
+    const hasPreceding = preceding !== null && preceding !== undefined;
+    if (hasPreceding && !Number.isSafeInteger(preceding)) {
+        throw new Error('AVI preceding-frame presentation timestamp is invalid');
+    }
+    const timestamps = [...(hasPreceding ? [preceding] : []), ...frames.map(frame => frame && frame.presentationTimeUs)];
+    if (timestamps.length < 2) throw new Error('AVI frame rate requires at least two presentation timestamps');
     let totalDeltaUs = 0;
-    let deltaCount = 0;
-    for (let index = 1; index < frames.length; index += 1) {
-        const previous = frames[index - 1] && frames[index - 1].presentationTimeUs;
-        const current = frames[index] && frames[index].presentationTimeUs;
-        if (!Number.isSafeInteger(previous) || !Number.isSafeInteger(current)) continue;
-        const delta = current - previous;
-        if (delta > 0) {
-            totalDeltaUs += delta;
-            deltaCount += 1;
+    for (let index = 1; index < timestamps.length; index += 1) {
+        const previous = timestamps[index - 1];
+        const current = timestamps[index];
+        if (!Number.isSafeInteger(previous) || !Number.isSafeInteger(current) || current <= previous) {
+            throw new Error('AVI frame rate requires strictly increasing presentation timestamps');
         }
+        totalDeltaUs += current - previous;
     }
-    if (deltaCount !== frames.length - 1 || totalDeltaUs <= 0) {
-        throw new Error('AVI frame rate requires strictly increasing presentation timestamps');
-    }
-    const frameRate = Math.round((deltaCount * 1000000) / totalDeltaUs);
+    const frameRate = Math.round(((timestamps.length - 1) * 1000000) / totalDeltaUs);
     if (!Number.isSafeInteger(frameRate)) throw new Error('AVI frame rate could not be derived');
     return Math.max(MIN_PATCH_VIDEO_FRAME_RATE, Math.min(MAX_PATCH_VIDEO_FRAME_RATE, frameRate));
 }
