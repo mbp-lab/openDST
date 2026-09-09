@@ -169,6 +169,26 @@ describe('resolveFaceCropConfiguration', () => {
         expect(resolveStudyResultId({}, null)).toBeNull();
     });
 
+    test('rejects missing and non-increasing presentation timestamps', async () => {
+        let callback;
+        const video = {requestVideoFrameCallback: jest.fn(next => { callback = next; return 1; }), cancelVideoFrameCallback: jest.fn()};
+        const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+            configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()},
+            uploadResultFile: jest.fn()});
+
+        const missing = controller.waitForFrame();
+        callback(10, {mediaTime: 0, presentedFrames: 1});
+        await expect(missing).rejects.toThrow('presentationTime is unavailable');
+
+        const first = controller.waitForFrame();
+        callback(20, {mediaTime: 0, presentationTime: 15, presentedFrames: 2});
+        await expect(first).resolves.toMatchObject({presentationTimeUs: 15000});
+
+        const repeated = controller.waitForFrame();
+        callback(30, {mediaTime: 0, presentationTime: 15, presentedFrames: 3});
+        await expect(repeated).rejects.toThrow('presentationTime is non-increasing');
+    });
+
     test('drains detector and assembly work before manifest finalization', async () => {
         const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
         const gate = deferred();
@@ -195,7 +215,9 @@ describe('resolveFaceCropConfiguration', () => {
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile,
                 createPipelineWorker: jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(assembly).mockReturnValueOnce(encoder)});
             await controller.start();
-            callback(0, {mediaTime: 1, presentedFrames: 1}); await Promise.resolve();
+            callback(20, {mediaTime: 0, presentationTime: 12.5, presentedFrames: 1}); await Promise.resolve();
+            expect(window.VideoFrame).toHaveBeenLastCalledWith(video, {timestamp: 12500});
+            expect(analysis.processFrame).toHaveBeenCalledWith(expect.objectContaining({timestampUs: 12500}));
             const stopping = controller.stop(); gate.resolve(); await stopping;
             expect(controller.acceptedFrames).toBe(1);
             expect(assembly.finish).toHaveBeenCalledTimes(1);
@@ -209,7 +231,8 @@ describe('resolveFaceCropConfiguration', () => {
             expect(statistics).not.toHaveProperty('artifactTimings');
             const manifest = JSON.parse(uploadResultFile.mock.calls[2][0]);
             expect(manifest.output).not.toHaveProperty('frameRate');
-            expect(manifest.output.aviHeaderFrameRateFallback).toBe(30);
+            expect(manifest.output).not.toHaveProperty('aviHeaderFrameRateFallback');
+            expect(manifest.output.aviHeaderFrameRatePolicy).toBe('required-per-part-from-presentationTimeUs-v1');
             expect(manifest.parts[0].frameRate).toBe(30);
             expect(captureFrame.close).toHaveBeenCalledTimes(1);
         } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }

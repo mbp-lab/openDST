@@ -1,5 +1,5 @@
 import {UPLOAD_STATUS} from '../uploadState';
-import {PATCH_VIDEO_FORMAT_VERSION, PATCH_VIDEO_FRAME_RATE, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
+import {PATCH_VIDEO_FORMAT_VERSION, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
 import {ORIENTATION_REFERENCE_SIZE, rotatedDimensions, selectQuarterTurnByLuminance} from './FrameNormalization';
 
 // Face-crop capture is an optional companion to MediaRecorder. It must fail
@@ -353,6 +353,7 @@ export class FaceCropCaptureController {
         this.acceptedFrames = 0;
         this.skippedFrames = 0;
         this.lastPresentedFrame = null;
+        this.lastPresentationTimeUs = null;
         this.faceDetections = 0;
         this.faceDetectionMisses = 0;
         this.frameTimings = createTimingMetrics(FRAME_TIMING_STAGES);
@@ -526,7 +527,7 @@ export class FaceCropCaptureController {
                 const event = await this.waitForFrame();
                 if (!event || this.state !== 'capturing') break;
                 this.recordSkippedFrames(event.metadata);
-                await this.processFrame(event.metadata, event.wallClockMs);
+                await this.processFrame(event.metadata, event.wallClockMs, event.presentationTimeUs);
             }
         } catch (error) {
             this.markIncomplete(error.message || 'Face-crop frame processing failed');
@@ -534,7 +535,7 @@ export class FaceCropCaptureController {
     }
 
     waitForFrame() {
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
             const callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
                 if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
                 this.frameWait = null;
@@ -544,7 +545,18 @@ export class FaceCropCaptureController {
                         skippedFrames: this.skippedFrames, inFlight: this.inFlight.size, assemblyBufferedResults: this.assemblyBufferedResults});
                     this.nextProgressLogFrame += 120;
                 }
-                resolve({metadata, wallClockMs: Date.now()});
+                if (!Number.isFinite(now) || !metadata || !Number.isFinite(metadata.presentationTime)) {
+                    reject(new Error('Video frame presentationTime is unavailable'));
+                    return;
+                }
+                const presentationTimeUs = Math.round(metadata.presentationTime * 1000);
+                if (!Number.isSafeInteger(presentationTimeUs) ||
+                    (this.lastPresentationTimeUs !== null && presentationTimeUs <= this.lastPresentationTimeUs)) {
+                    reject(new Error('Video frame presentationTime is non-increasing'));
+                    return;
+                }
+                this.lastPresentationTimeUs = presentationTimeUs;
+                resolve({metadata, presentationTimeUs, wallClockMs: Date.now()});
             });
             this.frameWait = {callbackId, resolve};
         });
@@ -566,11 +578,11 @@ export class FaceCropCaptureController {
         this.lastPresentedFrame = metadata.presentedFrames;
     }
 
-    async processFrame(metadata, wallClockMs = Date.now()) {
-        return this.processAnalysisFrame(metadata, wallClockMs);
+    async processFrame(metadata, wallClockMs = Date.now(), presentationTimeUs = null) {
+        return this.processAnalysisFrame(metadata, wallClockMs, presentationTimeUs);
     }
 
-    async processAnalysisFrame(metadata, wallClockMs) {
+    async processAnalysisFrame(metadata, wallClockMs, presentationTimeUs = null) {
         while (this.inFlight.size + this.assemblyBufferedResults >= this.configuration.analysisWorkerCount) {
             if (this.state !== 'capturing') return;
             if (!this.inFlight.size) {
@@ -584,7 +596,8 @@ export class FaceCropCaptureController {
         const source = dimensions(this.video);
         this.source = source;
         if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
-        const timestampUs = Math.round(metadata.mediaTime * 1000000);
+        if (!Number.isSafeInteger(presentationTimeUs)) throw new Error('Video frame presentationTime is required');
+        const timestampUs = presentationTimeUs;
         const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
         const task = worker.processFrame({frame, width: this.source.width, height: this.source.height, timestampUs, wallClockMs, sequence})
             .then(result => this.assemblyWorker.processAnalysisResult(result))
@@ -678,7 +691,7 @@ export class FaceCropCaptureController {
             capability: this.capability,
             configuration: this.configurationMetadata(),
             output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz',
-                aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', aviHeaderFrameRateFallback: PATCH_VIDEO_FRAME_RATE, frameSize: 72},
+                aviHeaderFrameRatePolicy: 'required-per-part-from-presentationTimeUs-v1', frameSize: 72},
             status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
                 : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
@@ -742,7 +755,7 @@ export class FaceCropCaptureController {
             manifest: this.manifest,
             configuration: this.configurationMetadata(),
             output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24',
-                aviHeaderFrameRatePolicy: 'derived-per-part-from-mediaTimeUs-v1', aviHeaderFrameRateFallback: PATCH_VIDEO_FRAME_RATE, frameSize: 72,
+                aviHeaderFrameRatePolicy: 'required-per-part-from-presentationTimeUs-v1', frameSize: 72,
                 extraction: {api: 'VideoFrame.copyTo', normalizationMode: this.frameNormalization && this.frameNormalization.mode,
                     nativeFormat: this.frameNormalization && this.frameNormalization.nativeFormat, outputFormat: 'RGBA'}},
             statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,

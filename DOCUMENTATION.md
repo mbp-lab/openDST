@@ -686,7 +686,7 @@ Decompress an `.avi.gz` file before opening it. The sidecar maps AVI frames to
 their source timestamps and records the detected face and crop used for each
 frame. Selection follows the largest eligible face and does not track identity;
 during a detection gap, the last valid crop is retained. Use the sidecar's
-`mediaTimeUs` values for scientific timing because source frames may be skipped
+`presentationTimeUs` values for scientific timing because source frames may be skipped
 under processing load.
 
 This mode requires `requestVideoFrameCallback`, `VideoFrame`, web workers, and

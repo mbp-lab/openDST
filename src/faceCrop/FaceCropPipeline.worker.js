@@ -335,7 +335,7 @@ async function normalizeFrame(frame, normalization, fallbackWidth, fallbackHeigh
 }
 
 function copyEvent(provenance, frameIndex, timestampUs, wallClockMs, roi, sourceWidth, sourceHeight) {
-    return {frameIndex, mediaTimeUs: timestampUs, wallClockMs, state: provenance.state,
+    return {frameIndex, presentationTimeUs: timestampUs, wallClockMs, state: provenance.state,
         source: {width: sourceWidth, height: sourceHeight},
         detection: {...provenance.detection},
         selection: {score: provenance.selectedScore,

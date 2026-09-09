@@ -57,9 +57,9 @@ AVI muxing, and gzip encoding do not run on the main thread.
   are `default`, `largest`, `held`, and `reacquired`.
 - Each ROI is deterministically area-resampled from sRGB RGBA source pixels to
   72 x 72 BGR24 using pixel-overlap weights and half-up rounding.
-- Sidecars map AVI frame indexes to source `mediaTimeUs`, callback `wallClockMs`,
+- Sidecars map AVI frame indexes to monotonic `presentationTimeUs`, callback `wallClockMs`,
   detector state, selected bounding box, and resolved ROI.
-- AVI headers use one frame rate per part derived from `mediaTimeUs`. Capture is
+- AVI headers use one frame rate per part derived from `presentationTimeUs`. Capture is
   callback-driven and may skip frames, so scientific timing must use the sidecar
   timestamps rather than inferred AVI cadence.
 - A held ROI has no time limit. Analyses must distinguish `held` frames from

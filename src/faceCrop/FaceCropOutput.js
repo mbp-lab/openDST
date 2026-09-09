@@ -5,7 +5,7 @@ import {UPLOAD_STATUS} from '../uploadState';
 // transport boundary for JATOS upload tracking and retries.
 export const PATCH_VIDEO_FORMAT_VERSION = 'patch-video-avi-gzip-bgr24-v1';
 export const PATCH_VIDEO_FRAME_RATE = 30;
-export const FACE_EVENTS_FORMAT_VERSION = 'face-events-json-v1';
+export const FACE_EVENTS_FORMAT_VERSION = 'face-events-json-v2';
 export const MAX_PENDING_PATCH_PARTS = 2;
 export const MAX_UPLOAD_ATTEMPTS = 3;
 const FRAME_BYTES = 72 * 72 * 3;
@@ -64,12 +64,12 @@ function list(type, chunks) { return chunk('LIST', concat([fourCC(type), ...chun
 
 export function resolveAviFrameRate(part) {
     const frames = part && part.faceEvents && Array.isArray(part.faceEvents.frames) ? part.faceEvents.frames : null;
-    if (!frames || frames.length < 2) return PATCH_VIDEO_FRAME_RATE;
+    if (!frames || frames.length < 2) throw new Error('AVI frame rate requires at least two presentation timestamps');
     let totalDeltaUs = 0;
     let deltaCount = 0;
     for (let index = 1; index < frames.length; index += 1) {
-        const previous = frames[index - 1] && frames[index - 1].mediaTimeUs;
-        const current = frames[index] && frames[index].mediaTimeUs;
+        const previous = frames[index - 1] && frames[index - 1].presentationTimeUs;
+        const current = frames[index] && frames[index].presentationTimeUs;
         if (!Number.isSafeInteger(previous) || !Number.isSafeInteger(current)) continue;
         const delta = current - previous;
         if (delta > 0) {
@@ -77,9 +77,11 @@ export function resolveAviFrameRate(part) {
             deltaCount += 1;
         }
     }
-    if (!deltaCount || totalDeltaUs <= 0) return PATCH_VIDEO_FRAME_RATE;
+    if (deltaCount !== frames.length - 1 || totalDeltaUs <= 0) {
+        throw new Error('AVI frame rate requires strictly increasing presentation timestamps');
+    }
     const frameRate = Math.round((deltaCount * 1000000) / totalDeltaUs);
-    if (!Number.isSafeInteger(frameRate)) return PATCH_VIDEO_FRAME_RATE;
+    if (!Number.isSafeInteger(frameRate)) throw new Error('AVI frame rate could not be derived');
     return Math.max(MIN_PATCH_VIDEO_FRAME_RATE, Math.min(MAX_PATCH_VIDEO_FRAME_RATE, frameRate));
 }
 

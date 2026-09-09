@@ -67,7 +67,7 @@ describe('analysis and assembly scheduling', () => {
         const originalVideoFrame = window.VideoFrame;
         window.VideoFrame = jest.fn(() => ({displayWidth: 72, displayHeight: 72}));
         try {
-            await controller.processAnalysisFrame({mediaTime: 1}, Date.now());
+            await controller.processAnalysisFrame({mediaTime: 1}, Date.now(), 1000000);
             await Promise.all([...controller.inFlight.values()]);
             expect(controller.incompleteReason).toBe('analysis failed');
             expect(controller.inFlight.size).toBe(0);
@@ -188,9 +188,9 @@ describe('analysis and assembly scheduling', () => {
         const originalVideoFrame = window.VideoFrame;
         window.VideoFrame = jest.fn(() => ({displayWidth: 72, displayHeight: 72}));
         try {
-            await controller.processAnalysisFrame({mediaTime: 1}, 1);
-            await controller.processAnalysisFrame({mediaTime: 2}, 2);
-            const thirdDispatch = controller.processAnalysisFrame({mediaTime: 3}, 3);
+            await controller.processAnalysisFrame({mediaTime: 1}, 1, 1000000);
+            await controller.processAnalysisFrame({mediaTime: 2}, 2, 2000000);
+            const thirdDispatch = controller.processAnalysisFrame({mediaTime: 3}, 3, 3000000);
             expect(worker.processFrame).toHaveBeenCalledTimes(2);
             first.resolve({sequence: 0, rgbx: new Uint8Array(4), timings: {}});
             await thirdDispatch;
@@ -492,7 +492,7 @@ describe('worker roles', () => {
         const result = await assembly.processAnalysisResult(input(0, 1000, [10, 20, 30]));
         expect(result.commits.map(commit => commit.sequence)).toEqual([0, 1]);
         const part = result.commits[1].parts[0];
-        expect(part.faceEvents.frames.map(frame => frame.mediaTimeUs)).toEqual([1000, 2000]);
+        expect(part.faceEvents.frames.map(frame => frame.presentationTimeUs)).toEqual([1000, 2000]);
         const encoder = new FaceCropEncodingPipeline({encodePart: item => Promise.resolve({...item, gzipBytes: pako.gzip(buildUncompressedAvi(item)).buffer})});
         const artifact = (await encoder.encode(part)).artifact;
         const avi = pako.ungzip(new Uint8Array(artifact.gzipBytes));

@@ -69,9 +69,13 @@ describe('uncompressed AVI patch video', () => {
 
     test('derives each AVI rate from its face-event timestamps', () => {
         expect(resolveAviFrameRate({faceEvents: {frames: [
-            {mediaTimeUs: 1000}, {mediaTimeUs: 41000}, {mediaTimeUs: 81000}
+            {presentationTimeUs: 1000}, {presentationTimeUs: 41000}, {presentationTimeUs: 81000}
         ]}})).toBe(25);
-        expect(resolveAviFrameRate({faceEvents: {frames: [{mediaTimeUs: 1000}]}})).toBe(30);
+        expect(() => resolveAviFrameRate({faceEvents: {frames: [{presentationTimeUs: 1000}]}}))
+            .toThrow('requires at least two');
+        expect(() => resolveAviFrameRate({faceEvents: {frames: [
+            {presentationTimeUs: 1000}, {presentationTimeUs: 1000}
+        ]}})).toThrow('strictly increasing');
     });
 
     test('reports the timestamp-derived rate with the encoded artifact', async () => {
@@ -83,7 +87,7 @@ describe('uncompressed AVI patch video', () => {
         try {
             const artifact = await encodePatchArtifact({captureId: 'capture', segmentIndex: 0, partIndex: 0,
                 filename: 'part.avi.gz', faceEventsFilename: 'part.face-events.json', frameCount: 2,
-                bytes: new Uint8Array(BGR24_FRAME_BYTES * 2), faceEvents: {frames: [{mediaTimeUs: 0}, {mediaTimeUs: 40000}]}});
+                bytes: new Uint8Array(BGR24_FRAME_BYTES * 2), faceEvents: {frames: [{presentationTimeUs: 0}, {presentationTimeUs: 40000}]}});
             expect(artifact.frameRate).toBe(25);
             expect(artifact.gzipBytes).toBe(gzipBytes);
         } finally {
@@ -104,7 +108,7 @@ describe('uncompressed AVI patch video', () => {
         try {
             await expect(encodeGzipAvi({
                 bytes: new Uint8Array(BGR24_FRAME_BYTES), frameCount: 1
-            })).resolves.toBe(compressed);
+            }, 30)).resolves.toBe(compressed);
             expect(window.CompressionStream).toHaveBeenCalledWith('gzip');
             expect(pipeThrough).toHaveBeenCalledWith(expect.anything());
         } finally {
@@ -138,7 +142,7 @@ describe('uncompressed AVI patch video', () => {
 
         expect(sealedParts[0]).toMatchObject({frameCount: 539, byteLength: 8382528, filename: 'RESULT_introduction_1_patch_s000_p000.avi.gz', faceEventsFilename: 'RESULT_introduction_1_patch_s000_p000.face-events.json'});
         expect(sealedParts[0].faceEvents.frames).toHaveLength(MAX_FRAMES_PER_PART);
-        expect(sealedParts[0].faceEvents.frames[0]).toMatchObject({frameIndex: 0, mediaTimeUs: 0, wallClockMs: 1700000000000});
+        expect(sealedParts[0].faceEvents.frames[0]).toMatchObject({frameIndex: 0, presentationTimeUs: 0, wallClockMs: 1700000000000});
         const secondRoi = firstRoi;
         expect(segmenter.appendFrame({
             bgr24: new Uint8Array(BGR24_FRAME_BYTES).fill(8), sourceWidth: 73, sourceHeight: 72, roi: secondRoi, provenance: provenance(), timestampUs: MAX_FRAMES_PER_PART * 1000, wallClockMs: 1700000000000 + MAX_FRAMES_PER_PART
