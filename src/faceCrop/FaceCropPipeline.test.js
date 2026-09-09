@@ -31,6 +31,35 @@ describe('MediaPipe detector configuration', () => {
             global.importScripts = originalVision;
         }
     });
+
+    test('initializes MediaPipe even when the runtime does not expose document', async () => {
+        jest.resetModules();
+        const originalVision = global.importScripts;
+        const originalDocument = global.document;
+
+        delete global.document;
+        const createFromOptions = jest.fn(() => Promise.resolve('detector'));
+        global.importScripts = jest.fn(() => {
+            if (typeof document === 'undefined') {
+                throw new Error("Can't find variable: document");
+            }
+            global.Vision = {
+                FaceDetector: {createFromOptions},
+                FilesetResolver: {forVisionTasks: jest.fn(() => Promise.resolve('fileset'))}
+            };
+        });
+        global.fetch = jest.fn(() => Promise.resolve({ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(1))}));
+
+        try {
+            const {createMediaPipeFaceDetector} = require('./FaceCropPipeline.worker');
+            await expect(createMediaPipeFaceDetector()).resolves.toBe('detector');
+            expect(global.document).toBeTruthy();
+        } finally {
+            global.importScripts = originalVision;
+            if (originalDocument === undefined) delete global.document; else global.document = originalDocument;
+            jest.resetModules();
+        }
+    });
 });
 
 describe('analysis and assembly scheduling', () => {

@@ -36,9 +36,35 @@ function warmupDetector(detector, frame, timestampUs) {
     }
 }
 
+function ensureBrowserGlobals() {
+    const scope = globalThis;
+    const compat = {
+        self: scope,
+        window: scope,
+        location: {href: 'https://localhost/', origin: 'https://localhost', hostname: 'localhost'},
+        navigator: {userAgent: 'generic-runtime', platform: 'generic', language: 'en-US'},
+        document: {
+            currentScript: {src: MEDIAPIPE_VISION_BUNDLE_URL},
+            createElement: () => ({setAttribute() {}, getContext() { return null; }, style: {}}),
+            getElementById: () => null,
+            querySelector: () => null,
+            body: {appendChild() {}, removeChild() {}, setAttribute() {}},
+            addEventListener() {},
+            removeEventListener() {},
+            fullscreenElement: null,
+            documentElement: {style: {}}
+        }
+    };
+
+    Object.keys(compat).forEach(key => {
+        if (typeof scope[key] === 'undefined') Object.defineProperty(scope, key, {value: compat[key], configurable: true, writable: true});
+    });
+}
+
 function loadVisionTasks() {
     // The vendored bundle is loaded synchronously inside the worker; keeping it
     // here makes the same module usable in both the worker and Jest environments.
+    ensureBrowserGlobals();
     if (visionTasks) return visionTasks;
     if (typeof globalThis.importScripts !== 'function') throw new Error('importScripts is unavailable in the capture worker');
     globalThis.importScripts(MEDIAPIPE_VISION_BUNDLE_URL);
