@@ -170,15 +170,25 @@ class PipelineWorker {
     }
 
     receive(message) {
+        if (message && message.diagnostic) {
+            console.info('[face-crop worker]', message.diagnostic);
+            return;
+        }
+
         if (!this.pending) return;
+
         const pending = this.pending;
         this.pending = null;
+
         if (message && message.error) {
             const error = new Error(message.error.message);
             error.name = message.error.name;
             if (message.error.stack) error.stack = message.error.stack;
             pending.reject(error);
-        } else pending.resolve(message && message.result);
+        } else {
+            pending.resolve(message && message.result);
+        }
+
         this.pump();
     }
 

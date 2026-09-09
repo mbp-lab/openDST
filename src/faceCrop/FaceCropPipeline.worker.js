@@ -1,5 +1,10 @@
 /* global globalThis */
-import {createFaceEventsFilename, createPatchVideoFilename, encodePatchArtifact, FACE_EVENTS_FORMAT_VERSION} from './FaceCropOutput';
+import {
+    createFaceEventsFilename,
+    createPatchVideoFilename,
+    encodePatchArtifact,
+    FACE_EVENTS_FORMAT_VERSION
+} from './FaceCropOutput';
 
 // Analysis, assembly, and encoding workers keep CPU-heavy patch production off
 // the main thread. The main thread only schedules VideoFrames and hands encoded
@@ -19,9 +24,53 @@ export const FACE_ROI_DESCRIPTOR_VERSION = 2;
 const PUBLIC_ASSET_ROOT = process.env.PUBLIC_URL || '';
 const MEDIAPIPE_WASM_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/wasm';
 const FACE_DETECTOR_MODEL_URL = PUBLIC_ASSET_ROOT + '/mediapipe/models/blaze_face_short_range.tflite';
-const MEDIAPIPE_VISION_BUNDLE_URL = PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/vision_bundle.js';
+const MEDIAPIPE_VISION_BUNDLE_URL =
+    PUBLIC_ASSET_ROOT + '/mediapipe/tasks-vision-1.0.1/vision_bundle.js';
 
 let visionTasks;
+
+function diagnostic(stage, details = {}) {
+    globalThis.postMessage({
+        diagnostic: {
+            stage,
+            ...details
+        }
+    });
+}
+
+function loadVisionTasks() {
+    if (visionTasks) return visionTasks;
+
+    const previousDocument = globalThis.document;
+
+    if (typeof globalThis.document === 'undefined') {
+        globalThis.document = {
+            currentScript: {
+                src: MEDIAPIPE_VISION_BUNDLE_URL
+            }
+        };
+    }
+
+    try {
+        if (typeof globalThis.importScripts !== 'function') {
+            throw new Error('importScripts is unavailable in the capture worker');
+        }
+        globalThis.importScripts(MEDIAPIPE_VISION_BUNDLE_URL);
+    } finally {
+        if (previousDocument === undefined) {
+            delete globalThis.document;
+        } else {
+            globalThis.document = previousDocument;
+        }
+    }
+
+    if (!globalThis.Vision) {
+        throw new Error('MediaPipe vision bundle did not initialize');
+    }
+
+    visionTasks = globalThis.Vision;
+    return visionTasks;
+}
 
 function timingNow() {
     return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
@@ -29,48 +78,15 @@ function timingNow() {
 
 function warmupDetector(detector, frame, timestampUs) {
     try {
-        detector.detectForVideo(frame, timestampUs / 1000);
+        diagnostic('before-warmup-detect');
+
+        const result = detector.detectForVideo(frame, timestampUs / 1000);
+
+        diagnostic('after-warmup-detect');
         return {};
     } finally {
         frame.close();
     }
-}
-
-function ensureBrowserGlobals() {
-    const scope = globalThis;
-    const compat = {
-        self: scope,
-        window: scope,
-        location: {href: 'https://localhost/', origin: 'https://localhost', hostname: 'localhost'},
-        navigator: {userAgent: 'generic-runtime', platform: 'generic', language: 'en-US'},
-        document: {
-            currentScript: {src: MEDIAPIPE_VISION_BUNDLE_URL},
-            createElement: () => ({setAttribute() {}, getContext() { return null; }, style: {}}),
-            getElementById: () => null,
-            querySelector: () => null,
-            body: {appendChild() {}, removeChild() {}, setAttribute() {}},
-            addEventListener() {},
-            removeEventListener() {},
-            fullscreenElement: null,
-            documentElement: {style: {}}
-        }
-    };
-
-    Object.keys(compat).forEach(key => {
-        if (typeof scope[key] === 'undefined') Object.defineProperty(scope, key, {value: compat[key], configurable: true, writable: true});
-    });
-}
-
-function loadVisionTasks() {
-    // The vendored bundle is loaded synchronously inside the worker; keeping it
-    // here makes the same module usable in both the worker and Jest environments.
-    ensureBrowserGlobals();
-    if (visionTasks) return visionTasks;
-    if (typeof globalThis.importScripts !== 'function') throw new Error('importScripts is unavailable in the capture worker');
-    globalThis.importScripts(MEDIAPIPE_VISION_BUNDLE_URL);
-    if (!globalThis.Vision) throw new Error('MediaPipe vision bundle did not initialize');
-    visionTasks = globalThis.Vision;
-    return visionTasks;
 }
 
 function initializationError(stage, error) {
@@ -79,26 +95,53 @@ function initializationError(stage, error) {
     return wrapped;
 }
 
-export async function createMediaPipeFaceDetector({minDetectionConfidence = 0.5, minSuppressionThreshold = 0.3, delegate = 'CPU'} = {}) {
+export async function createMediaPipeFaceDetector({
+    minDetectionConfidence = 0.5,
+    minSuppressionThreshold = 0.3,
+    delegate = 'CPU'
+} = {}) {
     const {FaceDetector, FilesetResolver} = loadVisionTasks();
+
     let fileset;
     let modelAssetBuffer;
+
     try {
         fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL);
     } catch (error) {
         throw initializationError('Wasm fileset loading', error);
     }
+
     try {
         const response = await fetch(FACE_DETECTOR_MODEL_URL);
-        if (!response.ok) throw new Error('HTTP ' + response.status + ' for face detector model');
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + ' for face detector model');
+        }
         modelAssetBuffer = new Uint8Array(await response.arrayBuffer());
     } catch (error) {
         throw initializationError('model loading', error);
     }
+
     try {
+        const canvas = new OffscreenCanvas(1, 1);
+        const gl = canvas.getContext('webgl2');
+
+        if (!gl) {
+            throw new Error('WebGL2 is unavailable on OffscreenCanvas in this worker');
+        }
+
+        if (gl.isContextLost()) {
+            throw new Error('WebGL2 context is already lost');
+        }
+
         return await FaceDetector.createFromOptions(fileset, {
-            baseOptions: {modelAssetBuffer, delegate},
-            runningMode: 'VIDEO', minDetectionConfidence, minSuppressionThreshold
+            baseOptions: {
+                modelAssetBuffer,
+                delegate
+            },
+            canvas,
+            runningMode: 'VIDEO',
+            minDetectionConfidence,
+            minSuppressionThreshold
         });
     } catch (error) {
         throw initializationError('FaceDetector construction', error);
@@ -391,7 +434,9 @@ export class FaceCropAnalysisPipeline {
         const startedAt = timingNow();
         try {
             const detectionStartedAt = timingNow();
+            diagnostic('before frame detectForVideo', {sequence});
             const detected = this.detector.detectForVideo(frame, timestampUs / 1000);
+            diagnostic('after frame detectForVideo', {sequence});
             const detectionMs = timingNow() - detectionStartedAt;
             const copyStartedAt = timingNow();
             const rgbx = await copyPackedRgba(frame, width, height);
