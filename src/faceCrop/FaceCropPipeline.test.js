@@ -399,6 +399,18 @@ describe('FaceRoiProvider', () => {
             .toMatchObject({state: 'reacquired'});
     });
 
+    test('smooths reacquisition from the preceding processed frame rather than across the miss gap', () => {
+        const provider = new FaceRoiProvider({scale: 1, verticalShiftRatio: 0, smoothingTauMs: 100});
+        provider.getRoi({width: 640, height: 480, detections: [detection(100, 100, 100, 100)], timestampMs: 0});
+        provider.getSelection({width: 640, height: 480, detections: [], timestampMs: 10000});
+
+        const selection = provider.getSelection({
+            width: 640, height: 480, detections: [detection(400, 300, 100, 100)], timestampMs: 10033
+        });
+
+        expect(selection).toMatchObject({state: 'reacquired', roi: {x: 184, y: 156, size: 100}});
+    });
+
     test('uses a centered default crop after a source resize', () => {
         const provider = new FaceRoiProvider();
         provider.getRoi({width: 640, height: 480, detections: [detection(200, 100, 200, 200)], timestampMs: 0});

@@ -53,7 +53,8 @@ AVI muxing, and gzip encoding do not run on the main thread.
 
 - Detection uses vendored TensorFlow.js and BlazeFace browser bundles with the WASM backend. A one-frame main-thread preflight recovers missing quarter-turn orientation by comparing 32×32 presented luminance with native NV12 Y-plane samples. Analysis workers then normalize supported full-range BT.709 NV12 (honoring plane offsets and strides) directly into rotated packed RGBA; genuine packed RGBA remains a direct path. Normalized pixels are converted directly to RGB tensors without continuous canvas/WebGL processing, and detector assets are loaded from `PUBLIC_URL`-relative `/tfjs/4.22.0/` assets. The confidence threshold is applied by BlazeFace and recorded in the manifest; legacy delegate and suppression settings remain recorded but are not applied.
 - Selected bounding boxes become bounded square ROIs using the configured scale,
-  vertical shift, and time-based exponential smoothing. Sidecar selection states
+  vertical shift, and time-based exponential smoothing measured between processed
+  frames, including detector misses. Sidecar selection states
   are `default`, `largest`, `held`, and `reacquired`.
 - Each ROI is deterministically area-resampled from sRGB RGBA source pixels to
   72 x 72 BGR24 using pixel-overlap weights and half-up rounding.

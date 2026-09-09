@@ -172,7 +172,8 @@ export class FaceRoiProvider {
         }
         this.configuration = {scale, verticalShiftRatio, smoothingTauMs, minDetectionConfidence};
         this.previous = null;
-        this.previousDetectionTimestampMs = null;
+        this.previousFrameTimestampMs = null;
+        this.hasDetection = false;
         this.hadMiss = false;
     }
 
@@ -190,6 +191,8 @@ export class FaceRoiProvider {
         // before the first detection, use the largest centered square.
         requireInteger(width, 'Source width', PATCH_SIZE);
         requireInteger(height, 'Source height', PATCH_SIZE);
+        const previousFrameTimestampMs = this.previousFrameTimestampMs;
+        this.previousFrameTimestampMs = Number.isFinite(timestampMs) ? timestampMs : null;
         const eligible = eligibleDetections(detections, this.configuration.minDetectionConfidence);
         const detection = detectionSummary(detections, eligible.length);
         if (!eligible.length) {
@@ -199,16 +202,16 @@ export class FaceRoiProvider {
                     selectedBoundingBox: null, tieBreakOccurred: false, detection};
             }
             this.previous = this.defaultRoi(width, height);
-            this.previousDetectionTimestampMs = null;
+            this.hasDetection = false;
             return {roi: {...this.previous}, state: 'default', candidateCount: 0, selectedScore: null,
                 selectedBoundingBox: null, tieBreakOccurred: false, detection};
         }
 
         const selected = eligible[0];
         const {scale, verticalShiftRatio, smoothingTauMs} = this.configuration;
-        const elapsed = Math.max(0, timestampMs - this.previousDetectionTimestampMs);
-        const smoothing = !this.previous || !Number.isFinite(timestampMs) ||
-            !Number.isFinite(this.previousDetectionTimestampMs) || smoothingTauMs === 0 ? 1 : 1 - Math.exp(-elapsed / smoothingTauMs);
+        const elapsed = Math.max(0, timestampMs - previousFrameTimestampMs);
+        const smoothing = !this.previous || !this.hasDetection || !Number.isFinite(timestampMs) ||
+            !Number.isFinite(previousFrameTimestampMs) || smoothingTauMs === 0 ? 1 : 1 - Math.exp(-elapsed / smoothingTauMs);
         const maximumSize = Math.min(width, height);
         const targetSize = Math.max(PATCH_SIZE, Math.min(maximumSize, Math.ceil(Math.max(selected.box.width, selected.box.height) * scale)));
         const size = Math.max(PATCH_SIZE, Math.min(maximumSize, Math.round(this.previous
@@ -220,7 +223,7 @@ export class FaceRoiProvider {
         this.previous = validateFaceRoiDescriptor({...FACE_ROI_DESCRIPTOR,
             x: Math.max(0, Math.min(width - size, Math.round(interpolate(this.previous && this.previous.x, targetX)))),
             y: Math.max(0, Math.min(height - size, Math.round(interpolate(this.previous && this.previous.y, targetY)))), size});
-        this.previousDetectionTimestampMs = Number.isFinite(timestampMs) ? timestampMs : null;
+        this.hasDetection = true;
         const state = this.hadMiss ? 'reacquired' : 'largest';
         this.hadMiss = false;
         return {roi: {...this.previous}, state, candidateCount: eligible.length, selectedScore: selected.score,
