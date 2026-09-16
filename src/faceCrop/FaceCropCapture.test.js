@@ -138,19 +138,66 @@ describe('resolveFaceCropConfiguration', () => {
         } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
     });
 
-    test('waits for current frame data when dimensions precede readiness', async () => {
+    test('waits for a presented frame even when dimensions and readyState are already available', async () => {
         let callback;
-        const video = {videoWidth: 480, videoHeight: 640, readyState: 0,
+        const video = {videoWidth: 480, videoHeight: 640, readyState: 4,
             requestVideoFrameCallback: jest.fn(nextCallback => { callback = nextCallback; return 1; }), cancelVideoFrameCallback: jest.fn()};
         const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
             configuration: resolveFaceCropConfiguration({}), uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn()});
         let resolved = false;
-        const ready = controller.waitForVideoReady().then(value => { resolved = value; });
+        const ready = controller.waitForPresentedFrame().then(value => { resolved = value; });
         await Promise.resolve();
         expect(resolved).toBe(false);
-        video.readyState = 2; callback(); await ready;
-        expect(resolved).toBe(true);
+        callback(12, {presentedFrames: 1}); await ready;
+        expect(resolved).toEqual({now: 12, metadata: {presentedFrames: 1}});
     });
+
+    test('retries a transient probe failure on the next presented frame', async () => {
+        const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
+        const callbacks = [];
+        const frame = {displayWidth: 72, displayHeight: 72, copyTo: jest.fn(() => Promise.resolve()), close: jest.fn()};
+        const transient = new Error('Invalid source state'); transient.name = 'InvalidStateError';
+        const worker = {initialize: jest.fn(() => Promise.resolve()), warmup: jest.fn(() => Promise.resolve()), close: jest.fn(() => Promise.resolve())};
+        const video = {videoWidth: 72, videoHeight: 72, readyState: 4,
+            requestVideoFrameCallback: jest.fn(callback => { callbacks.push(callback); return callbacks.length; }), cancelVideoFrameCallback: jest.fn()};
+        window.VideoFrame = jest.fn().mockImplementationOnce(() => { throw transient; }).mockImplementation(() => frame);
+        window.CompressionStream = jest.fn();
+        try {
+            const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+                configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
+                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn(),
+                createPipelineWorker: jest.fn(() => worker)});
+            const preparing = controller.prepare();
+            callbacks[0](1, {presentationTime: 1, presentedFrames: 1});
+            await Promise.resolve(); await Promise.resolve();
+            expect(callbacks).toHaveLength(2);
+            callbacks[1](2, {presentationTime: 2, presentedFrames: 2});
+            await expect(preparing).resolves.toBe(FACE_CROP_STATUS.DISABLED);
+            expect(controller.capability.probeAttempts).toHaveLength(2);
+            expect(controller.capability.probeAttempts[0].error).toMatchObject({name: 'InvalidStateError'});
+            expect(controller.capability.status).toBe('passed');
+        } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
+    });
+
+    test('does not retry a non-transient probe failure', async () => {
+        const original = {VideoFrame: window.VideoFrame, CompressionStream: window.CompressionStream};
+        const callbacks = [];
+        const uploadResultFile = jest.fn(() => Promise.resolve());
+        const failure = new Error('unsupported frame format');
+        const video = {videoWidth: 72, videoHeight: 72, readyState: 4,
+            requestVideoFrameCallback: jest.fn(callback => { callbacks.push(callback); return callbacks.length; }), cancelVideoFrameCallback: jest.fn()};
+        window.VideoFrame = jest.fn(() => { throw failure; }); window.CompressionStream = jest.fn();
+        try {
+            const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
+                configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
+                uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile});
+            const preparing = controller.prepare(); callbacks[0](1, {presentedFrames: 1});
+            await expect(preparing).resolves.toBe(FACE_CROP_STATUS.UNSUPPORTED);
+            expect(callbacks).toHaveLength(1);
+            expect(JSON.parse(uploadResultFile.mock.calls[0][0]).capability.probeAttempts).toHaveLength(1);
+        } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
+    });
+
 
     test('creates a fresh controller identity for a second capture', () => {
         const options = {video: {}, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
@@ -214,7 +261,10 @@ describe('resolveFaceCropConfiguration', () => {
                 captureId: 'capture', configuration: resolveFaceCropConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all'}),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile,
                 createPipelineWorker: jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(assembly).mockReturnValueOnce(encoder)});
-            await controller.start();
+            const starting = controller.start();
+            await Promise.resolve();
+            callback(10, {mediaTime: 0, presentationTime: 10, presentedFrames: 1});
+            await starting;
             callback(20, {mediaTime: 0, presentationTime: 12.5, presentedFrames: 1}); await Promise.resolve();
             expect(window.VideoFrame).toHaveBeenLastCalledWith(video, {timestamp: 12500});
             expect(analysis.processFrame).toHaveBeenCalledWith(expect.objectContaining({timestampUs: 12500}));

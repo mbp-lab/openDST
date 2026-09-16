@@ -85,9 +85,36 @@ function supportedDimensions({width, height}) {
     return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width >= 72 && height >= 72 && width * height <= MAX_SOURCE_PIXELS;
 }
 
-function videoHasCurrentFrame(video) {
-    const source = dimensions(video);
-    return supportedDimensions(source) && Number.isInteger(source.readyState) && source.readyState >= 2;
+function errorMetadata(error) {
+    return error ? {name: error.name || 'Error', message: error.message || String(error)} : null;
+}
+
+function isTransientVideoFrameError(error) {
+    return Boolean(error && (error.name === 'InvalidStateError' || /invalid source state/i.test(error.message || '')));
+}
+
+function videoStateMetadata(video) {
+    const stream = video && video.srcObject;
+    const track = stream && typeof stream.getVideoTracks === 'function' ? stream.getVideoTracks()[0] : null;
+    return {...dimensions(video), paused: video && typeof video.paused === 'boolean' ? video.paused : null,
+        ended: video && typeof video.ended === 'boolean' ? video.ended : null,
+        seeking: video && typeof video.seeking === 'boolean' ? video.seeking : null,
+        currentTime: video && Number.isFinite(video.currentTime) ? video.currentTime : null,
+        networkState: video && Number.isInteger(video.networkState) ? video.networkState : null,
+        streamActive: stream && typeof stream.active === 'boolean' ? stream.active : null,
+        track: track ? {readyState: track.readyState || null,
+            enabled: typeof track.enabled === 'boolean' ? track.enabled : null,
+            muted: typeof track.muted === 'boolean' ? track.muted : null} : null};
+}
+
+function frameCallbackMetadata(now, metadata) {
+    return {now: Number.isFinite(now) ? now : null,
+        presentationTime: metadata && Number.isFinite(metadata.presentationTime) ? metadata.presentationTime : null,
+        expectedDisplayTime: metadata && Number.isFinite(metadata.expectedDisplayTime) ? metadata.expectedDisplayTime : null,
+        mediaTime: metadata && Number.isFinite(metadata.mediaTime) ? metadata.mediaTime : null,
+        presentedFrames: metadata && Number.isSafeInteger(metadata.presentedFrames) ? metadata.presentedFrames : null,
+        width: metadata && Number.isFinite(metadata.width) ? metadata.width : null,
+        height: metadata && Number.isFinite(metadata.height) ? metadata.height : null};
 }
 
 const FRAME_TIMING_STAGES = ['analysisMs', 'assemblyMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs'];
@@ -193,8 +220,8 @@ async function normalizationPreflight(frame, video, source) {
 export async function probeFaceCropCapability(video) {
     const source = dimensions(video);
     const checks = {};
-    const failed = (reason, stage, error) => ({supported: false, capability: {status: 'failed', checks, failedStage: stage},
-        source, reason, error: error ? {name: error.name || 'Error', message: error.message || String(error)} : null});
+    const failed = (reason, stage, error) => ({supported: false,
+        capability: {status: 'failed', checks, failedStage: stage, error: errorMetadata(error)}, source, reason, error});
     if (!video || typeof video.requestVideoFrameCallback !== 'function' || typeof video.cancelVideoFrameCallback !== 'function') {
         checks.requestVideoFrameCallback = {status: 'failed'};
         checks.cancelVideoFrameCallback = {status: 'failed'};
@@ -382,36 +409,44 @@ export class FaceCropCaptureController {
         return this.preparePromise;
     }
 
-    waitForVideoReady() {
-        if (videoHasCurrentFrame(this.video)) return Promise.resolve(true);
+    waitForPresentedFrame() {
         return new Promise(resolve => {
-            const schedule = () => {
-                const callbackId = this.video.requestVideoFrameCallback(() => {
-                    if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
-                    if (videoHasCurrentFrame(this.video)) {
-                        this.frameWait = null;
-                        resolve(true);
-                    } else schedule();
-                });
-                this.frameWait = {callbackId, resolve: () => resolve(false)};
-            };
-            schedule();
+            const callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
+                if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
+                this.frameWait = null;
+                resolve({now, metadata});
+            });
+            this.frameWait = {callbackId, resolve: () => resolve(null)};
         });
     }
+
+    waitForVideoReady() { return this.waitForPresentedFrame(); }
 
     async prepareInternal() {
         if (this.state === 'prepared' || this.state === 'capturing') return this.status;
         this.state = 'starting';
         this.diagnostic('prepare-started', {analysisWorkerCount: this.configuration.analysisWorkerCount});
-        if (!await this.waitForVideoReady() || this.state === 'stopping') return this.status;
-        const capability = await probeFaceCropCapability(this.video);
+        let capability;
+        const attempts = [];
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
+            const presented = await this.waitForPresentedFrame();
+            if (!presented || this.state === 'stopping') return this.status;
+            const diagnostic = {attempt, video: videoStateMetadata(this.video),
+                callback: frameCallbackMetadata(presented.now, presented.metadata)};
+            capability = await probeFaceCropCapability(this.video);
+            diagnostic.error = capability.capability.error || null;
+            attempts.push(diagnostic);
+            this.diagnostic('probe-attempt', diagnostic);
+            if (capability.supported || !isTransientVideoFrameError(capability.error) || attempt === 2) break;
+        }
+        capability.capability.probeAttempts = attempts;
         this.capability = capability.capability;
         this.source = capability.source;
         this.frameNormalization = capability.frameNormalization || null;
         const frameCheck = this.capability.checks && this.capability.checks.videoFrame;
         const construct = frameCheck && frameCheck.construct;
         const copy = frameCheck && frameCheck.copyTo;
-        if (construct && typeof construct === 'object') {
+        if (construct && construct.status === 'passed') {
             this.diagnostic('frame-layout', {format: construct.format, codedWidth: construct.codedWidth,
                 codedHeight: construct.codedHeight, displayWidth: construct.displayWidth, displayHeight: construct.displayHeight,
                 visibleRect: JSON.stringify(construct.visibleRect), rotation: construct.rotation, flip: construct.flip,
