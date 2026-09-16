@@ -7,6 +7,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <meta name="theme-color" content="#000000" />
+    <script>
+      // Remove caches left by older production builds before the study starts.
+      // TODO: Gate this cleanup behind a REACT_APP_* environment configuration flag.
+      (function () {
+        var assetRoot = new URL("%PUBLIC_URL%/", window.location.origin).href;
+        var controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+        var reloadRequired = Boolean(controller && controller.scriptURL.indexOf(assetRoot) === 0);
+
+        var unregister = "serviceWorker" in navigator
+          ? navigator.serviceWorker.getRegistrations().then(function (registrations) {
+              return Promise.all(registrations
+                .filter(function (registration) { return registration.scope.indexOf(assetRoot) === 0; })
+                .map(function (registration) { return registration.unregister(); }));
+            })
+          : Promise.resolve();
+
+        var clearCacheStorage = "caches" in window
+          ? caches.keys().then(function (names) {
+              return Promise.all(names.map(function (name) {
+                return caches.open(name).then(function (cache) {
+                  return cache.keys().then(function (requests) {
+                    return Promise.all(requests
+                      .filter(function (request) { return request.url.indexOf(assetRoot) === 0; })
+                      .map(function (request) { return cache.delete(request); }));
+                  });
+                });
+              }));
+            })
+          : Promise.resolve();
+
+        window.__openDstCacheCleanup = Promise.all([unregister, clearCacheStorage])
+          .then(function () { return { reloadRequired: reloadRequired }; })
+          .catch(function (error) {
+            console.warn("Could not clear browser caches", error);
+            return { reloadRequired: false };
+          });
+      })();
+    </script>
     <script src="jatos.js"></script>
 
     <link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet" >

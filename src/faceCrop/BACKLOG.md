@@ -11,6 +11,7 @@ Keep stable design contracts in `README.md`; this file tracks open work only.
 
 ## Follow-up
 
+- [ ] Gate startup service-worker and Cache Storage cleanup behind a documented `REACT_APP_*` environment flag.
 - [ ] Reduce full-frame RGBA allocation/copy overhead; benchmark buffer reuse and ROI-only extraction with a compatibility fallback.
 - [ ] Make route changes and page lifecycle events wait for or explicitly report interrupted finalization.
 - [ ] Split worker RPC, scheduling, metrics, and JATOS integration out of `FaceCropCapture.js` where this simplifies lifecycle testing.
