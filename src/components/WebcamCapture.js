@@ -95,9 +95,15 @@ class WebcamCapture extends React.Component {
         this.mediaStreamRecorder.ondataavailable = event => {
             this.recordedChunks.push(event.data);
         }
+        this.mediaStreamRecorder.onstart = () => this.props.onVideoCaptureEvent && this.props.onVideoCaptureEvent({
+            type: 'start', studyPage: this.props.studyPage, videoCounter: this.props.videoCounter
+        });
         // Upload is triggered from MediaRecorder.onstop so every stop path
         // (manual, timeout, unmount) uses the same finalization behavior.
         this.mediaStreamRecorder.onstop = event => {
+            if (this.props.onVideoCaptureEvent) this.props.onVideoCaptureEvent({
+                type: 'stop', studyPage: this.props.studyPage, videoCounter: this.props.videoCounter
+            });
             this.uploadVideo();
         }
         this.mediaStreamRecorder.onerror = event => console.log(event);

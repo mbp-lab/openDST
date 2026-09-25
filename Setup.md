@@ -126,6 +126,7 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_MOBILE_ONLY` | `'true'` / `'false'` | `'true'` | When `'true'`, displays a "please use your smartphone" message on desktop browsers. Participants must use a mobile device. For desktop testing, use browser developer tools to simulate a mobile viewport. |
 | `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables webcam video recording during calibration, math task, and speech task. Videos are uploaded to the JATOS backend. **Requires `REACT_APP_LOGGING` to also be `'true'`.** |
 | `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
+| `REACT_APP_HEART_RATE_DEBUG` | `'true'` / `'false'` | `'false'` | Debug-only manual Web Bluetooth heart-rate capture. When enabled, participants can connect a BLE Heart Rate Service sensor before the study or continue without one. Requires `REACT_APP_LOGGING='true'` in a production build to persist separate `<studyResultId>_heartRate_000001.json` chunks. |
 | `REACT_APP_UPLOAD_CONSOLE_LOG` | `'true'` / `'false'` | `'false'` | Opt-in diagnostic upload. When enabled together with `REACT_APP_LOGGING`, new browser-console entries are uploaded in bounded sequential chunks named `<studyResultId>_consoleLog_000001.json`. |
 | `REACT_APP_FACE_CROP_RECORDING_MODE` | `off` / `calibration` / `all` | `off` | `off` disables face-crop recording. `calibration` captures only the introduction feedback recording; `all` captures every recording session. |
 | `REACT_APP_FACE_DETECTION_DELEGATE` | `CPU` / `GPU` | `CPU` | MediaPipe execution backend. Test `GPU` on every target device before deployment. |
@@ -659,12 +660,19 @@ All files are uploaded to JATOS using the JATOS JavaScript API. File names follo
 |---|---|---|
 | `{id}_mathTask.json` | JSON | Math task performance array |
 | `{id}_metaParticipantData.json` | JSON | Metadata, timestamps, VAS, PANAS |
+| `{id}_heartRate_000001.json` and later chunks | JSON | Debug BLE heart-rate measurements, RR intervals, RR-derived pulse epoch estimates, and video capture boundary events. Present only when `REACT_APP_HEART_RATE_DEBUG='true'` and logging is enabled. |
 | `{id}_data_storage.txt` | Text | Data storage configuration (`save_all_data`, `save_no_data`, `save_without_video`) |
 | `{id}_introduction_1.webm` | Video | Calibration recording |
 | `{id}_mathTask_1.webm` | Video | Math task recording |
 | `{id}_speechTask_1.webm` | Video | Speech task recording |
 
 > **Note:** Video format depends on the participant's browser. Most modern mobile browsers produce `.webm` files. Some may produce `.mp4`.
+
+Heart-rate values are recorded at browser notification receipt time. The Bluetooth
+Heart Rate Service does not provide a sensor clock; individual pulse epoch times
+are estimates reconstructed from RR intervals and anchored to notification
+receipt. Video boundary events include the study page and video counter, matching
+the identifiers in the video filenames.
 
 #### Optional face-crop recordings
 

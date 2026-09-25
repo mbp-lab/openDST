@@ -10,6 +10,26 @@
     "ready": "Ready!"
   },
   "permissions": "Please check if your browser has the permission to access your microphone and camera.",
+  "heartRateDebug": {
+    "title": "Heart-rate sensor (debug)",
+    "instructions": "Connect a BLE heart-rate sensor before the study, or continue without one. Heart-rate notifications continue to be collected while the study runs.",
+    "connecting": "Connecting…",
+    "connected": "Connected",
+    "connect": "Connect sensor",
+    "continueConnected": "Continue to study",
+    "continueWithout": "Continue without sensor",
+    "status": "Heart-rate debug capture",
+    "connectedTo": "connected to",
+    "notConnected": "not connected",
+    "sensorData": "Sensor data",
+    "waitingForData": "Waiting for the first heart-rate notification…",
+    "noDataYet": "No heart-rate notifications received yet.",
+    "notificationsReceived": "Notifications received",
+    "latestHeartRate": "Latest heart rate",
+    "rrIntervals": "RR intervals",
+    "rrNotPresent": "not present in this notification",
+    "lastNotification": "Last notification"
+  },
   "startPage": {
     "navbar": "Digital Health Studies",
     "header": "Welcome!",
@@ -493,4 +513,3 @@
     "speak": "Please keep on talking!"
   }
 }
-

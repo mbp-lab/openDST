@@ -1,4 +1,5 @@
 import React from 'react';
+import i18next from 'i18next';
 import StartPage from "./pages/StartPage";
 import Introduction from "./pages/Introduction";
 import MathTaskTutorial from "./pages/MathTaskTutorial";
@@ -12,6 +13,8 @@ import CancelDialog from "./components/CancelDialog.js";
 import { UAParser } from 'ua-parser-js';
 import {hasPendingUploads, registerUpload, settleUpload, UPLOAD_STATUS} from './uploadState';
 import {flushConsoleLog, startConsoleLogUpload} from './consoleLog';
+import HeartRateSetup from './components/HeartRateSetup';
+import {heartRateDebugEnabled} from './heartRate';
 
 /**
  * The main component holds most of the data that is collected during the study run. It's the parent component of the
@@ -94,6 +97,9 @@ class Main extends React.Component {
              */
             areAllUploadsSettled: true,
             videoUploads: [],
+            heartRateSetupComplete: false,
+            heartRateConnected: false,
+            heartRateDeviceName: null,
 
             /**
              * cancelDialogIsOpen is passed to the cancelDialog component as a prop and controls if it is open or closed.
@@ -123,6 +129,25 @@ class Main extends React.Component {
         this.endMathTask = this.endMathTask.bind(this)
         this.setStudyTimes = this.setStudyTimes.bind(this)
         this.nextVideoUploadId = 0;
+        this.heartRateSession = {
+            startedAtEpochMs: null,
+            status: 'not_started',
+            deviceName: null,
+            events: [],
+            measurements: [],
+            nextChunkIndex: 1,
+            activeVideoSegmentId: null,
+            uploadQueue: Promise.resolve(),
+            uploadedMeasurementCount: 0,
+            uploadedEventCount: 0,
+        };
+        this.heartRateDevice = null;
+        this.heartRateSetupContinue = this.heartRateSetupContinue.bind(this);
+        this.onHeartRateConnected = this.onHeartRateConnected.bind(this);
+        this.onHeartRateDisconnected = this.onHeartRateDisconnected.bind(this);
+        this.onHeartRateMeasurement = this.onHeartRateMeasurement.bind(this);
+        this.onVideoCaptureEvent = this.onVideoCaptureEvent.bind(this);
+        this.onHeartRateDevice = this.onHeartRateDevice.bind(this);
 
         /**
          * The data object holds various data that is collected during a study run including results from the math- and
@@ -308,6 +333,125 @@ class Main extends React.Component {
         this.startConsoleLogUpload();
     }
 
+    componentWillUnmount() {
+        this.disconnectHeartRateSensor();
+    }
+
+    heartRateSetupContinue() {
+        if (this.heartRateSession.status === 'not_started') {
+            this.heartRateSession.startedAtEpochMs = Date.now();
+            this.heartRateSession.status = this.state.heartRateConnected ? 'connected' : 'skipped';
+            this.heartRateSession.events.push({type: this.state.heartRateConnected ? 'connected' : 'skipped', epochMs: Date.now(), deviceName: this.heartRateSession.deviceName});
+        }
+        this.setState({heartRateSetupComplete: true});
+    }
+
+    onHeartRateConnected(deviceName) {
+        this.heartRateSession.startedAtEpochMs = this.heartRateSession.startedAtEpochMs || Date.now();
+        this.heartRateSession.status = 'connected';
+        this.heartRateSession.deviceName = deviceName;
+        this.heartRateSession.events.push({type: 'connected', epochMs: Date.now(), deviceName});
+        this.setState({heartRateConnected: true, heartRateDeviceName: deviceName});
+    }
+
+    onHeartRateDevice(device) {
+        if (this.heartRateDevice) {
+            this.heartRateDevice.removeEventListener('gattserverdisconnected', this.onHeartRateDisconnected);
+            if (this.heartRateDevice.gatt && this.heartRateDevice.gatt.connected) this.heartRateDevice.gatt.disconnect();
+        }
+        this.heartRateDevice = device;
+        if (device) device.addEventListener('gattserverdisconnected', this.onHeartRateDisconnected);
+    }
+
+    onHeartRateDisconnected() {
+        if (this.heartRateDevice) this.heartRateDevice.removeEventListener('gattserverdisconnected', this.onHeartRateDisconnected);
+        this.heartRateDevice = null;
+        if (this.heartRateSession.status === 'connected') {
+            this.heartRateSession.status = 'disconnected';
+            this.heartRateSession.events.push({type: 'disconnected', epochMs: Date.now()});
+        }
+        this.setState({heartRateConnected: false});
+    }
+
+    onHeartRateMeasurement(measurement) {
+        if (!this.state.heartRateSetupComplete) return;
+        const segmentId = this.heartRateSession.activeVideoSegmentId;
+        this.heartRateSession.measurements.push({
+            receivedAtEpochMs: measurement.receivedAtEpochMs,
+            bpm: measurement.bpm,
+            rrMs: measurement.rrMs,
+            pulseEpochMs: measurement.pulseEpochMs,
+            videoSegmentId: segmentId,
+        });
+        if (this.heartRateSession.measurements.length % 100 === 0) this.flushHeartRateChunk();
+    }
+
+    onVideoCaptureEvent(event) {
+        if (!heartRateDebugEnabled()) return;
+        const epochMs = Date.now();
+        const segmentId = event.type === 'start'
+            ? `${event.studyPage}-${event.videoCounter}-${epochMs}`
+            : this.heartRateSession.activeVideoSegmentId;
+        this.heartRateSession.events.push({
+            type: `video_${event.type}`,
+            epochMs,
+            studyPage: event.studyPage,
+            videoCounter: event.videoCounter,
+            segmentId,
+        });
+        if (event.type === 'start') this.heartRateSession.activeVideoSegmentId = segmentId;
+        if (event.type === 'stop' && this.heartRateSession.activeVideoSegmentId === segmentId) this.heartRateSession.activeVideoSegmentId = null;
+    }
+
+    heartRateUploadEnabled() {
+        return process.env.NODE_ENV !== 'development' && process.env.REACT_APP_LOGGING === 'true' && typeof jatos !== 'undefined'; // eslint-disable-line no-undef
+    }
+
+    flushHeartRateChunk(final = false) {
+        const session = this.heartRateSession;
+        if (!this.heartRateUploadEnabled()) return Promise.resolve();
+        session.uploadQueue = session.uploadQueue.then(() => {
+            const studyResultId = this.data.studyMetaTracker.studyResultId || jatos.studyResultId; // eslint-disable-line no-undef
+            if (!studyResultId) return;
+            const startMeasurement = session.uploadedMeasurementCount;
+            const startEvent = session.uploadedEventCount;
+            const remainingMeasurements = session.measurements.slice(startMeasurement);
+            const remainingEvents = session.events.slice(startEvent);
+            if (!remainingMeasurements.length && !remainingEvents.length && !final) return;
+            const chunkIndex = session.nextChunkIndex++;
+            const payload = {
+                schema: 'opendst-heart-rate-v1',
+                chunkIndex,
+                final,
+                status: session.status,
+                deviceName: session.deviceName,
+                startedAtEpochMs: session.startedAtEpochMs,
+                measurements: remainingMeasurements,
+                events: remainingEvents,
+                timestampNote: 'BLE Heart Rate Service provides no sensor timestamp. receivedAtEpochMs is browser notification receipt time; pulseEpochMs values are RR-derived estimates anchored to receipt time.',
+            };
+            const uploadId = this.markVideoAsUploading(`heart-rate-${chunkIndex}`);
+            return jatos.uploadResultFile(JSON.stringify(payload), `${studyResultId}_heartRate_${String(chunkIndex).padStart(6, '0')}.json`) // eslint-disable-line no-undef
+                .then(() => {
+                    session.uploadedMeasurementCount = startMeasurement + remainingMeasurements.length;
+                    session.uploadedEventCount = startEvent + remainingEvents.length;
+                    this.markVideoAsUploaded(uploadId);
+                })
+                .catch(error => {
+                    console.error('Heart-rate data upload failed', error);
+                    this.markVideoAsFailed(uploadId);
+                });
+        }).catch(error => console.error('Heart-rate upload queue failed', error));
+        return session.uploadQueue;
+    }
+
+    disconnectHeartRateSensor() {
+        const device = this.heartRateDevice;
+        this.heartRateDevice = null;
+        if (device) device.removeEventListener('gattserverdisconnected', this.onHeartRateDisconnected);
+        if (device && device.gatt && device.gatt.connected) device.gatt.disconnect();
+    }
+
     startConsoleLogUpload() {
         if (process.env.NODE_ENV === 'development' || process.env.REACT_APP_UPLOAD_CONSOLE_LOG !== 'true') return;
         if (typeof jatos === 'undefined') return; // eslint-disable-line no-undef
@@ -435,6 +579,12 @@ class Main extends React.Component {
     uploadFinalData(dataConfig, isVideoDataSubmitted) {
         this.data.studyTimes.test_end = Date.now() - this.data.studyTimes.reference;
         this.data.studyMetaTracker.videosSubmitted = isVideoDataSubmitted;
+        this.heartRateSession.status = this.heartRateSession.status === 'connected' ? 'completed' : this.heartRateSession.status;
+        this.heartRateSession.events.push({type: 'study_finished', epochMs: Date.now()});
+        this.disconnectHeartRateSensor();
+        // The no-data cancellation path does not call this method. All other
+        // finish paths persist the sensor stream under its own result filename.
+        this.flushHeartRateChunk(true);
         let studyResultId = this.data.studyMetaTracker.studyResultId;
         if(process.env.NODE_ENV !== "development" && process.env.REACT_APP_LOGGING === "true") {
             jatos.uploadResultFile(JSON.stringify(this.data.speechTaskFeedback), studyResultId + '_speechTask.json')//eslint-disable-line no-undef
@@ -496,6 +646,9 @@ class Main extends React.Component {
         window.scrollTo(0, 0)
         this.data.mathTaskScore = mathTaskScore;
         this.uploadData('mathTask_end', null)
+        // Persist heart-rate readings at task boundaries so a later cancel
+        // does not depend only on the final-study upload.
+        this.flushHeartRateChunk();
         this.handleNext();
     }
 
@@ -532,6 +685,7 @@ class Main extends React.Component {
     endSpeechTask() {
         window.scrollTo(0, 0);
         this.uploadData('speechTask_end', null)
+        this.flushHeartRateChunk();
         this.handleNext();
     }
 
@@ -591,6 +745,7 @@ class Main extends React.Component {
                         referenceTime={this.data.studyTimes.reference}
                         continueFromPanas={this.continueFromPanas}
                         onFaceCropStatus={this.updateFaceCropCaptureStatus}
+                        onVideoCaptureEvent={this.onVideoCaptureEvent}
                         markVideoAsUploading={this.markVideoAsUploading}
                         markVideoAsUploaded={this.markVideoAsUploaded}
                         markVideoAsFailed={this.markVideoAsFailed}
@@ -626,6 +781,7 @@ class Main extends React.Component {
                     handleCancelDialog={this.handleCancelDialog}
                     cancelDialogIsOpen={this.state.cancelDialogIsOpen}
                     onFaceCropStatus={this.updateFaceCropCaptureStatus}
+                    onVideoCaptureEvent={this.onVideoCaptureEvent}
                     markVideoAsUploading={this.markVideoAsUploading}
                     markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploaded={this.markVideoAsUploaded}
@@ -666,6 +822,7 @@ class Main extends React.Component {
                     endSpeechTask={this.endSpeechTask}
                     updateSpeechTaskFeedback={this.updateSpeechTaskFeedback}
                     onFaceCropStatus={this.updateFaceCropCaptureStatus}
+                    onVideoCaptureEvent={this.onVideoCaptureEvent}
                     studyResultId={this.data.studyMetaTracker.studyResultId}
                     markVideoAsFailed={this.markVideoAsFailed}
                     markVideoAsUploading={this.markVideoAsUploading}
@@ -704,12 +861,27 @@ class Main extends React.Component {
     }
 
     render() {
+        const heartRateDebug = heartRateDebugEnabled();
         return (
             <div className="App">
                 <div className="container ">
                     <div className="row justify-content-md-center">
                         <div className="col text-center">
-                            {this.renderCurrentComponent()}
+                            {heartRateDebug && !this.state.heartRateSetupComplete
+                                ? <HeartRateSetup
+                                    connected={this.state.heartRateConnected}
+                                    deviceName={this.state.heartRateDeviceName}
+                                    onConnected={this.onHeartRateConnected}
+                                    onDevice={this.onHeartRateDevice}
+                                    onMeasurement={this.onHeartRateMeasurement}
+                                    onContinue={this.heartRateSetupContinue}
+                                />
+                                : <>
+                                    {heartRateDebug && <div className="alert alert-info" role="status">
+                                        {i18next.t('heartRateDebug.status')}: {this.state.heartRateConnected ? `${i18next.t('heartRateDebug.connectedTo')} ${this.state.heartRateDeviceName}` : i18next.t('heartRateDebug.notConnected')}
+                                    </div>}
+                                    {this.renderCurrentComponent()}
+                                </>}
                         </div>
                     </div>
                 </div>

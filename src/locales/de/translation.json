@@ -10,6 +10,26 @@
     "ready": "Fertig!"
   },
   "permissions": "Prüfen Sie bitte, ob ihr Browser die Berechtigung hat auf Mikrophon und Kamera zuzugreifen.",
+  "heartRateDebug": {
+    "title": "Herzfrequenzsensor (Debug)",
+    "instructions": "Verbinden Sie vor der Studie einen BLE-Herzfrequenzsensor oder fahren Sie ohne Sensor fort. Herzfrequenzmeldungen werden während der Studie weiter erfasst.",
+    "connecting": "Verbindung wird hergestellt…",
+    "connected": "Verbunden",
+    "connect": "Sensor verbinden",
+    "continueConnected": "Studie starten",
+    "continueWithout": "Ohne Sensor fortfahren",
+    "status": "Herzfrequenz-Aufzeichnung (Debug)",
+    "connectedTo": "verbunden mit",
+    "notConnected": "nicht verbunden",
+    "sensorData": "Sensordaten",
+    "waitingForData": "Warte auf die erste Herzfrequenzmeldung…",
+    "noDataYet": "Noch keine Herzfrequenzmeldungen empfangen.",
+    "notificationsReceived": "Meldungen empfangen",
+    "latestHeartRate": "Letzte Herzfrequenz",
+    "rrIntervals": "RR-Intervalle",
+    "rrNotPresent": "in dieser Meldung nicht enthalten",
+    "lastNotification": "Letzte Meldung"
+  },
   "startPage": {
     "navbar": "Digital Health Studies",
     "header": "Herzlich Willkommen!",

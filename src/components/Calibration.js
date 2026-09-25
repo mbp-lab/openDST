@@ -194,6 +194,7 @@ export default class Calibration extends React.Component {
                                         markVideoAsUploaded={this.props.markVideoAsUploaded}
                                         markVideoAsFailed={this.props.markVideoAsFailed}
                                         onFaceCropStatus={this.props.onFaceCropStatus}
+                                        onVideoCaptureEvent={this.props.onVideoCaptureEvent}
                                         studyResultId={this.props.studyResultId}
                                         videoCounter={1}
                                         handleAbortDialog={this.handleAbortDialog}
