@@ -90,3 +90,9 @@ Contributor references: [processing contract](docs/processing.md) and [follow-up
 | `diagnostics` | false | Boolean; opt-in verbose troubleshooting evidence |
 
 Use numeric values, not strings. Missing fields receive defaults; supplied invalid values fail validation. The library always generates a unique capture ID unless the host supplies one. A custom ID must be unique across recordings. `filenamePrefix` and custom IDs accept letters, digits, underscores, and hyphens; context identifiers are stored separately as JSON.
+
+## Refactor validation and retention policy
+
+The campaign's [acceptance report](docs/campaign/acceptance-report.md) records exact browser/JATOS workloads and remaining platform limits. After building, external Playwright can run `node tests/browser-sustained.cjs` (set `FACECROP_SUSTAINED_PARTS=6`, `FACECROP_REQUIRE_FRAME_OBSERVATION=1`, `FACECROP_ASSERT_FRAME_RELEASE=1`, and `FACECROP_ASSERT_TRANSPORT_ACK_RELEASE=1` for the full retention gates). `node tests/browser-jatos.cjs` requires the documented disposable local JATOS seed/workbench archive; it never modifies a participant study.
+
+Completed frame/encoded payloads and settled transport acknowledgements are released by the sink. Compact artifact history grows with part count; the openDST host retains one latest compact status per capture ID. Caller-held completion promises/context remain caller-owned. Abort prevents new facecrop writes, preserves observable in-flight completions, and cannot prove remote absence after rejection. In openDST, “Cancel and submit data without video” submits `save_without_video`; it does not retract recordings already uploaded or in flight. The host owns camera tracks, navigation, withdrawal and deletion policy.

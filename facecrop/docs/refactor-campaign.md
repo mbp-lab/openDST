@@ -1,6 +1,6 @@
 # Facecrop audit and refactor campaign
 
-Brief status: complete. Campaign status: initial evidence gathered; proposals and implementation pending. This document records the agreed scope; it does not itself establish that every candidate should be adopted.
+Brief status: complete. Campaign status: complete; see the [final disposition](campaign/disposition.md) and [acceptance report](campaign/acceptance-report.md). This document records the agreed scope; it does not itself establish that every candidate should be adopted.
 
 Date: 2026-10-06.
 
@@ -207,14 +207,16 @@ Compare against baseline before measuring improvement. Preserve a baseline outpu
 
 ### Baseline commands and prerequisites
 
-These are current entry points, not claims that the stronger campaign gates already exist. Run sequentially where generated assets are shared. Install locked dependencies explicitly when needed; current host npm hooks still perform the implicit work identified in workstream D.
+These are current entry points, not claims that the stronger campaign gates already exist. Run sequentially where generated assets are shared. Install locked dependencies explicitly. The campaign removed implicit host hooks; run `npm run facecrop:stage` before host commands on a clean checkout or after library changes.
 
 From the openDST repository root:
 
 ```sh
+npm ci
 npm --prefix facecrop ci
 npm --prefix facecrop test
 npm --prefix facecrop run build
+npm run facecrop:stage
 CI=true npm test -- --watchAll=false --runInBand
 CI=true npm run build
 ```
@@ -227,7 +229,7 @@ For the existing browser smoke test, build first, then use the external Playwrig
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright npm --prefix facecrop run test:browser
 ```
 
-The browser and any required system libraries must be available. Set `PLAYWRIGHT_BROWSERS_PATH` when using a custom browser installation. Do not add Playwright to the library's locked runtime just to run this external acceptance harness. This command remains a short canvas-stream/mock-transport test; the sustained and real-JATOS harnesses still need to be created or extended.
+The browser and any required system libraries must be available. Set `PLAYWRIGHT_BROWSERS_PATH` when using a custom browser installation. Do not add Playwright to the library's locked runtime just to run this external acceptance harness. This command remains a short canvas-stream/mock-transport test; the stronger final harnesses are now `tests/browser-sustained.cjs` and `tests/browser-jatos.cjs`, with durable results linked in the acceptance report.
 
 From the workbench root, packaging and the existing isolated runner checks use:
 
@@ -242,14 +244,14 @@ Packaging requires a valid local study manifest, installed tooling and a writabl
 
 | Deliverable | Required contents | Current status |
 |---|---|---|
-| Baseline record | Commit/worktree identity, environment, commands, output corpus, retention workload and race matrix | Historical checks available; durable campaign baseline pending |
-| A proposal/result | Retention ownership, compact ledger contract, persistence-status decision, before/after retention evidence | Source evidence gathered; implementation pending |
-| B proposal/result | Resource owner table, state/transition map, host race traces and cancellation documentation | Source evidence gathered; implementation pending |
-| C proposal/result | Config flow, policy/constants inventory, accounting transitions and compatibility impact | Source evidence gathered; implementation pending |
-| D proposal/result | Distribution contract, setup/stage behavior, hash verification, examples and toolchain support | Source evidence gathered; implementation pending |
-| E profiling/disposition | Reproducible workload, resource measurements, worker-design decision and any scientific proposal | Sustained profiling pending |
-| Acceptance report | Focused tests, sustained browser results, actual JATOS upload evidence, device checks where required, remaining gaps | Existing smoke/runner baselines only |
-| Final disposition register | Every finding mapped to implemented, retained or deferred, with rationale, gates and commits | Pending |
+| Baseline record | Commit/worktree identity, environment, commands, output corpus, retention workload and race matrix | Recorded with pinned-source/browser evidence and AVI/sidecar corpus; see [baseline](campaign/baseline.md) |
+| A proposal/result | Retention ownership, compact ledger contract, persistence-status decision, before/after retention evidence | Implemented and validated; [decision/results](campaign/memory-persistence.md) |
+| B proposal/result | Resource owner table, state/transition map, host race traces and cancellation documentation | Implemented/retained with owner, race and history evidence; [results](campaign-lifecycle.md) |
+| C proposal/result | Config flow, policy/constants inventory, accounting transitions and compatibility impact | Implemented canonical host defaults/count checks; retained scientific/normal-only contracts; [results](campaign/config-accounting.md) |
+| D proposal/result | Distribution contract, setup/stage behavior, hash verification, examples and toolchain support | Implemented and validated clean consumer, recovery and packaging; [results](build-deployment-decision.md) |
+| E profiling/disposition | Reproducible workload, resource measurements, worker-design decision and any scientific proposal | Six-part baseline/final profiling and explicit retained/deferred decisions; [results](campaign/processing-disposition.md) |
+| Acceptance report | Focused tests, sustained browser results, actual JATOS upload evidence, device checks where required, remaining gaps | Final focused, sustained, actual JATOS and packaging/runner evidence; [report](campaign/acceptance-report.md) |
+| Final disposition register | Every finding mapped to implemented, retained or deferred, with rationale, gates and commits | Every finding mapped with rationale, evidence and commits; [register](campaign/disposition.md) |
 
 Mark a gate passed only with evidence matching its scope. Track missing tools or environments separately from test failures. A deferral may complete an exploration item, but it must not be used to declare an implemented change validated when its required acceptance gate remains unmet.
 
