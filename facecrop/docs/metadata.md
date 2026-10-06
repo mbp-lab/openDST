@@ -23,6 +23,8 @@ The manifest's `validity` records effective configuration, detector/runtime vers
 
 `health.accounting` counts submitted, processed, sealed, encoded, and persisted frames. Processing/encoding/persistence failures and discarded work are distinct. At normal finalization, `reconciliation.checks` verifies the stage equations. `consistent` means these counts reconcile; it does not mean every operation succeeded. Always also check `summary.status` and artifact outcomes.
 
+The additive `reconciliation.checks.counts` flag reports whether accepted-frame and stage counters are nonnegative safe integers; `checks` and `consistent` are only populated for normal finalization, while aborted captures leave reconciliation absent (not performed).
+
 `callbackGaps` counts browser presentation-counter gaps between observed callbacks. It does not identify camera loss, browser scheduling, or CPU pressure as the cause. Queue-wait totals measure time blocked on analysis or encoding capacity. These metrics do not describe all hardware frames or establish physiological signal quality.
 
 A video part counts as persisted only when its AVI and sidecar writes both resolve. If any required output or the final manifest fails to persist, the returned session result is incomplete. The stored manifest cannot attest to its own subsequent write outcome; check the result's `manifest` and `artifacts` for that.

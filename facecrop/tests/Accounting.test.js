@@ -15,3 +15,19 @@ test('reports a lost frame at the boundary where counts cease to reconcile', () 
     expect(reconcileAccounting(counts, 10)).toMatchObject({status: 'inconsistent', checks: {
         submitted: true, assembly: true, encoding: false, persistence: true}});
 });
+
+test.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid frame counts even when stage arithmetic can balance: %s', value => {
+        const counts = {submittedFrames: value, processedFrames: value, failedProcessingFrames: 0,
+            sealedFrames: 0, encodedFrames: 0, failedEncodingFrames: 0,
+            persistedFrames: 0, failedPersistenceFrames: 0};
+        expect(reconcileAccounting(counts, 0)).toMatchObject({status: 'inconsistent', checks: {counts: false}});
+    });
+
+test('rejects an invalid accepted-frame domain on an otherwise empty capture', () => {
+    const counts = {submittedFrames: 0, processedFrames: 0, failedProcessingFrames: 0,
+        sealedFrames: 0, encodedFrames: 0, failedEncodingFrames: 0,
+        persistedFrames: 0, failedPersistenceFrames: 0};
+    expect(reconcileAccounting(counts, -1)).toMatchObject({status: 'inconsistent', checks: {counts: false}});
+    expect(reconcileAccounting(counts, 0)).toMatchObject({status: 'consistent', checks: {counts: true}});
+});

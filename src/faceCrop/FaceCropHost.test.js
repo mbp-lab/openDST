@@ -39,6 +39,14 @@ test('host policies select captures while provided invalid settings fail explici
     expect(() => resolveFaceCropHostConfiguration({REACT_APP_FACE_CROP_RECORDING_MODE: 'all', REACT_APP_FACE_CROP_SCALE: 'oops'}, 'speechTask')).toThrow();
 });
 
+test('host defaults and partial environment settings match the library resolved configuration', () => {
+    const environment = {REACT_APP_FACE_CROP_RECORDING_MODE: 'all'};
+    expect(resolveFaceCropHostConfiguration(environment, 'speechTask').config).toEqual(library.validateConfiguration());
+    expect(resolveFaceCropHostConfiguration({...environment, REACT_APP_FACE_CROP_SCALE: '2',
+        REACT_APP_FACE_CROP_SMOOTHING_TAU_MS: '0', REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT: '2'}, 'speechTask').config)
+        .toEqual(library.validateConfiguration({roi: {scale: 2, smoothingTauMs: 0}, pipeline: {analysisWorkerCount: 2}}));
+});
+
 test('host context, readable prefix and finalization sentinel survive multiple writes', async () => {
     process.env.REACT_APP_FACE_CROP_RECORDING_MODE = 'all';
     window.jatos = {uploadResultFile: jest.fn(() => Promise.resolve())};

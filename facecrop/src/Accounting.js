@@ -1,6 +1,10 @@
 /** Stage equations describe integrity, not whether a face was freshly detected. */
 export function reconcileAccounting(accounting, acceptedFrames) {
+    const frameCounts = ['submittedFrames', 'processedFrames', 'failedProcessingFrames', 'sealedFrames',
+        'encodedFrames', 'failedEncodingFrames', 'persistedFrames', 'failedPersistenceFrames'];
     const checks = {
+        counts: [acceptedFrames, ...frameCounts.map(key => accounting[key])]
+            .every(value => Number.isSafeInteger(value) && value >= 0),
         submitted: accounting.submittedFrames === accounting.processedFrames + accounting.failedProcessingFrames,
         assembly: acceptedFrames === accounting.sealedFrames,
         encoding: accounting.sealedFrames === accounting.encodedFrames + accounting.failedEncodingFrames,

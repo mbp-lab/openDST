@@ -218,3 +218,50 @@ describe('capability and capture lifecycle', () => {
     });
 
 });
+
+// Drive the real controller stage transitions while substituting worker/transport
+// boundaries, so reconciliation is checked against failures rather than hand counts.
+test.each(['processing', 'encoding', 'persistence'])('reconciles actual %s failure transitions', async failureStage => {
+    const originalVideoFrame = window.VideoFrame;
+    window.VideoFrame = jest.fn(() => ({close: jest.fn()}));
+    const artifact = {captureId: 'failure-capture', segmentIndex: 0, partIndex: 0,
+        filename: 'failure.avi.gz', faceEventsFilename: 'failure.face-events.json',
+        frameCount: 1, frameRate: 30, gzipBytes: new Uint8Array([1]).buffer,
+        faceEvents: {aviFilename: 'failure.avi.gz', frameCount: 1, frames: [{frameIndex: 0, presentationTimeUs: 1000}]}};
+    const close = jest.fn(() => Promise.resolve());
+    const uploadResultFile = jest.fn((payload, filename) => failureStage === 'persistence' && filename.endsWith('.avi.gz')
+        ? Promise.reject(new Error('transport response lost')) : Promise.resolve());
+    const controller = new FaceCropCaptureController({video: {videoWidth: 72, videoHeight: 72},
+        captureId: 'failure-capture', filenamePrefix: 'failure',
+        configuration: controllerConfiguration(validateConfiguration()), uploadResultFile});
+    controller.sink.sleep = () => Promise.resolve();
+    controller.state = 'capturing';
+    controller.frameCallbacks = 1;
+    controller.analysisWorkers = [{close, processFrame: ({frame}) => {
+        frame.close();
+        return failureStage === 'processing' ? Promise.reject(new Error('analysis failed')) : Promise.resolve({sequence: 0});
+    }}];
+    controller.assemblyWorker = {close, processAnalysisResult: () => Promise.resolve({bufferedResultCount: 0,
+        commits: [{accepted: true, detectionState: 'largest', parts: [artifact], timings: {}}]}),
+        finish: () => Promise.resolve({parts: [], bufferedResultCount: 0})};
+    controller.encoderWorker = {close, encodePart: () => failureStage === 'encoding'
+        ? Promise.reject(new Error('encoding failed')) : Promise.resolve({artifact, timings: {}})};
+    try {
+        await controller.processAnalysisFrame({}, 1700000000000, 1000);
+        await controller.finalize();
+        expect(controller.status).toBe(FACE_CROP_STATUS.INCOMPLETE);
+        expect(controller.accounting.reconciliation).toMatchObject({status: 'consistent', checks: {counts: true}});
+        expect(controller.accounting.submittedFrames).toBe(1);
+        expect(controller.accounting.failedProcessingFrames).toBe(failureStage === 'processing' ? 1 : 0);
+        expect(controller.accounting.failedEncodingFrames).toBe(failureStage === 'encoding' ? 1 : 0);
+        expect(controller.accounting.failedPersistenceFrames).toBe(failureStage === 'persistence' ? 1 : 0);
+        expect(controller.accounting.persistedFrames).toBe(0);
+        if (failureStage === 'persistence') {
+            expect(controller.sink.inventory()).toEqual(expect.arrayContaining([
+                expect.objectContaining({filename: 'failure.avi.gz', status: 'uncertain', attempts: 3}),
+                expect.objectContaining({filename: 'failure.face-events.json', status: 'not_attempted', attempts: 0})
+            ]));
+        }
+        expect(close).toHaveBeenCalledTimes(3);
+    } finally { window.VideoFrame = originalVideoFrame; }
+});

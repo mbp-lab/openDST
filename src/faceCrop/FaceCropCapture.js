@@ -31,19 +31,20 @@ export function resolveFaceCropHostConfiguration(environment = process.env, stud
         }
         return parsed;
     };
+    const defaults = validateConfiguration();
     const config = validateConfiguration({
         roi: {
-            smoothingTauMs: number('REACT_APP_FACE_CROP_SMOOTHING_TAU_MS', environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS, 0, 10000, 100, true),
-            scale: number('REACT_APP_FACE_CROP_SCALE', environment.REACT_APP_FACE_CROP_SCALE, 1, 3, 1.5),
-            verticalShiftRatio: number('REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO', environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO, -1, 1, 0.15)
+            smoothingTauMs: number('REACT_APP_FACE_CROP_SMOOTHING_TAU_MS', environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS, 0, 10000, defaults.roi.smoothingTauMs, true),
+            scale: number('REACT_APP_FACE_CROP_SCALE', environment.REACT_APP_FACE_CROP_SCALE, 1, 3, defaults.roi.scale),
+            verticalShiftRatio: number('REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO', environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO, -1, 1, defaults.roi.verticalShiftRatio)
         },
         detector: {
-            minConfidence: number('REACT_APP_FACE_DETECTION_MIN_CONFIDENCE', environment.REACT_APP_FACE_DETECTION_MIN_CONFIDENCE, 0, 1, 0.5)
+            minConfidence: number('REACT_APP_FACE_DETECTION_MIN_CONFIDENCE', environment.REACT_APP_FACE_DETECTION_MIN_CONFIDENCE, 0, 1, defaults.detector.minConfidence)
         },
         pipeline: {
-            analysisWorkerCount: number('REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT', environment.REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT, 1, 2, 1, true)
+            analysisWorkerCount: number('REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT', environment.REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT, 1, 2, defaults.pipeline.analysisWorkerCount, true)
         },
-        persistence: {maxAttempts: 3, retryDelayMs: 100},
+        persistence: defaults.persistence,
         diagnostics: false
     });
     return {requestedMode, mode, enabled: true, config};
