@@ -1,6 +1,6 @@
 # Facecrop campaign baseline
 
-Recorded 2026-10-06 from the `openDST` checkout before campaign production edits.
+Recorded 2026-10-06 from the `openDST` checkout before campaign production edits. Coverage gaps and commands below describe that historical checkpoint; current validation and setup are documented in the [acceptance report](acceptance-report.md) and [library README](../../README.md).
 
 ## Source and environment
 
@@ -65,4 +65,4 @@ The checked-in [output regression suite](../../tests/FaceCropOutput.test.js) pin
 | Detector and assembly work must drain before manifest finalization | `FaceCropCapture.test.js`: “drains detector and assembly work before manifest finalization” | Processing drain ordering |
 | Stop/abort/navigation/unmount/camera races in host | `WebcamCapture.lifecycle.test.js`, `Main.faceCrop.test.js`, `FaceCropHost.test.js` | See host suite; not a complete physical-camera or real-JATOS race matrix |
 
-Still uncovered: repeated stop/start against a live browser capture, slow real JATOS upload during navigation, and sustained browser resource trends. These remain campaign gates rather than claims established by the short smoke test.
+At this baseline, repeated stop/start against a live browser capture, slow real JATOS upload during navigation, and sustained browser resource trends were not established by the short smoke test. Final coverage and remaining platform limits are recorded in the [acceptance report](acceptance-report.md).

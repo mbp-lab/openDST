@@ -13,7 +13,7 @@ Current focused suites: 94 standalone tests in eight suites, 24 frontend tests i
 - [D contract/results](../build-deployment-decision.md): private complete browser distribution, explicit setup/stage, exact file/hash verification and failure recovery.
 - [E profile/disposition](processing-disposition.md): worker design retained; full-frame copies and scientific sampling are unchanged.
 - Final browser evidence: [pinned baseline](sustained-pinned-baseline.json), [six-part final](sustained-final.json), [root mount/repeated start](browser-root-mount-final.json). Positive original-frame observations, acknowledgement release, ordering, complete asset loading and tracked-resource cleanup pass.
-- Final server/package evidence: [actual JATOS](jatos-acceptance-final-result.json), [package verification](packaging-acceptance-result.json), [all 27 runner checks](runner-final-summary.txt). Success, stored bytes despite rejected responses, and marker cancellation pass on the frozen artifact. Intermediate reports are checkpoints only.
+- Final server/package evidence: [actual JATOS](jatos-acceptance-final-result.json), [package verification](packaging-acceptance-result.json), [all 27 runner checks](runner-final-summary.txt). Success, stored bytes despite rejected responses, and marker cancellation pass on the frozen artifact. Superseded intermediate browser/JATOS reports were removed; baseline comparisons and final evidence remain.
 - Standalone build with `NODE_OPTIONS` unset reproduced the exact final hash. The worker binary SHA remains identical to the pinned extraction worker, strengthening unchanged scientific processing evidence.
 
 ## Resource ownership and retained policy

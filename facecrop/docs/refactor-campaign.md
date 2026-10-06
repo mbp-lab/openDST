@@ -1,6 +1,6 @@
-# Facecrop audit and refactor campaign
+# Facecrop audit and refactor campaign — archived scope
 
-Brief status: complete. Campaign status: complete; see the [final disposition](campaign/disposition.md) and [acceptance report](campaign/acceptance-report.md). This document records the agreed scope; it does not itself establish that every candidate should be adopted.
+Brief status: complete. Campaign status: complete; see the [final disposition](campaign/disposition.md) and [acceptance report](campaign/acceptance-report.md). This document preserves the original agreed scope and execution protocol as a historical record. Its investigative instructions and starting-point findings are not current tasks or descriptions of the final implementation. Use the linked acceptance report for final results and [backlog](backlog.md) for follow-up work.
 
 Date: 2026-10-06.
 
@@ -37,7 +37,7 @@ Extraction checkpoints:
 
 Facecrop lives in `facecrop/`; the study adapter remains in `src/faceCrop/`. The workbench repository's recorded openDST Git link has not been advanced. Do not update it or push changes without an applicable instruction.
 
-## Current architecture and ownership
+## Starting architecture and ownership
 
 | Layer | Responsibility | Important boundary |
 |---|---|---|
@@ -89,7 +89,7 @@ Paths below are relative to this document. The findings describe the extraction 
 | Consumer examples and browser check | [Plain-browser example](../examples/plain-browser/index.html), [React example](../examples/react/FacecropRecorder.jsx), [Chromium smoke test](../tests/browser-smoke.cjs) |
 | Existing boundaries and deferred profiling | [Coupling documentation](coupling.md), [backlog](backlog.md) |
 
-The original audit reports, retention script/results and validation logs were session artifacts under `/tmp/facecrop-campaign-*` and `/tmp/facecrop-*tests.log`. They are not durable repository fixtures. Before implementation, preserve a reproducible baseline and its results in a reviewed campaign artifact; do not rely on the availability of those temporary files.
+The original audit reports, retention script/results and validation logs were session artifacts under `/tmp/facecrop-campaign-*` and `/tmp/facecrop-*tests.log`. They are not durable repository fixtures. The reproducible baseline and final results are now preserved in [campaign/baseline.md](campaign/baseline.md) and the acceptance report; temporary session files are not required.
 
 To reproduce the retention observation, enqueue 200 parts of 500 realistic frame records through the sink with an immediately resolving transport, finalize, then inspect retained records, pending work and compressed buffers. Record before/after heap with explicit GC when available, identifying the Node version and synthetic workload. The encoded bytes in the original fixture were synthetic; it was an object-retention experiment, not an AVI validity or throughput test.
 
@@ -207,7 +207,7 @@ Compare against baseline before measuring improvement. Preserve a baseline outpu
 
 ### Baseline commands and prerequisites
 
-These are current entry points, not claims that the stronger campaign gates already exist. Run sequentially where generated assets are shared. Install locked dependencies explicitly. The campaign removed implicit host hooks; run `npm run facecrop:stage` before host commands on a clean checkout or after library changes.
+These commands remain reproduction entry points; final gate coverage is recorded in the acceptance report. Run sequentially where generated assets are shared. Install locked dependencies explicitly. The campaign removed implicit host hooks; run `npm run facecrop:stage` before host commands on a clean checkout or after library changes.
 
 From the openDST repository root:
 
@@ -221,7 +221,7 @@ CI=true npm test -- --watchAll=false --runInBand
 CI=true npm run build
 ```
 
-The host commands require its installed lockfile dependencies (`npm ci` from openDST). The standalone build should also be checked without an inherited `NODE_OPTIONS` setting. Record the Node/npm versions; the supported floor is a campaign decision to verify, not established by success on the current toolchain.
+The host commands require its installed lockfile dependencies (`npm ci` from openDST). The standalone build should also be checked without an inherited `NODE_OPTIONS` setting. The supported toolchain is Node 22/npm 10; the validated versions are Node 22.16.0/npm 10.9.2. Other major versions are not claimed supported.
 
 For the existing browser smoke test, build first, then use the external Playwright/Chromium setup documented in the [library README](../README.md):
 
@@ -285,6 +285,6 @@ Suggested sequence:
 
 The campaign is complete when every scoped area has an evidence-backed disposition: implemented improvement, retained design with rationale, or explicitly deferred item with a reason and unresolved gate. Exploration does not require rewriting every area.
 
-Completion of this brief is separate from completion of the campaign. The pending entries above remain pending until execution provides evidence.
+This criterion has been met. The final disposition and acceptance report record the evidence and explicit deferrals; there are no pending campaign acceptance entries.
 
 Implemented changes must satisfy their acceptance gates, have reviewable compatibility decisions and migrations where needed, and be captured in semantic commits. Documentation must state remaining limitations, supported deployment behavior and cancellation policy. Preserve the user's startup edit, avoid creating a facecrop submodule, and leave workbench Git-link updates and publication outside this authorization.
