@@ -3,7 +3,16 @@ const os = require('os');
 const path = require('path');
 const {digestTree, expectedFiles, verifyDistribution} = require('../scripts/verify-distribution.cjs');
 const packageInfo = require('../package.json');
-const {stageDistribution} = require('../../scripts/vendor-face-detector-assets.js');
+const {stageDistribution: stageBrowserDistribution} = require('../scripts/stage-distribution.cjs');
+
+function stageDistribution(root, distributionRoot, options) {
+    return stageBrowserDistribution(distributionRoot, {
+        generatedDirectory: path.join(root, 'src/faceCrop/generated'),
+        publicRoot: path.join(root, 'public/facecrop'),
+        publicSubpath: '/facecrop/',
+        workRoot: root
+    }, options);
+}
 const {replaceDirectory} = require('../scripts/build.cjs');
 
 function withTempDirectory(callback) {
@@ -158,5 +167,22 @@ test('incomplete stage rollback preserves recovery backups and reports their loc
         expect(fs.readFileSync(path.join(caught.recoveryDirectory, 'backup-1'), 'utf8')).toBe('known-good-metadata');
         expect(fs.readFileSync(path.join(generated, 'facecrop.js'), 'utf8')).toBe('known-good-entry');
         fs.rmSync(caught.recoveryDirectory, {recursive: true, force: true});
+    });
+});
+
+test('staging accepts independent host paths and deployment URLs', () => {
+    withTempDirectory(root => {
+        const distribution = path.join(root, 'distribution');
+        const hash = makeDistribution(distribution);
+        const generatedDirectory = path.join(root, 'bundle-input');
+        const publicRoot = path.join(root, 'static/runtime');
+        const result = stageBrowserDistribution(distribution, {
+            generatedDirectory, publicRoot, publicSubpath: '/study/runtime/', workRoot: root
+        });
+        expect(result.publicSubpath).toBe(`/study/runtime/${hash}/`);
+        expect(verifyDistribution(path.join(publicRoot, hash)).assetDirectory).toBe(hash);
+        expect(JSON.parse(fs.readFileSync(path.join(generatedDirectory, 'facecropAssets.json'), 'utf8')))
+            .toEqual({publicSubpath: result.publicSubpath});
+        expect(fs.existsSync(path.join(root, 'src'))).toBe(false);
     });
 });

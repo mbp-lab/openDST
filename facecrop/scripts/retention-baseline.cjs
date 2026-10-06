@@ -1,8 +1,9 @@
 /*
  * Reproduce the campaign's completed-part retention observation.
- * Run from openDST/ with either:
- *   node --expose-gc facecrop/scripts/retention-baseline.cjs --baseline
- *   node --expose-gc facecrop/scripts/retention-baseline.cjs
+ * Run from this package with either:
+ *   node --expose-gc scripts/retention-baseline.cjs --baseline --baseline-repository /path/to/openDST
+ *   node --expose-gc scripts/retention-baseline.cjs --baseline --baseline-source /path/to/source-snapshot
+ *   node --expose-gc scripts/retention-baseline.cjs
  * The transport bytes are deliberately synthetic; the frame metadata follows
  * the production face-event shape. This is not a browser memory benchmark.
  */
@@ -15,19 +16,51 @@ const {execFileSync} = require('child_process');
 const root = path.resolve(__dirname, '..');
 const babel = require(path.join(root, 'node_modules/@babel/core'));
 const BASELINE_COMMIT = '4fd85bc6e031f33f3dd3aad6207e25b69fd8d595';
+function optionValue(name) {
+    const index = process.argv.indexOf(name);
+    if (index === -1) return null;
+    const value = process.argv[index + 1];
+    if (!value || value.startsWith('--')) throw new Error(`${name} requires a path`);
+    return value;
+}
 const baselineMode = process.argv.includes('--baseline');
+const baselineRepository = optionValue('--baseline-repository');
+const baselineSource = optionValue('--baseline-source');
+if (baselineRepository && baselineSource) throw new Error('Choose either --baseline-repository or --baseline-source');
+if (baselineMode && !baselineRepository && !baselineSource) {
+    throw new Error('Baseline mode needs an explicit source: pass --baseline-repository PATH or --baseline-source PATH (a directory containing src/)');
+}
+if (!baselineMode && (baselineRepository || baselineSource)) {
+    throw new Error('--baseline-repository and --baseline-source require --baseline');
+}
 let sourceRoot = root;
 let baselineSnapshot;
-if (baselineMode) {
+let sourceDescription = 'current worktree';
+if (baselineSource) {
+    sourceRoot = path.resolve(baselineSource);
+    if (!fs.existsSync(path.join(sourceRoot, 'src', 'FaceCropOutput.js')) ||
+        !fs.existsSync(path.join(sourceRoot, 'src', 'Metadata.js')) ||
+        !fs.existsSync(path.join(sourceRoot, 'src', 'uploadState.js'))) {
+        throw new Error(`Baseline source must contain src/FaceCropOutput.js, src/Metadata.js and src/uploadState.js: ${sourceRoot}`);
+    }
+    sourceDescription = `baseline source ${sourceRoot}`;
+} else if (baselineMode) {
+    const repositoryRoot = path.resolve(baselineRepository);
     baselineSnapshot = fs.mkdtempSync(path.join(os.tmpdir(), 'facecrop-retention-baseline-'));
-    fs.mkdirSync(path.join(baselineSnapshot, 'src'));
-    ['FaceCropOutput.js', 'Metadata.js', 'uploadState.js'].forEach(filename => {
-        const content = execFileSync('git', ['show', `${BASELINE_COMMIT}:facecrop/src/${filename}`], {
-            cwd: path.dirname(root), encoding: 'utf8'
+    try {
+        fs.mkdirSync(path.join(baselineSnapshot, 'src'));
+        ['FaceCropOutput.js', 'Metadata.js', 'uploadState.js'].forEach(filename => {
+            const content = execFileSync('git', ['show', `${BASELINE_COMMIT}:facecrop/src/${filename}`], {
+                cwd: repositoryRoot, encoding: 'utf8'
+            });
+            fs.writeFileSync(path.join(baselineSnapshot, 'src', filename), content);
         });
-        fs.writeFileSync(path.join(baselineSnapshot, 'src', filename), content);
-    });
+    } catch (error) {
+        fs.rmSync(baselineSnapshot, {recursive: true, force: true});
+        throw error;
+    }
     sourceRoot = baselineSnapshot;
+    sourceDescription = `${BASELINE_COMMIT} from ${repositoryRoot}`;
 }
 const originalJsLoader = Module._extensions['.js'];
 Module._extensions['.js'] = (module, filename) => {
@@ -89,7 +122,7 @@ async function main() {
         artifacts: sink.inventory().map(({completion, ...artifact}) => artifact)}));
     const report = {
         scope: 'Node sink fixture; no browser/model/camera; synthetic encoded bytes, realistic metadata shape',
-        source: baselineMode ? BASELINE_COMMIT : 'current worktree',
+        source: sourceDescription,
         node: process.version,
         echoPayload,
         compactHistorySerializedBytes: compactHistoryBytes,

@@ -6,15 +6,20 @@ The harness creates a fresh fixture under `/tmp`, copies `run-study.bash`, its t
 
 The browser creates a synthetic canvas camera stream, calls the actual `createCaptureSession` and `createJatosTransport(window.jatos)`, and checks normal AVI/sidecar/manifest uploads in the JATOS result-upload tree, including gzip/RIFF and JSON content plus write order. A second capture holds the response to an AVI upload only after the real JATOS upload promise resolves. The harness aborts while the library sees that response as pending, releases it afterward, checks the already accepted AVI remains, verifies no face-events sidecar or further capture write is stored, and submits a real `config.txt` beginning with `save_without_video` through JATOS.
 
-Run after the standalone build/stage using the disposable JATOS seed and external browser installation:
+Run from the `facecrop/` package after the standalone build using the disposable JATOS seed and external browser installation. This host acceptance harness requires `FACECROP_WORKBENCH_ROOT`; it no longer infers the workbench from its location. By default, the archive is `<workbench>/jatos/archives/facecropping_test.jzip` and the seed is `<workbench>/.jatos-temp/<installed-JATOS-version>/`. Set `FACECROP_JATOS_ARCHIVE` or `FACECROP_JATOS_SEED` to use explicit paths instead. These path overrides are resolved from the invocation directory, so absolute paths are clearest.
 
 ```sh
+FACECROP_WORKBENCH_ROOT=/path/to/workbench \
+FACECROP_JATOS_ARCHIVE=/path/to/workbench/jatos/archives/facecropping_test.jzip \
+FACECROP_JATOS_SEED=/path/to/workbench/.jatos-temp/3.11.1 \
 PLAYWRIGHT_MODULE=/tmp/facecrop-browser/node_modules/playwright \
 PLAYWRIGHT_BROWSERS_PATH=/tmp/facecrop-browser/browsers \
 LD_LIBRARY_PATH=/tmp/facecrop-browser/runtime/lib/x86_64-linux-gnu:/tmp/facecrop-browser/runtime/usr/lib/x86_64-linux-gnu \
 FACECROP_EXPECTED_DIST_HASH=c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c \
-node facecrop/tests/browser-jatos.cjs
+node tests/browser-jatos.cjs
 ```
+
+The archive and seed overrides are optional when their workbench-relative defaults exist. The explicit workbench root is mandatory, and the harness reports that requirement before loading Playwright.
 
 Executed result: JATOS 3.11.1, Playwright Chromium 153.0.8010.12, Node v22.16.0. The final run stored and validated normal AVI gzip/RIFF, sidecar JSON and manifest in `study-result_1/comp-result_1`; actual upload order was AVI, sidecar, then manifest. Both stored sidecars were linked to manifest parts and checked for frame indexes, within-part timestamp order and cross-part timestamp continuity. The two parts held 539 and 5 frames.
 

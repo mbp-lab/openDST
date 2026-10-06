@@ -5,18 +5,25 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const {spawn} = require('child_process');
-const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const zlib = require('zlib');
 const {promisify} = require('util');
 const sleep = promisify(setTimeout);
 
-const repository = path.resolve(__dirname, '../../..');
-const sourceArchive = path.join(repository, 'jatos/archives/facecropping_test.jzip');
+const workbenchRoot = process.env.FACECROP_WORKBENCH_ROOT;
+if (!workbenchRoot) {
+    process.stderr.write('Set FACECROP_WORKBENCH_ROOT to the openDST workbench directory before running this host acceptance harness.\n');
+    process.exit(1);
+}
+const repository = path.resolve(workbenchRoot);
+const resolveOverride = (value, fallback) => value ? path.resolve(value) : fallback;
+const sourceArchive = resolveOverride(process.env.FACECROP_JATOS_ARCHIVE,
+    path.join(repository, 'jatos/archives/facecropping_test.jzip'));
 const distribution = path.resolve(__dirname, '../dist');
 const installedJatos = process.env.JATOS_HOME || '/opt/jatos';
 const archiveStudyDirectory = 'facecropping_test';
 const distributionMount = `/study_assets/${archiveStudyDirectory}/facecrop/`;
 const fileTypes = {'.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm', '.bin': 'application/octet-stream'};
+const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 function walk(root) {
     if (!fs.existsSync(root)) return [];
@@ -98,7 +105,8 @@ async function main() {
     assert(fs.existsSync(path.join(distribution, 'tfjs/4.22.0/model/model.json')), 'Current model assets are missing');
     assert(fs.existsSync(path.join(installedJatos, 'bin/jatos')), `JATOS is not installed at ${installedJatos}`);
     const version = fs.readFileSync(path.join(installedJatos, 'VERSION'), 'utf8').trim();
-    const sourceSeed = path.join(repository, '.jatos-temp', version);
+    const sourceSeed = resolveOverride(process.env.FACECROP_JATOS_SEED,
+        path.join(repository, '.jatos-temp', version));
     for (const file of ['jatos.mv.db', 'api-token', 'VERSION']) assert(fs.existsSync(path.join(sourceSeed, file)), `Missing provisioned seed file ${file}`);
     const distHash = requiredDistributionHash();
     if (process.env.FACECROP_EXPECTED_DIST_HASH) assert.equal(distHash, process.env.FACECROP_EXPECTED_DIST_HASH,

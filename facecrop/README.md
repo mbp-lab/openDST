@@ -21,6 +21,22 @@ npm --prefix facecrop ci
 npm run facecrop:stage
 ```
 
+Reusable staging and rollback are implemented in `scripts/stage-distribution.cjs`; the openDST wrapper supplies CRA destinations. Other hosts can supply their own generated directory, public root and URL prefix.
+
+For a different host, stage an already-built distribution with explicit destinations:
+
+```js
+const {stageDistribution} = require('./scripts/stage-distribution.cjs');
+stageDistribution('/path/to/facecrop/dist', {
+  generatedDirectory: '/path/to/host/generated',
+  publicRoot: '/path/to/host/public/assets/facecrop',
+  publicSubpath: '/assets/facecrop/',
+  workRoot: '/path/to/host'
+});
+```
+
+The generated files are `facecrop.js` and `facecropAssets.json`; the latter supplies the matching runtime URL. `workRoot` must exist and support renaming staged files into the destinations.
+
 `facecrop:stage` builds and verifies the standalone output and then stages its generated CRA entry, public URL metadata, and content-hashed runtime directory. It never installs dependencies. Ordinary `npm start`, `npm test`, and `npm run build` do not build or stage facecrop. If you change facecrop sources, rerun the explicit stage command first. Failed build or staging validation preserves the previous usable output. Prior hash directories are retained so already-open pages can finish fetching their runtime assets; remove old versions only as a separate deployment cleanup after they are no longer referenced.
 
 A real Chromium acceptance run also checks classic worker loading, TFJS WASM/model fetches, completed artifact writes, and abort behavior. Playwright and its Chromium binary stay outside the package's normal lockfile and install:
@@ -93,6 +109,6 @@ Use numeric values, not strings. Missing fields receive defaults; supplied inval
 
 ## Refactor validation and retention policy
 
-The campaign's [acceptance report](docs/campaign/acceptance-report.md) records exact browser/JATOS workloads and remaining platform limits. After building, external Playwright can run `node tests/browser-sustained.cjs` (set `FACECROP_SUSTAINED_PARTS=6`, `FACECROP_REQUIRE_FRAME_OBSERVATION=1`, `FACECROP_ASSERT_FRAME_RELEASE=1`, and `FACECROP_ASSERT_TRANSPORT_ACK_RELEASE=1` for the full retention gates). `node tests/browser-jatos.cjs` requires the documented disposable local JATOS seed/workbench archive; it never modifies a participant study.
+The campaign's [acceptance report](docs/campaign/acceptance-report.md) records exact browser/JATOS workloads and remaining platform limits. After building, external Playwright can run `node tests/browser-sustained.cjs` (set `FACECROP_SUSTAINED_PARTS=6`, `FACECROP_REQUIRE_FRAME_OBSERVATION=1`, `FACECROP_ASSERT_FRAME_RELEASE=1`, and `FACECROP_ASSERT_TRANSPORT_ACK_RELEASE=1` for the full retention gates). `node tests/browser-jatos.cjs` requires an explicit `FACECROP_WORKBENCH_ROOT` and the documented disposable local JATOS seed/workbench archive; it never modifies a participant study.
 
 Completed frame/encoded payloads and settled transport acknowledgements are released by the sink. Compact artifact history grows with part count; the openDST host retains one latest compact status per capture ID. Caller-held completion promises/context remain caller-owned. Abort prevents new facecrop writes, preserves observable in-flight completions, and cannot prove remote absence after rejection. In openDST, “Cancel and submit data without video” submits `save_without_video`; it does not retract recordings already uploaded or in flight. The host owns camera tracks, navigation, withdrawal and deletion policy.

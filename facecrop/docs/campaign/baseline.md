@@ -11,12 +11,15 @@ Recorded 2026-10-06 from the `openDST` checkout before campaign production edits
 
 ## Retention reproduction
 
-Run from `openDST/` after installing the facecrop lockfile dependencies. The first command loads the sink, metadata and upload-status modules from the pinned extraction commit using `git show`; the second measures the current worktree:
+Run from `facecrop/` after installing the package lockfile dependencies. Baseline mode requires an explicit source. To reproduce the pinned extraction checkpoint from a workbench checkout, pass its repository path; `--baseline-source` accepts a directory containing the three source files under `src/` and does not need Git history. The current-worktree command needs neither option:
 
 ```sh
-node --expose-gc facecrop/scripts/retention-baseline.cjs --baseline
-node --expose-gc facecrop/scripts/retention-baseline.cjs
+node --expose-gc scripts/retention-baseline.cjs --baseline --baseline-repository /path/to/openDST
+node --expose-gc scripts/retention-baseline.cjs --baseline --baseline-source /path/to/baseline-snapshot
+node --expose-gc scripts/retention-baseline.cjs
 ```
+
+The report's `source` field identifies the current worktree, supplied source directory, or pinned commit and repository used for the comparison.
 
 Both runs construct 200 sink parts with 500 frame records each. Every frame carries presentation time, wall clock, source dimensions, detection, selection/bounding box and ROI metadata matching the face-event shape. The transport resolves immediately; encoded bytes are one-byte synthetic placeholders. On Node `v22.16.0` with explicit GC, the pinned pre-refactor run retained 200 payload parts, 100,000 reachable frame records and 400 file-ledger entries, with zero pending uploads, zero retained compressed buffers, and about 34.37 MiB heap growth. The current worktree run retains zero payload parts and zero frame records, with 200 compact part entries and 400 file-ledger entries, zero pending uploads, zero compressed buffers, and about 0.40 MiB heap growth. Heap growth varies with runtime and is diagnostic, not a browser/mobile estimate; structural retained-record count is the primary result. This fixture measures object retention, not AVI validity, upload throughput, or camera resources.
 
