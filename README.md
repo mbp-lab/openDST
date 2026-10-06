@@ -67,6 +67,18 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 In the project directory, you can run:
 
+### Facecrop setup
+
+Install the locked dependencies in both packages and stage facecrop explicitly after a clean checkout or after changing its source:
+
+```sh
+npm ci
+npm --prefix facecrop ci
+npm run facecrop:stage
+```
+
+The stage command builds and validates the complete browser distribution. It does not install packages. `npm start`, `npm test`, and `npm run build` use the last staged distribution and never stage it implicitly.
+
 ### `npm start`
 
 Runs the app in the development mode.<br />
@@ -84,4 +96,3 @@ The build is minified and the filenames include the hashes.<br />
 Your app is ready to be deployed!
 
 See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-

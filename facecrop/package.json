@@ -13,9 +13,11 @@
   "scripts": {
     "clean": "node scripts/clean.cjs",
     "build": "node scripts/build.cjs",
+    "verify:dist": "node scripts/verify-distribution.cjs",
     "test": "jest --runInBand",
     "test:browser": "node tests/browser-smoke.cjs"
   },
+  "engines": {"node": "22.x", "npm": "10.x"},
   "devDependencies": {
     "@babel/core": "7.9.0",
     "@babel/plugin-proposal-nullish-coalescing-operator": "7.18.6",

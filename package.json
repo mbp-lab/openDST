@@ -25,17 +25,14 @@
     "ua-parser-js": "^1.0.2"
   },
   "scripts": {
-    "prestart": "node scripts/vendor-face-detector-assets.js",
     "start": "react-scripts start",
-    "prebuild": "node scripts/vendor-face-detector-assets.js",
+    "facecrop:stage": "node scripts/vendor-face-detector-assets.js",
     "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "pretest": "node scripts/vendor-face-detector-assets.js"
+    "eject": "react-scripts eject"
   },
-  "eslintConfig": {
-    "extends": "react-app"
-  },
+  "engines": {"node": "22.x", "npm": "10.x"},
+  "eslintConfig": {"extends": "react-app"},
   "browserslist": {
     "production": [
       ">0.2%",

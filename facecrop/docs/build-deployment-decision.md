@@ -1,0 +1,55 @@
+# Build and deployment decision: facecrop
+
+Date: 2026-10-06. This records the workstream D decision, implementation, and gate evidence for [the refactor campaign](refactor-campaign.md).
+
+## Decision and implementation status
+
+Keep the supported artifact for this campaign as a complete, privately maintained browser distribution built from `facecrop/` and staged into the CRA/JATOS host. Do not promise npm package installation yet. Dependency installation, build, validation, and host staging are explicit commands. Ordinary `start`, `build`, and `test` hooks do not install dependencies or stage facecrop.
+
+The implementation adds a complete distribution verifier, a temporary-output build that validates before replacing `dist/`, and an explicit `npm run facecrop:stage` command. Staging retains prior content-hash directories and rolls back generated CRA files if promotion fails. If rollback itself fails, staging retains its recovery directory and reports its location.
+
+This keeps the current UMD plus classic worker integration and does not require a remote repository, submodule, package publication, or CRA upgrade. The private package metadata (`private: true`) agrees with the current consumer: CRA imports generated `dist/facecrop.js` and reads a generated public asset path. `files` and `main` resemble package metadata, but there is no pack/install consumer evidence.
+
+## Evidence and limits
+
+- `facecrop/scripts/build.cjs` emits the UMD entry, classic worker, TensorFlow.js runtime, three WASM binaries, BlazeFace loader/model, notices, and `asset-manifest.json`. It hashes the distribution tree before writing the manifest, so the manifest is intentionally excluded from its own hash.
+- At audit time, the builder deleted `dist/` before compilation. The implementation now builds in a temporary directory and replaces the previous distribution only after full verification. `scripts/clean.cjs` remains an explicit destructive command.
+- At audit time, the stage script checked two JS files and hash syntax, wrote generated CRA files before staging assets, and deleted its destination before copying. The implementation verifies the complete required file set and recomputed hash, adds a new immutable hash directory first, and promotes generated files with rollback on failure.
+- At audit time, staging could run nested `npm ci --ignore-scripts` and host lifecycle hooks invoked it implicitly. The implementation requires dependencies to be installed at exact locked versions, reports the explicit recovery command, and stages only via `npm run facecrop:stage`.
+- `openDST/facecrop/README.md` documents standalone installation/build and a cache-safe hash directory. The examples nevertheless repeat the browser script URL and `assetBaseUrl` URL, and the plain-browser example hardcodes the JATOS study mount. CRA builds derive the deployed base from `PUBLIC_URL`; the adapter appends the generated `/facecrop/<hash>/` subpath.
+- The campaign workbench packages the CRA build into a JATOS `.jzip`; `build-study.bash` runs `npm ci`, builds with `PUBLIC_URL=/study_assets/<study>`, and writes to the configured JATOS archive directory. The runner gate requires an installed JATOS, generated archive, and provisioned matching seed. It can skip successfully if one is missing.
+- A disposable clean checkout at `/tmp/facecrop-clean-checkout.3GFE2n` passed offline locked dependency installation for both the standalone package and host on Node `v22.16.0` / npm `10.9.2`. The documented explicit stage command built and staged hash `025d438502c2788d56a378966f54c0f51826a30cc45efc97f8f259e58b260095`; standalone tests passed 89/89 and host tests passed 20/20. The host production build compiled at `PUBLIC_URL=/study_assets/clean-consumer/` and its bundle included both the nested public prefix and the matching `/facecrop/<hash>/` path. Package metadata declares Node 22.x and npm 10.x based on this environment; no other major versions are claimed.
+- In the disposable checkout, removing the required model source caused the build to fail with an actionable missing-asset error; the previous distribution then passed verification with the same hash and the build lock was removed. Repeated successful builds also produced the same hash. These checks cover builder validation/preservation and the private CRA consumer, not external npm packaging.
+- For browser acceptance, external Playwright and Chromium are available at `/tmp/facecrop-browser`; set `PLAYWRIGHT_BROWSERS_PATH=/tmp/facecrop-browser/browsers`. The actual JATOS installation, archive, and matching seed are present. Do not interpret available inputs as a passed browser/JATOS gate.
+- No browser/device support floor is established by these source files. The README calls for HTTPS or localhost. The campaign explicitly distinguishes the existing short mock-transport browser smoke from sustained capture and a real browser/JATOS upload path.
+
+## Alternatives and impact
+
+| Option | Benefits | Costs and risks | Recommendation |
+|---|---|---|---|
+| Keep implicit CRA hooks | Existing contributors get generated assets automatically when starting/testing/building. | Commands conceal compilation, dependency repair, generated-file mutation, possible network access, and destructive replacement. Failures are harder to attribute. | Retain convenience only as an explicit `stage` command, not an npm lifecycle hook. |
+| Explicit private browser distribution (proposed) | Matches current UMD/worker/runtime layout, CRA adapter, and JATOS static-asset deployment; no publishing service or source-module bundling contract needed. | Consumers must stage the complete output tree and use its matching hashed URL. Clean setup requires an explicit sequence. | Use for the campaign; document and validate it end to end. |
+| Publish/install an npm package | Familiar versioned dependency and potential React/plain-browser reuse. | Requires a stable package API, package inclusion audit, clean `npm pack`/install tests, worker/WASM/model URL contract, licensing review, release ownership and version migration. Current package is private and examples consume local `dist`. | Defer until there is a real external consumer and a separate distribution decision. |
+| Commit generated CRA assets | Removes build work from host start/test and can help constrained/offline builds. | Duplicates potentially large generated output, can drift from source/lockfile, and still needs a reproducible update/check rule. | Do not adopt absent a demonstrated offline requirement. |
+
+## Implemented changes and migration
+
+1. Standalone install, build, test, and host staging have explicit commands. `facecrop:stage` checks every pinned facecrop development dependency and directs contributors to `npm --prefix facecrop ci` if installation is incomplete. CRA hooks do no facecrop install or staging.
+2. The builder uses a temporary sibling, validates the manifest schema and complete runtime tree, and recomputes the hash before replacing `dist/`. Compile or validation failure leaves the previous distribution usable.
+3. The stage command verifies the full distribution, copies and re-verifies the new hash directory, then promotes the CRA entry and URL metadata with rollback. If rollback itself fails, the stage directory is retained and reported for manual recovery. Previous content-hash directories remain available for open pages; cleanup is a separate deployment operation.
+4. The plain-browser example derives its script URL and `assetBaseUrl` from one configured distribution base. The host and library READMEs explain the explicit stage sequence and nested JATOS mount behavior.
+5. Package metadata and both READMEs record Node 22.x/npm 10.x. Clean locked installation, tests, and build evidence is available on Node 22.16.0/npm 10.9.2; no other major versions are claimed. `NODE_OPTIONS=--openssl-legacy-provider` remains limited to the existing CRA production build command.
+
+Existing contributors can migrate by running locked installs once, building facecrop, and running the explicit stage command before host development/build commands. The generated `src/faceCrop/generated/` and `public/facecrop/` outputs remain generated artifacts. Rollback is to restore the previous known-good distribution and staged hash directory together; never restore just the JS entry or just the public tree.
+
+## Acceptance gates
+
+- **Passed:** disposable clean locked installs, explicit stage, standalone 89-test suite, host 20-test suite, and CRA production build with a nested `PUBLIC_URL` as recorded above. The built main chunk contains the nested host prefix and content-hash runtime path.
+- **Passed:** focused verifier/stage regressions cover corrupted hash, missing runtime file, malformed manifest, promotion failure, incomplete rollback recovery, old-hash retention, and generated-file preservation. A forced missing model source in the builder left the previous verified `dist/` unchanged. Repeated successful builds produced the same asset hash.
+- **Passed:** the verifier recomputes the manifest hash over the exact required distribution and rejects missing/extra files and symlinks; the distribution includes runtime, model, worker, and license notices.
+- **Pending:** browser requests for the worker, every WASM variant, and model from a real Chromium run; root and nested runtime loading across browser execution; sustained and real JATOS browser upload/cancellation.
+- **Outside this D pass:** deterministic JATOS archive listing and real browser-to-JATOS upload/cancellation remain campaign acceptance gates. The isolated runner and CRA build do not prove these browser/server behaviors. Do not claim npm-pack support; there is no clean npm package consumer test or publish workflow.
+
+## Current gate status
+
+The local JATOS installation, test archive, and matching seed appear present, so the isolated JATOS runner has its documented inputs. Do not interpret that as a passed run: this D audit did not start JATOS or modify its state. Browser/JATOS acceptance remains pending; run Playwright with `PLAYWRIGHT_BROWSERS_PATH=/tmp/facecrop-browser/browsers`. No npm package publication or external clean package consumer was tested, so npm installation is not a supported distribution contract.

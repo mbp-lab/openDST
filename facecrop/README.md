@@ -9,8 +9,19 @@ From this directory, run:
 ```sh
 npm ci
 npm run build
+npm run verify:dist
 npm test
 ```
+
+The supported project toolchain recorded for this checkout is Node 22.x with npm 10.x. These files have been exercised on Node 22.16.0 and npm 10.9.2; other major versions are not currently claimed. On a fresh openDST checkout, install both locked dependency trees and explicitly stage the validated browser distribution before starting, testing, or building the CRA host:
+
+```sh
+npm ci
+npm --prefix facecrop ci
+npm run facecrop:stage
+```
+
+`facecrop:stage` builds and verifies the standalone output and then stages its generated CRA entry, public URL metadata, and content-hashed runtime directory. It never installs dependencies. Ordinary `npm start`, `npm test`, and `npm run build` do not build or stage facecrop. If you change facecrop sources, rerun the explicit stage command first. Failed build or staging validation preserves the previous usable output. Prior hash directories are retained so already-open pages can finish fetching their runtime assets; remove old versions only as a separate deployment cleanup after they are no longer referenced.
 
 A real Chromium acceptance run also checks classic worker loading, TFJS WASM/model fetches, completed artifact writes, and abort behavior. Playwright and its Chromium binary stay outside the package's normal lockfile and install:
 
@@ -20,7 +31,7 @@ PLAYWRIGHT_MODULE=/tmp/facecrop-browser/node_modules/playwright /tmp/facecrop-br
 PLAYWRIGHT_MODULE=/tmp/facecrop-browser/node_modules/playwright npm run test:browser
 ```
 
-The lockfile pins the Webpack 4 build tool, test tools, TFJS 4.22.0, the TFJS WASM backend 4.22.0, and BlazeFace 0.1.0. `npm run build` writes `dist/facecrop.js` (UMD), `dist/facecrop.worker.js` (classic worker), the versioned `dist/tfjs/4.22.0/` runtime/WASM/model assets, third-party license notices, and `dist/asset-manifest.json`. The manifest gives the SHA-256 asset directory for cache-safe deployments. Publish the complete `dist/` contents under a path ending in that directory value, such as `/assets/facecrop/<assetDirectory>/`, and keep that URL stable. The openDST CRA integration stages the same distribution under `/facecrop/<assetDirectory>/` and updates its generated host path automatically. Use HTTPS or localhost for camera and `VideoFrame` APIs.
+The lockfile pins the Webpack 4 build tool, test tools, TFJS 4.22.0, the TFJS WASM backend 4.22.0, and BlazeFace 0.1.0. `npm run build` writes `dist/facecrop.js` (UMD), `dist/facecrop.worker.js` (classic worker), the versioned `dist/tfjs/4.22.0/` runtime/WASM/model assets, third-party license notices, and `dist/asset-manifest.json`. `npm run verify:dist` checks the complete required file set and recomputes the manifest's SHA-256 directory hash. Publish the complete `dist/` contents under a path ending in that directory value, such as `/assets/facecrop/<assetDirectory>/`, and keep that URL stable. The openDST CRA integration stages the same distribution under `/facecrop/<assetDirectory>/` and derives the runtime URL from `PUBLIC_URL`. Use HTTPS or localhost for camera and `VideoFrame` APIs.
 
 The worker is intentionally classic: it loads TensorFlow.js, the WASM backend, and BlazeFace with `importScripts`. Keep `facecrop.worker.js` and `tfjs/` at the same distribution root. The library accepts the absolute directory URL as `assetBaseUrl`, so it can be deployed under a versioned or nested path without a build-time `PUBLIC_URL`.
 
