@@ -18,14 +18,18 @@ test('host finalization stops ordinary recording before waiting on facecrop writ
         })};
     const capture = {captureId: 'capture', stop: jest.fn(() => gate.promise), abort: jest.fn(() => Promise.resolve({status: 'aborted'}))};
     component.registerFaceCropSession(capture);
-    expect(registered).toHaveBeenCalledWith(capture);
-    const stopping = capture.stop();
+    const handle = registered.mock.calls[0][0];
+    expect(handle).not.toBe(capture);
+    expect(component.faceCropController).toBe(handle);
+    const originalStop = capture.stop;
+    const stopping = handle.stop();
     expect(component.mediaStreamRecorder.stop).toHaveBeenCalledTimes(1);
     await Promise.resolve();
     expect(onstop).toHaveBeenCalledTimes(1);
     gate.resolve({status: 'complete'});
     expect(await stopping).toEqual({status: 'complete'});
-    await capture.stop();
+    await handle.stop();
+    expect(capture.stop).toBe(originalStop);
     expect(component.mediaStreamRecorder.stop).toHaveBeenCalledTimes(1);
 });
 
@@ -64,4 +68,40 @@ test('stop during asynchronous recorder creation prevents recording from startin
     await component.stopRecording();
     gate.resolve(); await starting;
     expect(recorder.start).not.toHaveBeenCalled();
+});
+
+test('host abort supersedes drain through a stable coordinator without waiting for transport', async () => {
+    const gate = deferred();
+    const registered = jest.fn();
+    const component = new WebcamCapture({onFaceCropSessionCreated: registered});
+    component.mediaStreamRecorder = {state: 'recording', stop: jest.fn(function () {
+        this.state = 'inactive';
+        Promise.resolve().then(() => this.onstop({}));
+    })};
+    const capture = {captureId: 'capture', stop: jest.fn(() => gate.promise),
+        abort: jest.fn(() => Promise.resolve({status: 'aborted'}))};
+    const originalAbort = capture.abort;
+    component.registerFaceCropSession(capture);
+    const handle = registered.mock.calls[0][0];
+    const stopping = handle.stop();
+    await expect(handle.abort()).resolves.toEqual({status: 'aborted'});
+    expect(component.mediaStreamRecorder.stop).toHaveBeenCalledTimes(1);
+    expect(capture.abort).toBe(originalAbort);
+    gate.resolve({status: 'complete'});
+    await stopping;
+});
+
+test('rejected library finalization still waits for component recorder cleanup', async () => {
+    const registered = jest.fn();
+    const component = new WebcamCapture({onFaceCropSessionCreated: registered});
+    component.mediaStreamRecorder = {state: 'recording', stop: jest.fn(function () { this.state = 'inactive'; })};
+    const error = new Error('finalization failed');
+    component.registerFaceCropSession({captureId: 'capture', stop: () => Promise.reject(error), abort: jest.fn()});
+    const handle = registered.mock.calls[0][0];
+    let settled = false;
+    const stopping = handle.stop().catch(failure => { settled = true; return failure; });
+    await Promise.resolve(); await Promise.resolve();
+    expect(settled).toBe(false);
+    component.mediaStreamRecorder.onstop({});
+    expect(await stopping).toBe(error);
 });

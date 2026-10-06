@@ -220,23 +220,21 @@ class WebcamCapture extends React.Component {
 
     registerFaceCropSession(session) {
         if (!session) return;
-        // Main can finalize before unmount: stop ordinary recording at the same boundary,
-        // then let the standalone session drain independently of camera-track ownership.
-        const stop = session.stop.bind(session);
-        const abort = session.abort.bind(session);
-        session.stop = async () => {
+        // The component owns recorder cleanup; the library handle stays unchanged.
+        const finish = async operation => {
             const recorderStop = this.stopMediaRecorder();
-            const result = await stop();
-            await recorderStop;
-            return result;
+            try { return await operation(); }
+            finally { await recorderStop; }
         };
-        session.abort = async () => {
-            const recorderStop = this.stopMediaRecorder();
-            const result = await abort();
-            await recorderStop;
-            return result;
+        const coordinated = {
+            captureId: session.captureId,
+            prepare: () => session.prepare(),
+            start: () => session.start(),
+            stop: () => finish(() => session.stop()),
+            abort: () => finish(() => session.abort())
         };
-        if (this.props.onFaceCropSessionCreated) this.props.onFaceCropSessionCreated(session);
+        this.faceCropController = coordinated;
+        if (this.props.onFaceCropSessionCreated) this.props.onFaceCropSessionCreated(coordinated);
     }
 
     async stopRecording({deferFaceCropStop = false} = {}) {
