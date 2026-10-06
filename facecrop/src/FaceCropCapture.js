@@ -198,7 +198,7 @@ export async function probeFaceCropCapability(video) {
     }
 }
 
-class PipelineWorker {
+export class PipelineWorker {
     constructor(assetBaseUrl, diagnostics = false) {
         this.worker = new Worker(new URL('facecrop.worker.js', assetBaseUrl).href);
         this.diagnostics = diagnostics;
@@ -233,17 +233,28 @@ class PipelineWorker {
         this.pump();
     }
 
+    releaseFrame(request) {
+        // Until postMessage succeeds, this request still owns the VideoFrame.
+        const frame = request.payload && request.payload.frame;
+        if (frame && !request.transferred) {
+            try { frame.close(); } catch (_) {}
+        }
+    }
+
     fail(error) {
         if (this.diagnostics) console.error('[face-crop] Worker failure', error);
         this.closed = true;
         this.worker.terminate();
-        if (this.pending) this.pending.reject(error);
+        if (this.pending) { this.releaseFrame(this.pending); this.pending.reject(error); }
         this.pending = null;
-        this.queue.splice(0).forEach(request => request.reject(error));
+        this.queue.splice(0).forEach(request => { this.releaseFrame(request); request.reject(error); });
     }
 
     request(type, payload = {}, transfer = []) {
-        if (this.closed) return Promise.reject(new Error('Face-crop worker is closed'));
+        if (this.closed) {
+            this.releaseFrame({payload});
+            return Promise.reject(new Error('Face-crop worker is closed'));
+        }
         return new Promise((resolve, reject) => {
             this.queue.push({type, payload, transfer, resolve, reject});
             this.pump();
@@ -256,8 +267,10 @@ class PipelineWorker {
         this.pending = pending;
         try {
             this.worker.postMessage({type: pending.type, payload: pending.payload}, pending.transfer);
+            pending.transferred = true;
         } catch (error) {
             this.pending = null;
+            this.releaseFrame(pending);
             pending.reject(error);
             this.pump();
         }
