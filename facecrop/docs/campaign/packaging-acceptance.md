@@ -1,0 +1,9 @@
+# Final packaging and runner acceptance
+
+Passed for frozen distribution `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c` on Node 22.16.0 / npm 10.9.2. The dedicated workbench build now explicitly installs both lockfiles, stages facecrop, then builds CRA with `/study_assets/facecropping_test/`. The package was written to a disposable JATOS_HOME, preserving the existing archive.
+
+Machine evidence is [packaging-acceptance-result.json](packaging-acceptance-result.json); the exact sorted contents are [archive-member-list.txt](archive-member-list.txt). The archive has 113 members / 88 files; SHA-256 `dc9bca7e1124b786dfa0a7c255a5518ad2ba5d329073f8597bebeb3abb9f728f`, extracted-tree hash `68151a90f6618442211b40a1b9b4359e75efe6ddf419a3bac023460f827d5e32`. The active runtime tree byte-matches dist; every retained historical runtime tree also has all 14 required files and a matching hash. Old hashes are intentionally retained for cached/open pages. Contents are deterministic for the same source and retained asset set; ZIP metadata/timestamps are not claimed bit-reproducible.
+
+`./tests/test-run-study.bash `/tmp/opendst-packaging-jatos-final2.Hv23FR/archives/facecropping_test.jzip` ran all 27 checks: 27 passed, zero failed/skipped. Durable PASS/summary evidence is [runner-final-summary.txt](runner-final-summary.txt). Installed JATOS state remained unchanged. The existing `/opt/jatos/archives/facecropping_test.jzip` still hashes to `0cf7e08442a52cd67dfae4d3828d64bf865c0d4a26918a1636a1208dd79a1127`.
+
+Packaging used the actual worktree, including the user's preserved page 1 / slide 4 startup edit, which is excluded from campaign commits. This proves the local private distribution/CRA/JATOS path; actual uploads are separately proven by the final JATOS report. No production participant study, publication or workbench Git-link update occurred.

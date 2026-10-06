@@ -99,6 +99,21 @@ test('failed session validation never registers a stranded pending sentinel', ()
     expect(tracked.markVideoAsUploading).not.toHaveBeenCalled();
 });
 
+test('prepare rejection remains disposable and settles the host sentinel once', async () => {
+    process.env.REACT_APP_FACE_CROP_RECORDING_MODE = 'all';
+    window.jatos = {uploadResultFile: jest.fn()};
+    const prepareError = new Error('worker initialization failed');
+    const capture = session({prepare: jest.fn(() => Promise.reject(prepareError))});
+    library.createCaptureSession.mockReturnValue(capture);
+    const tracked = props();
+    const handle = createFaceCropHostSession({video: {}, props: tracked});
+    await expect(handle.start()).rejects.toBe(prepareError);
+    await expect(handle.stop()).resolves.toMatchObject({status: 'aborted'});
+    expect(capture.dispose).toHaveBeenCalledTimes(1);
+    expect(capture.stop).not.toHaveBeenCalled();
+    expect(tracked.markVideoAsFailed).toHaveBeenCalledTimes(1);
+    expect(tracked.markVideoAsFailed).toHaveBeenCalledWith('face-crop-session-unique');
+});
 
 test('JATOS identity fallback belongs to the host adapter', () => {
     expect(resolveStudyResultId({studyResultId: null}, {studyResultId: 163})).toBe(163);

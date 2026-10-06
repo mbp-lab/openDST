@@ -1,0 +1,335 @@
+{
+  "status": "passed",
+  "gate": "real browser + disposable real JATOS server; not a production server/device test",
+  "jatosVersion": "3.11.1",
+  "browserVersion": "153.0.8010.12",
+  "nodeVersion": "v22.16.0",
+  "distributionAssetHash": "c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c",
+  "distributionMount": "/study_assets/facecropping_test/facecrop/",
+  "studyId": "1",
+  "archiveSha256": "0cf7e08442a52cd67dfae4d3828d64bf865c0d4a26918a1636a1208dd79a1127",
+  "originalIndexReplacedOnlyInFixture": true,
+  "normal": {
+    "status": "complete",
+    "captureId": "jatos-normal",
+    "filenames": [
+      "jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+      "jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+      "jatos_normal_jatos-normal_patch_s000_p001.avi.gz",
+      "jatos_normal_jatos-normal_patch_s000_p001.face-events.json",
+      "jatos_normal_jatos-normal_manifest.json"
+    ],
+    "writes": [
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+        "calledAt": 18434.90000000596,
+        "resolvedAt": 18485.70000000298
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+        "calledAt": 18486.10000000149,
+        "resolvedAt": 18696.90000000596
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p001.avi.gz",
+        "calledAt": 18697,
+        "resolvedAt": 18708.60000000149
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p001.face-events.json",
+        "calledAt": 18708.60000000149,
+        "resolvedAt": 18720.20000000298
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_manifest.json",
+        "calledAt": 18721.10000000149,
+        "resolvedAt": 18733.60000000149
+      }
+    ],
+    "partSummaries": [
+      {
+        "aviFilename": "jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+        "sidecarFilename": "jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+        "frameCount": 539,
+        "firstFrameIndex": 0,
+        "lastFrameIndex": 538,
+        "firstPresentationTimeUs": 462200,
+        "lastPresentationTimeUs": 18381200
+      },
+      {
+        "aviFilename": "jatos_normal_jatos-normal_patch_s000_p001.avi.gz",
+        "sidecarFilename": "jatos_normal_jatos-normal_patch_s000_p001.face-events.json",
+        "frameCount": 5,
+        "firstFrameIndex": 0,
+        "lastFrameIndex": 4,
+        "firstPresentationTimeUs": 18414200,
+        "lastPresentationTimeUs": 18546100
+      }
+    ]
+  },
+  "rejectedResponses": [
+    {
+      "kind": "avi",
+      "status": "incomplete",
+      "captureId": "jatos-reject-avi",
+      "targetFilename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz",
+      "targetStatus": "uncertain",
+      "targetAttempts": 3,
+      "serverAcceptedAttempts": 3,
+      "filenames": [
+        "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz"
+      ],
+      "outcomes": [
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz",
+          "status": "uncertain",
+          "attempts": 3
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.face-events.json",
+          "status": "not_attempted",
+          "attempts": 0
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p001.avi.gz",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p001.face-events.json",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_manifest.json",
+          "status": "succeeded",
+          "attempts": 1
+        }
+      ],
+      "manifestStatus": "succeeded",
+      "calls": [
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p001.avi.gz",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_patch_s000_p001.face-events.json",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_avi_jatos-reject-avi_manifest.json",
+          "responseRejectedAfterServerAcceptance": false
+        }
+      ]
+    },
+    {
+      "kind": "sidecar",
+      "status": "incomplete",
+      "captureId": "jatos-reject-sidecar",
+      "targetFilename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json",
+      "targetStatus": "uncertain",
+      "targetAttempts": 3,
+      "serverAcceptedAttempts": 3,
+      "filenames": [
+        "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json"
+      ],
+      "outcomes": [
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.avi.gz",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json",
+          "status": "uncertain",
+          "attempts": 3
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p001.avi.gz",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p001.face-events.json",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_manifest.json",
+          "status": "succeeded",
+          "attempts": 1
+        }
+      ],
+      "manifestStatus": "succeeded",
+      "calls": [
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.avi.gz",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p001.avi.gz",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p001.face-events.json",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_sidecar_jatos-reject-sidecar_manifest.json",
+          "responseRejectedAfterServerAcceptance": false
+        }
+      ]
+    },
+    {
+      "kind": "manifest",
+      "status": "incomplete",
+      "captureId": "jatos-reject-manifest",
+      "targetFilename": "jatos_reject_manifest_jatos-reject-manifest_manifest.json",
+      "targetStatus": "uncertain",
+      "targetAttempts": 3,
+      "serverAcceptedAttempts": 3,
+      "filenames": [
+        "jatos_reject_manifest_jatos-reject-manifest_manifest.json"
+      ],
+      "outcomes": [
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_patch_s000_p000.avi.gz",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_patch_s000_p000.face-events.json",
+          "status": "succeeded",
+          "attempts": 1
+        },
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_manifest.json",
+          "status": "uncertain",
+          "attempts": 3
+        }
+      ],
+      "manifestStatus": "uncertain",
+      "calls": [
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_patch_s000_p000.avi.gz",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_patch_s000_p000.face-events.json",
+          "responseRejectedAfterServerAcceptance": false
+        },
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_manifest.json",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_manifest.json",
+          "responseRejectedAfterServerAcceptance": true
+        },
+        {
+          "filename": "jatos_reject_manifest_jatos-reject-manifest_manifest.json",
+          "responseRejectedAfterServerAcceptance": true
+        }
+      ]
+    }
+  ],
+  "abort": {
+    "status": "aborted",
+    "captureId": "jatos-abort",
+    "abortLatencyMs": 0.3999999985098839,
+    "heldAcceptedFilename": "jatos_abort_jatos-abort_patch_s000_p000.avi.gz",
+    "filenames": [
+      "jatos_abort_jatos-abort_patch_s000_p000.avi.gz"
+    ],
+    "pendingCompletionCount": 1
+  },
+  "marker": {
+    "filename": "config.txt",
+    "firstLine": "save_without_video"
+  },
+  "files": {
+    "jatos_normal_jatos-normal_patch_s000_p000.avi.gz": {
+      "path": "study-result_1/comp-result_1/jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+      "bytes": 25300,
+      "sha256": "85dca766dc557ea8eb307a5ac28b89b99404da0e1d9db042b6551257101a4ade"
+    },
+    "jatos_normal_jatos-normal_patch_s000_p000.face-events.json": {
+      "path": "study-result_1/comp-result_1/jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+      "bytes": 227886,
+      "sha256": "0eb40dc9f27b6529077014ea79975979c2228a14b78e905a6e27d07d012ab8c9"
+    },
+    "jatos_normal_jatos-normal_manifest.json": {
+      "path": "study-result_1/comp-result_1/jatos_normal_jatos-normal_manifest.json",
+      "bytes": 4011,
+      "sha256": "30845e6f3567d7f68739ecc4c9caee17a0b6d952e60118730389470a0f936e07"
+    },
+    "jatos_abort_jatos-abort_patch_s000_p000.avi.gz": {
+      "path": "study-result_1/comp-result_1/jatos_abort_jatos-abort_patch_s000_p000.avi.gz",
+      "bytes": 25653,
+      "sha256": "53baeb91d16bfd7831401804edae95a498931e1a6b25b494b1fe33f9bf141b6d"
+    },
+    "config.txt": {
+      "path": "study-result_1/comp-result_1/config.txt",
+      "bytes": 60,
+      "sha256": "1aad1e245e669ecf83343021cac80dd02a8cd3d32f4bf4a3984666dd5f0d2afb"
+    },
+    "jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz": {
+      "path": "study-result_1/comp-result_1/jatos_reject_avi_jatos-reject-avi_patch_s000_p000.avi.gz",
+      "bytes": 24901,
+      "sha256": "9e806a747c4812c33e02e795a12939894786a1ef7949799deb89a96de5b98aab"
+    },
+    "jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json": {
+      "path": "study-result_1/comp-result_1/jatos_reject_sidecar_jatos-reject-sidecar_patch_s000_p000.face-events.json",
+      "bytes": 230531,
+      "sha256": "ed84f5afc4f0cd7db25891066767d04d1118263f74caeae6bc8d7714d5c9aead"
+    },
+    "jatos_reject_manifest_jatos-reject-manifest_manifest.json": {
+      "path": "study-result_1/comp-result_1/jatos_reject_manifest_jatos-reject-manifest_manifest.json",
+      "bytes": 3621,
+      "sha256": "3fcd82b4d1b0315412ca111513f0049dde51346fa07acd68b0a387d7bf4153bf"
+    }
+  },
+  "validations": {
+    "realJatosUploadApi": true,
+    "aviGzipRiff": true,
+    "sidecarJson": true,
+    "manifestJson": true,
+    "aviBeforeSidecarBeforeManifest": true,
+    "abortedAcceptedAviRetained": true,
+    "noAbortSidecar": true,
+    "saveWithoutVideoMarker": true,
+    "installedJatosStateUnchanged": true,
+    "rejectedAviSidecarNotAttempted": true,
+    "responseLossRetainsServerBytes": true,
+    "allNormalPartIndexesTimestampsAndManifestLinks": true
+  },
+  "remainingGaps": [
+    "participant experience under production deployment",
+    "physical camera/device formats",
+    "production JATOS persistence and cancellation path"
+  ]
+}

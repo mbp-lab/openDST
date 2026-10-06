@@ -1,0 +1,921 @@
+{
+  "browser": "153.0.8010.12",
+  "requestedPartsPerWorkerCount": 6,
+  "minFramesPerSustainedRun": 3234,
+  "mount": "/study_assets/other-study/facecrop/",
+  "runtimeAssetChecks": [
+    {
+      "file": "APACHE-2.0.txt",
+      "status": 200,
+      "bytes": 11358
+    },
+    {
+      "file": "asset-manifest.json",
+      "status": 200,
+      "bytes": 175
+    },
+    {
+      "file": "facecrop.js",
+      "status": 200,
+      "bytes": 51765
+    },
+    {
+      "file": "facecrop.worker.js",
+      "status": 200,
+      "bytes": 25885
+    },
+    {
+      "file": "LICENSE",
+      "status": 200,
+      "bytes": 35149
+    },
+    {
+      "file": "tfjs/4.22.0/blazeface.min.umd.js",
+      "status": 200,
+      "bytes": 10803
+    },
+    {
+      "file": "tfjs/4.22.0/model/group1-shard1of1.bin",
+      "status": 200,
+      "bytes": 401768
+    },
+    {
+      "file": "tfjs/4.22.0/model/model.json",
+      "status": 200,
+      "bytes": 64036
+    },
+    {
+      "file": "tfjs/4.22.0/tf-backend-wasm.min.js",
+      "status": 200,
+      "bytes": 149861
+    },
+    {
+      "file": "tfjs/4.22.0/tf.min.js",
+      "status": 200,
+      "bytes": 1469843
+    },
+    {
+      "file": "tfjs/4.22.0/tfjs-backend-wasm-simd.wasm",
+      "status": 200,
+      "bytes": 424594
+    },
+    {
+      "file": "tfjs/4.22.0/tfjs-backend-wasm-threaded-simd.wasm",
+      "status": 200,
+      "bytes": 435643
+    },
+    {
+      "file": "tfjs/4.22.0/tfjs-backend-wasm.wasm",
+      "status": 200,
+      "bytes": 311123
+    },
+    {
+      "file": "THIRD_PARTY_NOTICES.txt",
+      "status": 200,
+      "bytes": 357
+    }
+  ],
+  "frameReleaseAssertion": true,
+  "actualPartCounts": [
+    7,
+    7
+  ],
+  "realWorkers": true,
+  "wasm": true,
+  "deviceCamera": false,
+  "instrumentationLimits": [
+    "Chromium headless canvas stream, not a physical camera",
+    "WeakRef collection and performance.memory are diagnostic signals, not complete native/GPU memory accounting",
+    "WeakRef/forced-GC results are diagnostic object-reachability evidence, not a complete measurement of browser/native/GPU memory."
+  ],
+  "result": {
+    "sustained": [
+      {
+        "name": "sustained",
+        "captureId": "sustained-worker-1",
+        "elapsedMs": 108553.10000000149,
+        "status": "complete",
+        "reason": null,
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 3243,
+            "processedFrames": 3243,
+            "sealedFrames": 3243,
+            "encodedFrames": 3243,
+            "persistedFrames": 3243,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0,
+            "reconciliation": {
+              "status": "consistent",
+              "checks": {
+                "counts": true,
+                "submitted": true,
+                "assembly": true,
+                "encoding": true,
+                "persistence": true
+              },
+              "callbackGapsInterpretation": "Browser presentation gaps; cause is not attributable from callback metadata"
+            }
+          },
+          "faceDetections": 158,
+          "faceDetectionMisses": 3085,
+          "acceptedFrames": 3243,
+          "skippedFrames": 0,
+          "frameCallbacks": 3243,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 3243,
+              "meanMs": 3.4721554096856,
+              "minMs": 2.7999999970197678,
+              "maxMs": 11.400000005960464
+            },
+            "assemblyMs": {
+              "count": 3243,
+              "meanMs": 0.1798334879076409,
+              "minMs": 0,
+              "maxMs": 1.6999999955296516
+            },
+            "detectionMs": {
+              "count": 3243,
+              "meanMs": 3.399044094349342,
+              "minMs": 2.7000000029802322,
+              "maxMs": 11.200000002980232
+            },
+            "roiSelectionMs": {
+              "count": 3243,
+              "meanMs": 0.003361085425767126,
+              "minMs": 0,
+              "maxMs": 0.10000000149011612
+            },
+            "rgbaCopyMs": {
+              "count": 3243,
+              "meanMs": 0.07172371129810624,
+              "minMs": 0,
+              "maxMs": 0.7999999970197678
+            },
+            "cropAndSegmentMs": {
+              "count": 3243,
+              "meanMs": 0.174375578552034,
+              "minMs": 0,
+              "maxMs": 1.5999999940395355
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 7,
+              "meanMs": 37.74285714115415,
+              "minMs": 2.5,
+              "maxMs": 48.70000000298023
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 27.80000000447035,
+            "meanMs": 9.266666668156782
+          }
+        },
+        "distinctParts": 7,
+        "writes": 22,
+        "bytes": 2921515,
+        "attempts": {
+          "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p006.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_manifest.json": 1
+        },
+        "pendingArtifacts": 0,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 3,
+        "peakWorkersLive": 3,
+        "frameCallbacksCreatedTotal": 3245,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 1,
+        "requestedParts": 6,
+        "minimumFramesForRequestedParts": 3234,
+        "retriedFaceEvents": true,
+        "liveTransportPayloadWeakRefsAfterGc": 0,
+        "payloadWeakRefCount": 7,
+        "completedFrameEvidenceSamplesDuringCapture": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          }
+        ],
+        "sidecarFrameEvidence": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 0,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": null,
+            "firstPresentationTimeUs": 281200,
+            "lastPresentationTimeUs": 18200200
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 1,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 18200200,
+            "firstPresentationTimeUs": 18233100,
+            "lastPresentationTimeUs": 36152200
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 2,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 36152200,
+            "firstPresentationTimeUs": 36185100,
+            "lastPresentationTimeUs": 54137200
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 3,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 54137200,
+            "firstPresentationTimeUs": 54170200,
+            "lastPresentationTimeUs": 72089200
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 4,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 72089200,
+            "firstPresentationTimeUs": 72122200,
+            "lastPresentationTimeUs": 90074200
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 5,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 90074200,
+            "firstPresentationTimeUs": 90107200,
+            "lastPresentationTimeUs": 108026200
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 6,
+            "frameCount": 9,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 8,
+            "precedingFramePresentationTimeUs": 108026200,
+            "firstPresentationTimeUs": 108059300,
+            "lastPresentationTimeUs": 108323200
+          }
+        ],
+        "terminalFrameEvidenceArrays": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz",
+            "frameCount": 9,
+            "liveAfterGc": false
+          }
+        ],
+        "liveAnalysisFrameArraysAtTerminal": 0
+      },
+      {
+        "name": "sustained",
+        "captureId": "sustained-worker-2",
+        "elapsedMs": 108496.10000000149,
+        "status": "complete",
+        "reason": null,
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 3242,
+            "processedFrames": 3242,
+            "sealedFrames": 3242,
+            "encodedFrames": 3242,
+            "persistedFrames": 3242,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0,
+            "reconciliation": {
+              "status": "consistent",
+              "checks": {
+                "counts": true,
+                "submitted": true,
+                "assembly": true,
+                "encoding": true,
+                "persistence": true
+              },
+              "callbackGapsInterpretation": "Browser presentation gaps; cause is not attributable from callback metadata"
+            }
+          },
+          "faceDetections": 184,
+          "faceDetectionMisses": 3058,
+          "acceptedFrames": 3242,
+          "skippedFrames": 0,
+          "frameCallbacks": 3242,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 3242,
+              "meanMs": 3.4693090663918382,
+              "minMs": 2.899999998509884,
+              "maxMs": 6.700000002980232
+            },
+            "assemblyMs": {
+              "count": 3242,
+              "meanMs": 0.16952498500303761,
+              "minMs": 0,
+              "maxMs": 1.5
+            },
+            "detectionMs": {
+              "count": 3242,
+              "meanMs": 3.3966995675362677,
+              "minMs": 2.7999999970197678,
+              "maxMs": 6.5
+            },
+            "roiSelectionMs": {
+              "count": 3242,
+              "meanMs": 0.0033312769954878148,
+              "minMs": 0,
+              "maxMs": 0.10000000149011612
+            },
+            "rgbaCopyMs": {
+              "count": 3242,
+              "meanMs": 0.07149907320802203,
+              "minMs": 0,
+              "maxMs": 2.100000001490116
+            },
+            "cropAndSegmentMs": {
+              "count": 3242,
+              "meanMs": 0.16412708246224356,
+              "minMs": 0,
+              "maxMs": 1.5
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 7,
+              "meanMs": 38.114285713859964,
+              "minMs": 2,
+              "maxMs": 47.600000001490116
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 29.400000005960464,
+            "meanMs": 9.800000001986822
+          }
+        },
+        "distinctParts": 7,
+        "writes": 22,
+        "bytes": 2930342,
+        "attempts": {
+          "sustained_w2_sustained-worker-2_patch_s000_p000.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p001.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p002.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p003.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p004.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p005.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p005.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p006.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p006.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_manifest.json": 1
+        },
+        "pendingArtifacts": 0,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 7,
+        "peakWorkersLive": 4,
+        "frameCallbacksCreatedTotal": 6489,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 2,
+        "requestedParts": 6,
+        "minimumFramesForRequestedParts": 3234,
+        "retriedFaceEvents": true,
+        "liveTransportPayloadWeakRefsAfterGc": 0,
+        "payloadWeakRefCount": 7,
+        "completedFrameEvidenceSamplesDuringCapture": [
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          }
+        ],
+        "sidecarFrameEvidence": [
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 0,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": null,
+            "firstPresentationTimeUs": 108785200,
+            "lastPresentationTimeUs": 126737200
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 1,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 126737200,
+            "firstPresentationTimeUs": 126770200,
+            "lastPresentationTimeUs": 144689100
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 2,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 144689100,
+            "firstPresentationTimeUs": 144722200,
+            "lastPresentationTimeUs": 162674200
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 3,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 162674200,
+            "firstPresentationTimeUs": 162707100,
+            "lastPresentationTimeUs": 180626100
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 4,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 180626100,
+            "firstPresentationTimeUs": 180659200,
+            "lastPresentationTimeUs": 198611100
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 5,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 198611100,
+            "firstPresentationTimeUs": 198644200,
+            "lastPresentationTimeUs": 216563200
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 6,
+            "frameCount": 8,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 7,
+            "precedingFramePresentationTimeUs": 216563200,
+            "firstPresentationTimeUs": 216596200,
+            "lastPresentationTimeUs": 216827200
+          }
+        ],
+        "terminalFrameEvidenceArrays": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz",
+            "frameCount": 9,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.avi.gz",
+            "frameCount": 8,
+            "liveAfterGc": false
+          }
+        ],
+        "liveAnalysisFrameArraysAtTerminal": 0
+      }
+    ],
+    "aborted": [
+      {
+        "name": "abort",
+        "captureId": "abort-worker-1",
+        "elapsedMs": 18300.80000000447,
+        "status": "aborted",
+        "reason": "Capture aborted by the study",
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 540,
+            "processedFrames": 540,
+            "sealedFrames": 539,
+            "encodedFrames": 539,
+            "persistedFrames": 0,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0
+          },
+          "faceDetections": 33,
+          "faceDetectionMisses": 507,
+          "acceptedFrames": 540,
+          "skippedFrames": 0,
+          "frameCallbacks": 540,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 540,
+              "meanMs": 3.450555553204483,
+              "minMs": 2.899999998509884,
+              "maxMs": 5.399999998509884
+            },
+            "assemblyMs": {
+              "count": 540,
+              "meanMs": 0.11703703727711122,
+              "minMs": 0,
+              "maxMs": 1.7000000029802322
+            },
+            "detectionMs": {
+              "count": 540,
+              "meanMs": 3.3787037026689024,
+              "minMs": 2.8000000044703484,
+              "maxMs": 5.300000004470348
+            },
+            "roiSelectionMs": {
+              "count": 540,
+              "meanMs": 0.004259259239942934,
+              "minMs": 0,
+              "maxMs": 0.10000000149011612
+            },
+            "rgbaCopyMs": {
+              "count": 540,
+              "meanMs": 0.06981481356477295,
+              "minMs": 0,
+              "maxMs": 1.2999999970197678
+            },
+            "cropAndSegmentMs": {
+              "count": 540,
+              "meanMs": 0.11148148172155571,
+              "minMs": 0,
+              "maxMs": 1.6000000014901161
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 1,
+              "meanMs": 41.5,
+              "minMs": 41.5,
+              "maxMs": 41.5
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 28.299999997019768,
+            "meanMs": 9.433333332339922
+          }
+        },
+        "distinctParts": 1,
+        "writes": 1,
+        "bytes": 25597,
+        "attempts": {
+          "abort_w1_abort-worker-1_patch_s000_p000.avi.gz": 1
+        },
+        "pendingArtifacts": 1,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 10,
+        "peakWorkersLive": 4,
+        "frameCallbacksCreatedTotal": 7031,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 1,
+        "writesAtAbort": 0,
+        "writesAfterRelease": 1,
+        "abortRequestLatencyMs": 110.5,
+        "pendingCompletionCount": 1
+      },
+      {
+        "name": "abort",
+        "captureId": "abort-worker-2",
+        "elapsedMs": 18249.60000000149,
+        "status": "aborted",
+        "reason": "Capture aborted by the study",
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 540,
+            "processedFrames": 540,
+            "sealedFrames": 539,
+            "encodedFrames": 539,
+            "persistedFrames": 0,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0
+          },
+          "faceDetections": 19,
+          "faceDetectionMisses": 521,
+          "acceptedFrames": 540,
+          "skippedFrames": 0,
+          "frameCallbacks": 540,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 540,
+              "meanMs": 3.4549999976737644,
+              "minMs": 3,
+              "maxMs": 6.299999997019768
+            },
+            "assemblyMs": {
+              "count": 540,
+              "meanMs": 0.17166666700332261,
+              "minMs": 0,
+              "maxMs": 1.7999999970197678
+            },
+            "detectionMs": {
+              "count": 540,
+              "meanMs": 3.3790740731827635,
+              "minMs": 2.899999998509884,
+              "maxMs": 6.100000001490116
+            },
+            "roiSelectionMs": {
+              "count": 540,
+              "meanMs": 0.00407407405199828,
+              "minMs": 0,
+              "maxMs": 0.10000000149011612
+            },
+            "rgbaCopyMs": {
+              "count": 540,
+              "meanMs": 0.07259259117698219,
+              "minMs": 0,
+              "maxMs": 0.7000000029802322
+            },
+            "cropAndSegmentMs": {
+              "count": 540,
+              "meanMs": 0.16574074111326995,
+              "minMs": 0,
+              "maxMs": 1.6000000014901161
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 1,
+              "meanMs": 42.399999998509884,
+              "minMs": 42.399999998509884,
+              "maxMs": 42.399999998509884
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 27.600000001490116,
+            "meanMs": 9.200000000496706
+          }
+        },
+        "distinctParts": 1,
+        "writes": 1,
+        "bytes": 34147,
+        "attempts": {
+          "abort_w2_abort-worker-2_patch_s000_p000.avi.gz": 1
+        },
+        "pendingArtifacts": 1,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 14,
+        "peakWorkersLive": 4,
+        "frameCallbacksCreatedTotal": 7573,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 2,
+        "writesAtAbort": 0,
+        "writesAfterRelease": 1,
+        "abortRequestLatencyMs": 110.39999999850988,
+        "pendingCompletionCount": 1
+      }
+    ],
+    "streamTrackStateAfter": "live"
+  },
+  "worktreeCommit": "74ee026d78178c2f4605f0f7313ddfbade7abfc0",
+  "distributionAssetDirectory": "fc604147e13b48cb784ff95857534b6d5f8f36ff555b1d4313a55ca587c83b8f",
+  "nodeVersion": "v22.16.0",
+  "npmVersion": "10.9.2",
+  "measurementMethod": {
+    "frameArrays": "WeakRef to original v3 frame arrays captured by a JSON.stringify wrapper before library load; only filename, count, and WeakRef retained",
+    "collection": "Two explicit Chromium GCs after sidecar success while capture was continuing and after terminal completion",
+    "validation": "Successful sidecars parsed transiently; the harness retained only compact count/index/timestamp/segment/part summaries"
+  }
+}

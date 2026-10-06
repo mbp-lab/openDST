@@ -1,0 +1,9 @@
+{
+  "source": "Main retention regression using final actual Chromium status snapshot and compact inventory",
+  "updatesToSameCapture": 1000,
+  "distinctAdditionalCaptures": 200,
+  "retainedRows": 201,
+  "statusSnapshotBytes": 2738,
+  "serializedHistoryBytes": 775542,
+  "policy": "one latest snapshot per capture ID; compact capture/part history grows intentionally; no arbitrary fixed capture limit"
+}

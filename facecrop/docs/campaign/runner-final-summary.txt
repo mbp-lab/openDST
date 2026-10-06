@@ -1,0 +1,28 @@
+[test-run-study] PASS: invalid archive: rejected with actionable error
+[test-run-study] PASS: missing seed: attempted one-time provisioning
+[test-run-study] PASS: seed version mismatch: refused startup
+[test-run-study] PASS: invalid token: actionable authentication error
+[test-run-study] PASS: normal import: JATOS started and study URL emitted
+[test-run-study] PASS: normal import: saved under fixture development state
+[test-run-study] PASS: normal import: study, batch, and General Multiple link emitted
+[test-run-study] PASS: normal import: testing batch properties verified
+[test-run-study] PASS: termination: wrapper exited after SIGTERM
+[test-run-study] PASS: termination: JATOS stopped responding
+[test-run-study] PASS: termination: development assets and scratch directory retained
+[test-run-study] PASS: repeat import: reused the saved testing batch
+[test-run-study] PASS: repeat import: retained the imported study ID
+[test-run-study] PASS: repeat import: retained the study link
+[test-run-study] PASS: repeat import: existing result retained
+[test-run-study] PASS: locking: concurrent update refused
+[test-run-study] PASS: termination: wrapper exited after SIGTERM
+[test-run-study] PASS: termination: JATOS stopped responding
+[test-run-study] PASS: termination: development assets and scratch directory retained
+[test-run-study] PASS: saved port conflict: refused a conflicting port
+[test-run-study] PASS: occupied saved port: resume refused a bound port
+[test-run-study] PASS: resume: reused saved study, batch, and link without importing
+[test-run-study] PASS: resume: uploaded result retained
+[test-run-study] PASS: termination: wrapper exited after SIGTERM
+[test-run-study] PASS: termination: JATOS stopped responding
+[test-run-study] PASS: termination: development assets and scratch directory retained
+[test-run-study] PASS: isolation: installed JATOS data unchanged
+[test-run-study] Results: 27 passed, 0 failed

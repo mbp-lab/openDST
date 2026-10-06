@@ -50,8 +50,11 @@ describe('capability and capture lifecycle', () => {
         try {
             const createPipelineWorker = jest.fn().mockReturnValueOnce(analysis).mockReturnValueOnce(analysis)
                 .mockReturnValueOnce(assembly).mockReturnValueOnce(encoder);
+            const settings = validateConfiguration({roi: {smoothingTauMs: 125, scale: 1.8, verticalShiftRatio: -0.2},
+                detector: {minConfidence: 0.8}, pipeline: {analysisWorkerCount: 2},
+                persistence: {maxAttempts: 4, retryDelayMs: 250}});
             const controller = new FaceCropCaptureController({video, studyResultId: 'RESULT', studyPage: 'introduction', videoCounter: 1,
-                configuration: controllerConfiguration(validateConfiguration({pipeline: {analysisWorkerCount: 2}})),
+                configuration: controllerConfiguration(settings),
                 uploadTracker: {registerUpload: jest.fn(), settleUpload: jest.fn()}, uploadResultFile: jest.fn(), createPipelineWorker});
             const preparing = controller.prepare();
             await Promise.resolve();
@@ -67,6 +70,16 @@ describe('capability and capture lifecycle', () => {
             expect(assembly.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'assembly', identity: expect.objectContaining({studyResultId: 'RESULT'})}));
             expect(encoder.initialize).toHaveBeenCalledWith(expect.objectContaining({role: 'encoder'}));
             expect(analysis.warmup).toHaveBeenCalledTimes(6);
+            const effectiveWorkerSettings = {faceRoiSmoothingTauMs: 125, faceRoiScale: 1.8,
+                faceRoiVerticalShiftRatio: -0.2, faceDetectionMinConfidence: 0.8, analysisWorkerCount: 2};
+            for (const worker of [analysis, assembly, encoder]) {
+                expect(worker.initialize).toHaveBeenCalledWith(expect.objectContaining({
+                    configuration: expect.objectContaining(effectiveWorkerSettings)}));
+            }
+            expect(controller.configurationMetadata()).toMatchObject({roi: settings.roi,
+                detector: {minConfidence: 0.8}, analysisWorkerCount: 2});
+            expect(controller.sink.maxAttempts).toBe(4);
+            expect(controller.sink.retryDelayMs).toBe(250);
         } finally { window.VideoFrame = original.VideoFrame; window.CompressionStream = original.CompressionStream; }
     });
 

@@ -1,0 +1,1558 @@
+{
+  "browser": "153.0.8010.12",
+  "requestedPartsPerWorkerCount": 6,
+  "minFramesPerSustainedRun": 3234,
+  "mount": "/study_assets/other-study/facecrop/",
+  "runtimeAssetChecks": [
+    {
+      "file": "APACHE-2.0.txt",
+      "status": 200,
+      "bytes": 11358
+    },
+    {
+      "file": "asset-manifest.json",
+      "status": 200,
+      "bytes": 175
+    },
+    {
+      "file": "facecrop.js",
+      "status": 200,
+      "bytes": 51801
+    },
+    {
+      "file": "facecrop.worker.js",
+      "status": 200,
+      "bytes": 25885
+    },
+    {
+      "file": "LICENSE",
+      "status": 200,
+      "bytes": 35149
+    },
+    {
+      "file": "tfjs/4.22.0/blazeface.min.umd.js",
+      "status": 200,
+      "bytes": 10803
+    },
+    {
+      "file": "tfjs/4.22.0/model/group1-shard1of1.bin",
+      "status": 200,
+      "bytes": 401768
+    },
+    {
+      "file": "tfjs/4.22.0/model/model.json",
+      "status": 200,
+      "bytes": 64036
+    },
+    {
+      "file": "tfjs/4.22.0/tf-backend-wasm.min.js",
+      "status": 200,
+      "bytes": 149861
+    },
+    {
+      "file": "tfjs/4.22.0/tf.min.js",
+      "status": 200,
+      "bytes": 1469843
+    },
+    {
+      "file": "tfjs/4.22.0/tfjs-backend-wasm-simd.wasm",
+      "status": 200,
+      "bytes": 424594
+    },
+    {
+      "file": "tfjs/4.22.0/tfjs-backend-wasm-threaded-simd.wasm",
+      "status": 200,
+      "bytes": 435643
+    },
+    {
+      "file": "tfjs/4.22.0/tfjs-backend-wasm.wasm",
+      "status": 200,
+      "bytes": 311123
+    },
+    {
+      "file": "THIRD_PARTY_NOTICES.txt",
+      "status": 200,
+      "bytes": 357
+    }
+  ],
+  "frameReleaseAssertion": true,
+  "actualPartCounts": [
+    7,
+    7
+  ],
+  "realWorkers": true,
+  "wasm": true,
+  "deviceCamera": false,
+  "instrumentationLimits": [
+    "Chromium headless canvas stream, not a physical camera",
+    "WeakRef collection and performance.memory are diagnostic signals, not complete native/GPU memory accounting"
+  ],
+  "result": {
+    "sustained": [
+      {
+        "name": "sustained",
+        "captureId": "sustained-worker-1",
+        "elapsedMs": 108544.90000000596,
+        "status": "complete",
+        "reason": null,
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 3243,
+            "processedFrames": 3243,
+            "sealedFrames": 3243,
+            "encodedFrames": 3243,
+            "persistedFrames": 3243,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0,
+            "reconciliation": {
+              "status": "consistent",
+              "checks": {
+                "counts": true,
+                "submitted": true,
+                "assembly": true,
+                "encoding": true,
+                "persistence": true
+              },
+              "callbackGapsInterpretation": "Browser presentation gaps; cause is not attributable from callback metadata"
+            }
+          },
+          "faceDetections": 158,
+          "faceDetectionMisses": 3085,
+          "acceptedFrames": 3243,
+          "skippedFrames": 0,
+          "frameCallbacks": 3243,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 3243,
+              "meanMs": 3.2173604695812767,
+              "minMs": 2.8000000044703484,
+              "maxMs": 5.4000000059604645
+            },
+            "assemblyMs": {
+              "count": 3243,
+              "meanMs": 0.1736663584466737,
+              "minMs": 0,
+              "maxMs": 2.1999999955296516
+            },
+            "detectionMs": {
+              "count": 3243,
+              "meanMs": 3.1471477043649823,
+              "minMs": 2.7999999970197678,
+              "maxMs": 5.300000004470348
+            },
+            "roiSelectionMs": {
+              "count": 3243,
+              "meanMs": 0.0031760715515643683,
+              "minMs": 0,
+              "maxMs": 0.29999999701976776
+            },
+            "rgbaCopyMs": {
+              "count": 3243,
+              "meanMs": 0.06904101067584796,
+              "minMs": 0,
+              "maxMs": 0.7000000029802322
+            },
+            "cropAndSegmentMs": {
+              "count": 3243,
+              "meanMs": 0.16873265506491136,
+              "minMs": 0,
+              "maxMs": 1.8999999985098839
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 7,
+              "meanMs": 35.57142857462168,
+              "minMs": 2.2000000029802322,
+              "maxMs": 43.600000001490116
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 28.399999998509884,
+            "meanMs": 9.466666666169962
+          }
+        },
+        "distinctParts": 7,
+        "writes": 22,
+        "bytes": 2921528,
+        "attempts": {
+          "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz": 1,
+          "sustained_w1_sustained-worker-1_patch_s000_p006.face-events.json": 2,
+          "sustained_w1_sustained-worker-1_manifest.json": 1
+        },
+        "pendingArtifacts": 0,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 3,
+        "peakWorkersLive": 3,
+        "frameCallbacksCreatedTotal": 3245,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 1,
+        "requestedParts": 6,
+        "minimumFramesForRequestedParts": 3234,
+        "terminalStatusSnapshot": {
+          "type": "status",
+          "status": "complete",
+          "capability": {
+            "status": "passed",
+            "failedStage": null,
+            "error": null
+          },
+          "capture": {
+            "captureId": "sustained-worker-1",
+            "context": {
+              "harness": "sustained"
+            }
+          },
+          "source": {
+            "width": 96,
+            "height": 96,
+            "readyState": 4,
+            "pixelCount": 9216,
+            "aspectRatio": 1,
+            "orientation": "square"
+          },
+          "manifest": {
+            "filename": "sustained_w1_sustained-worker-1_manifest.json",
+            "status": "succeeded"
+          },
+          "configuration": {
+            "roi": {
+              "smoothingTauMs": 100,
+              "scale": 1.5,
+              "verticalShiftRatio": 0.15
+            },
+            "detector": {
+              "implementation": "blazeface",
+              "modelVersion": "0.1.0",
+              "runtime": "tensorflowjs",
+              "runtimeVersion": "4.22.0",
+              "backend": "wasm",
+              "minConfidence": 0.5
+            },
+            "analysisWorkerCount": 1,
+            "selectionPolicy": "largest-eligible-bounding-box-v1",
+            "sampling": {
+              "method": "area-average-v1",
+              "roiDescriptorVersion": 2,
+              "rounding": "half-up",
+              "inputColorSpace": "srgb",
+              "outputPixelFormat": "bgr24",
+              "frameSize": 72
+            }
+          },
+          "output": {
+            "format": "patch-video-avi-gzip-bgr24-v1",
+            "container": "avi.gz",
+            "transportEncoding": "gzip",
+            "videoCodec": "DIB",
+            "pixelFormat": "bgr24",
+            "aviHeaderFrameRatePolicy": "required-per-part-from-presentationTimeUs-v1",
+            "frameSize": 72,
+            "extraction": {
+              "api": "VideoFrame.copyTo",
+              "normalizationMode": "rgba-copy",
+              "nativeFormat": "BGRA",
+              "outputFormat": "RGBA"
+            }
+          },
+          "statistics": {
+            "accounting": {
+              "submittedFrames": 3243,
+              "processedFrames": 3243,
+              "sealedFrames": 3243,
+              "encodedFrames": 3243,
+              "persistedFrames": 3243,
+              "failedPersistenceFrames": 0,
+              "failedProcessingFrames": 0,
+              "failedEncodingFrames": 0,
+              "discardedFrames": 0,
+              "callbackGaps": 0,
+              "analysisQueueWaitMs": 0,
+              "encodingQueueWaitMs": 0,
+              "reconciliation": {
+                "status": "consistent",
+                "checks": {
+                  "counts": true,
+                  "submitted": true,
+                  "assembly": true,
+                  "encoding": true,
+                  "persistence": true
+                },
+                "callbackGapsInterpretation": "Browser presentation gaps; cause is not attributable from callback metadata"
+              }
+            },
+            "faceDetections": 158,
+            "faceDetectionMisses": 3085,
+            "acceptedFrames": 3243,
+            "skippedFrames": 0,
+            "frameCallbacks": 3243,
+            "frameTimings": {
+              "analysisMs": {
+                "count": 3243,
+                "meanMs": 3.2173604695812767,
+                "minMs": 2.8000000044703484,
+                "maxMs": 5.4000000059604645
+              },
+              "assemblyMs": {
+                "count": 3243,
+                "meanMs": 0.1736663584466737,
+                "minMs": 0,
+                "maxMs": 2.1999999955296516
+              },
+              "detectionMs": {
+                "count": 3243,
+                "meanMs": 3.1471477043649823,
+                "minMs": 2.7999999970197678,
+                "maxMs": 5.300000004470348
+              },
+              "roiSelectionMs": {
+                "count": 3243,
+                "meanMs": 0.0031760715515643683,
+                "minMs": 0,
+                "maxMs": 0.29999999701976776
+              },
+              "rgbaCopyMs": {
+                "count": 3243,
+                "meanMs": 0.06904101067584796,
+                "minMs": 0,
+                "maxMs": 0.7000000029802322
+              },
+              "cropAndSegmentMs": {
+                "count": 3243,
+                "meanMs": 0.16873265506491136,
+                "minMs": 0,
+                "maxMs": 1.8999999985098839
+              }
+            },
+            "encodingTimings": {
+              "encodingMs": {
+                "count": 7,
+                "meanMs": 35.57142857462168,
+                "minMs": 2.2000000029802322,
+                "maxMs": 43.600000001490116
+              }
+            },
+            "detectorWarmup": {
+              "requested": 3,
+              "completed": 3,
+              "totalMs": 28.399999998509884,
+              "meanMs": 9.466666666169962
+            }
+          },
+          "reason": null,
+          "reasonCode": null
+        },
+        "terminalArtifactOutcomes": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_manifest.json",
+            "status": "succeeded",
+            "attempts": 1
+          }
+        ],
+        "retriedFaceEvents": true,
+        "liveTransportPayloadWeakRefsAfterGc": 0,
+        "payloadWeakRefCount": 7,
+        "completedFrameEvidenceSamplesDuringCapture": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          }
+        ],
+        "sidecarFrameEvidence": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 0,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": null,
+            "firstPresentationTimeUs": 279700,
+            "lastPresentationTimeUs": 18198800
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 1,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 18198800,
+            "firstPresentationTimeUs": 18231700,
+            "lastPresentationTimeUs": 36150800
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 2,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 36150800,
+            "firstPresentationTimeUs": 36183800,
+            "lastPresentationTimeUs": 54135800
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 3,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 54135800,
+            "firstPresentationTimeUs": 54168800,
+            "lastPresentationTimeUs": 72087700
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 4,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 72087700,
+            "firstPresentationTimeUs": 72120800,
+            "lastPresentationTimeUs": 90072800
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 5,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 90072800,
+            "firstPresentationTimeUs": 90105800,
+            "lastPresentationTimeUs": 108024800
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 6,
+            "frameCount": 9,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 8,
+            "precedingFramePresentationTimeUs": 108024800,
+            "firstPresentationTimeUs": 108057800,
+            "lastPresentationTimeUs": 108321700
+          }
+        ],
+        "terminalFrameEvidenceArrays": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz",
+            "frameCount": 9,
+            "liveAfterGc": false
+          }
+        ],
+        "liveAnalysisFrameArraysAtTerminal": 0,
+        "transportAcknowledgementRefs": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_manifest.json",
+            "kind": "manifest",
+            "aliveAfterGc": false
+          }
+        ],
+        "liveTransportAcknowledgementRefsAfterGc": 0
+      },
+      {
+        "name": "sustained",
+        "captureId": "sustained-worker-2",
+        "elapsedMs": 108507.90000000596,
+        "status": "complete",
+        "reason": null,
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 3241,
+            "processedFrames": 3241,
+            "sealedFrames": 3241,
+            "encodedFrames": 3241,
+            "persistedFrames": 3241,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0,
+            "reconciliation": {
+              "status": "consistent",
+              "checks": {
+                "counts": true,
+                "submitted": true,
+                "assembly": true,
+                "encoding": true,
+                "persistence": true
+              },
+              "callbackGapsInterpretation": "Browser presentation gaps; cause is not attributable from callback metadata"
+            }
+          },
+          "faceDetections": 184,
+          "faceDetectionMisses": 3057,
+          "acceptedFrames": 3241,
+          "skippedFrames": 0,
+          "frameCallbacks": 3241,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 3241,
+              "meanMs": 3.263468066337892,
+              "minMs": 2.8000000044703484,
+              "maxMs": 9.199999995529652
+            },
+            "assemblyMs": {
+              "count": 3241,
+              "meanMs": 0.1688367788326736,
+              "minMs": 0,
+              "maxMs": 1.6000000014901161
+            },
+            "detectionMs": {
+              "count": 3241,
+              "meanMs": 3.192101204941967,
+              "minMs": 2.7999999970197678,
+              "maxMs": 9.199999995529652
+            },
+            "roiSelectionMs": {
+              "count": 3241,
+              "meanMs": 0.002900339407856101,
+              "minMs": 0,
+              "maxMs": 0.20000000298023224
+            },
+            "rgbaCopyMs": {
+              "count": 3241,
+              "meanMs": 0.07034865714119969,
+              "minMs": 0,
+              "maxMs": 1.1999999955296516
+            },
+            "cropAndSegmentMs": {
+              "count": 3241,
+              "meanMs": 0.16460968841376517,
+              "minMs": 0,
+              "maxMs": 1.5
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 7,
+              "meanMs": 36.957142857568606,
+              "minMs": 1.7000000029802322,
+              "maxMs": 47.600000001490116
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 29.5,
+            "meanMs": 9.833333333333334
+          }
+        },
+        "distinctParts": 7,
+        "writes": 22,
+        "bytes": 2929476,
+        "attempts": {
+          "sustained_w2_sustained-worker-2_patch_s000_p000.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p001.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p002.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p003.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p004.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p005.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p005.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_patch_s000_p006.avi.gz": 1,
+          "sustained_w2_sustained-worker-2_patch_s000_p006.face-events.json": 2,
+          "sustained_w2_sustained-worker-2_manifest.json": 1
+        },
+        "pendingArtifacts": 0,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 7,
+        "peakWorkersLive": 4,
+        "frameCallbacksCreatedTotal": 6488,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 2,
+        "requestedParts": 6,
+        "minimumFramesForRequestedParts": 3234,
+        "terminalStatusSnapshot": {
+          "type": "status",
+          "status": "complete",
+          "capability": {
+            "status": "passed",
+            "failedStage": null,
+            "error": null
+          },
+          "capture": {
+            "captureId": "sustained-worker-2",
+            "context": {
+              "harness": "sustained"
+            }
+          },
+          "source": {
+            "width": 96,
+            "height": 96,
+            "readyState": 4,
+            "pixelCount": 9216,
+            "aspectRatio": 1,
+            "orientation": "square"
+          },
+          "manifest": {
+            "filename": "sustained_w2_sustained-worker-2_manifest.json",
+            "status": "succeeded"
+          },
+          "configuration": {
+            "roi": {
+              "smoothingTauMs": 100,
+              "scale": 1.5,
+              "verticalShiftRatio": 0.15
+            },
+            "detector": {
+              "implementation": "blazeface",
+              "modelVersion": "0.1.0",
+              "runtime": "tensorflowjs",
+              "runtimeVersion": "4.22.0",
+              "backend": "wasm",
+              "minConfidence": 0.5
+            },
+            "analysisWorkerCount": 2,
+            "selectionPolicy": "largest-eligible-bounding-box-v1",
+            "sampling": {
+              "method": "area-average-v1",
+              "roiDescriptorVersion": 2,
+              "rounding": "half-up",
+              "inputColorSpace": "srgb",
+              "outputPixelFormat": "bgr24",
+              "frameSize": 72
+            }
+          },
+          "output": {
+            "format": "patch-video-avi-gzip-bgr24-v1",
+            "container": "avi.gz",
+            "transportEncoding": "gzip",
+            "videoCodec": "DIB",
+            "pixelFormat": "bgr24",
+            "aviHeaderFrameRatePolicy": "required-per-part-from-presentationTimeUs-v1",
+            "frameSize": 72,
+            "extraction": {
+              "api": "VideoFrame.copyTo",
+              "normalizationMode": "rgba-copy",
+              "nativeFormat": "BGRA",
+              "outputFormat": "RGBA"
+            }
+          },
+          "statistics": {
+            "accounting": {
+              "submittedFrames": 3241,
+              "processedFrames": 3241,
+              "sealedFrames": 3241,
+              "encodedFrames": 3241,
+              "persistedFrames": 3241,
+              "failedPersistenceFrames": 0,
+              "failedProcessingFrames": 0,
+              "failedEncodingFrames": 0,
+              "discardedFrames": 0,
+              "callbackGaps": 0,
+              "analysisQueueWaitMs": 0,
+              "encodingQueueWaitMs": 0,
+              "reconciliation": {
+                "status": "consistent",
+                "checks": {
+                  "counts": true,
+                  "submitted": true,
+                  "assembly": true,
+                  "encoding": true,
+                  "persistence": true
+                },
+                "callbackGapsInterpretation": "Browser presentation gaps; cause is not attributable from callback metadata"
+              }
+            },
+            "faceDetections": 184,
+            "faceDetectionMisses": 3057,
+            "acceptedFrames": 3241,
+            "skippedFrames": 0,
+            "frameCallbacks": 3241,
+            "frameTimings": {
+              "analysisMs": {
+                "count": 3241,
+                "meanMs": 3.263468066337892,
+                "minMs": 2.8000000044703484,
+                "maxMs": 9.199999995529652
+              },
+              "assemblyMs": {
+                "count": 3241,
+                "meanMs": 0.1688367788326736,
+                "minMs": 0,
+                "maxMs": 1.6000000014901161
+              },
+              "detectionMs": {
+                "count": 3241,
+                "meanMs": 3.192101204941967,
+                "minMs": 2.7999999970197678,
+                "maxMs": 9.199999995529652
+              },
+              "roiSelectionMs": {
+                "count": 3241,
+                "meanMs": 0.002900339407856101,
+                "minMs": 0,
+                "maxMs": 0.20000000298023224
+              },
+              "rgbaCopyMs": {
+                "count": 3241,
+                "meanMs": 0.07034865714119969,
+                "minMs": 0,
+                "maxMs": 1.1999999955296516
+              },
+              "cropAndSegmentMs": {
+                "count": 3241,
+                "meanMs": 0.16460968841376517,
+                "minMs": 0,
+                "maxMs": 1.5
+              }
+            },
+            "encodingTimings": {
+              "encodingMs": {
+                "count": 7,
+                "meanMs": 36.957142857568606,
+                "minMs": 1.7000000029802322,
+                "maxMs": 47.600000001490116
+              }
+            },
+            "detectorWarmup": {
+              "requested": 3,
+              "completed": 3,
+              "totalMs": 29.5,
+              "meanMs": 9.833333333333334
+            }
+          },
+          "reason": null,
+          "reasonCode": null
+        },
+        "terminalArtifactOutcomes": [
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.avi.gz",
+            "status": "succeeded",
+            "attempts": 1
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.face-events.json",
+            "status": "succeeded",
+            "attempts": 2
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_manifest.json",
+            "status": "succeeded",
+            "attempts": 1
+          }
+        ],
+        "retriedFaceEvents": true,
+        "liveTransportPayloadWeakRefsAfterGc": 0,
+        "payloadWeakRefCount": 7,
+        "completedFrameEvidenceSamplesDuringCapture": [
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json",
+            "frameCount": 539,
+            "observedArrays": 1,
+            "liveArraysAfterGc": 0,
+            "duringCapture": true
+          }
+        ],
+        "sidecarFrameEvidence": [
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 0,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": null,
+            "firstPresentationTimeUs": 108783800,
+            "lastPresentationTimeUs": 126735800
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 1,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 126735800,
+            "firstPresentationTimeUs": 126768800,
+            "lastPresentationTimeUs": 144687800
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 2,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 144687800,
+            "firstPresentationTimeUs": 144720800,
+            "lastPresentationTimeUs": 162672800
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 3,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 162672800,
+            "firstPresentationTimeUs": 162705800,
+            "lastPresentationTimeUs": 180624700
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 4,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 180624700,
+            "firstPresentationTimeUs": 180657800,
+            "lastPresentationTimeUs": 198609800
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 5,
+            "frameCount": 539,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 538,
+            "precedingFramePresentationTimeUs": 198609800,
+            "firstPresentationTimeUs": 198642800,
+            "lastPresentationTimeUs": 216561800
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.face-events.json",
+            "segmentIndex": 0,
+            "partIndex": 6,
+            "frameCount": 7,
+            "firstFrameIndex": 0,
+            "lastFrameIndex": 6,
+            "precedingFramePresentationTimeUs": 216561800,
+            "firstPresentationTimeUs": 216594700,
+            "lastPresentationTimeUs": 216792800
+          }
+        ],
+        "terminalFrameEvidenceArrays": [
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p000.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p001.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p002.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p003.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p004.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p005.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w1_sustained-worker-1_patch_s000_p006.avi.gz",
+            "frameCount": 9,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.avi.gz",
+            "frameCount": 539,
+            "liveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.avi.gz",
+            "frameCount": 7,
+            "liveAfterGc": false
+          }
+        ],
+        "liveAnalysisFrameArraysAtTerminal": 0,
+        "transportAcknowledgementRefs": [
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p000.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p001.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p002.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p003.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p004.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p005.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_patch_s000_p006.face-events.json",
+            "kind": "sidecar",
+            "aliveAfterGc": false
+          },
+          {
+            "filename": "sustained_w2_sustained-worker-2_manifest.json",
+            "kind": "manifest",
+            "aliveAfterGc": false
+          }
+        ],
+        "liveTransportAcknowledgementRefsAfterGc": 0
+      }
+    ],
+    "aborted": [
+      {
+        "name": "abort",
+        "captureId": "abort-worker-1",
+        "elapsedMs": 18266.10000000149,
+        "status": "aborted",
+        "reason": "Capture aborted by the study",
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 540,
+            "processedFrames": 540,
+            "sealedFrames": 539,
+            "encodedFrames": 539,
+            "persistedFrames": 0,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0
+          },
+          "faceDetections": 33,
+          "faceDetectionMisses": 507,
+          "acceptedFrames": 540,
+          "skippedFrames": 0,
+          "frameCallbacks": 540,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 540,
+              "meanMs": 3.378888889733288,
+              "minMs": 2.899999998509884,
+              "maxMs": 5.200000002980232
+            },
+            "assemblyMs": {
+              "count": 540,
+              "meanMs": 0.11648148145112718,
+              "minMs": 0,
+              "maxMs": 1.5
+            },
+            "detectionMs": {
+              "count": 540,
+              "meanMs": 3.2998148161503993,
+              "minMs": 2.7999999970197678,
+              "maxMs": 5.200000002980232
+            },
+            "roiSelectionMs": {
+              "count": 540,
+              "meanMs": 0.0035185185295564148,
+              "minMs": 0,
+              "maxMs": 0.10000000149011612
+            },
+            "rgbaCopyMs": {
+              "count": 540,
+              "meanMs": 0.07759259210692511,
+              "minMs": 0,
+              "maxMs": 1.3000000044703484
+            },
+            "cropAndSegmentMs": {
+              "count": 540,
+              "meanMs": 0.11074074069382976,
+              "minMs": 0,
+              "maxMs": 1.3999999985098839
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 1,
+              "meanMs": 41.5,
+              "minMs": 41.5,
+              "maxMs": 41.5
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 26.599999994039536,
+            "meanMs": 8.866666664679846
+          }
+        },
+        "distinctParts": 1,
+        "writes": 1,
+        "bytes": 25619,
+        "attempts": {
+          "abort_w1_abort-worker-1_patch_s000_p000.avi.gz": 1
+        },
+        "pendingArtifacts": 1,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 10,
+        "peakWorkersLive": 4,
+        "frameCallbacksCreatedTotal": 7030,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 1,
+        "writesAtAbort": 0,
+        "writesAfterRelease": 1,
+        "abortRequestLatencyMs": 112.39999999850988,
+        "pendingCompletionCount": 1,
+        "transportAcknowledgementRefs": [
+          {
+            "filename": "abort_w1_abort-worker-1_patch_s000_p000.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": true
+          }
+        ],
+        "liveTransportAcknowledgementRefsAfterGc": 1
+      },
+      {
+        "name": "abort",
+        "captureId": "abort-worker-2",
+        "elapsedMs": 18260.39999999851,
+        "status": "aborted",
+        "reason": "Capture aborted by the study",
+        "statistics": {
+          "accounting": {
+            "submittedFrames": 540,
+            "processedFrames": 540,
+            "sealedFrames": 539,
+            "encodedFrames": 539,
+            "persistedFrames": 0,
+            "failedPersistenceFrames": 0,
+            "failedProcessingFrames": 0,
+            "failedEncodingFrames": 0,
+            "discardedFrames": 0,
+            "callbackGaps": 0,
+            "analysisQueueWaitMs": 0,
+            "encodingQueueWaitMs": 0
+          },
+          "faceDetections": 19,
+          "faceDetectionMisses": 521,
+          "acceptedFrames": 540,
+          "skippedFrames": 0,
+          "frameCallbacks": 540,
+          "frameTimings": {
+            "analysisMs": {
+              "count": 540,
+              "meanMs": 3.3596296308907108,
+              "minMs": 2.9000000059604645,
+              "maxMs": 5.700000002980232
+            },
+            "assemblyMs": {
+              "count": 540,
+              "meanMs": 0.16962962943922605,
+              "minMs": 0,
+              "maxMs": 1.7000000029802322
+            },
+            "detectionMs": {
+              "count": 540,
+              "meanMs": 3.2851851869512494,
+              "minMs": 2.899999998509884,
+              "maxMs": 5.600000001490116
+            },
+            "roiSelectionMs": {
+              "count": 540,
+              "meanMs": 0.0035185185295564165,
+              "minMs": 0,
+              "maxMs": 0.10000000149011612
+            },
+            "rgbaCopyMs": {
+              "count": 540,
+              "meanMs": 0.07222222169792203,
+              "minMs": 0,
+              "maxMs": 0.8000000044703484
+            },
+            "cropAndSegmentMs": {
+              "count": 540,
+              "meanMs": 0.16444444424576224,
+              "minMs": 0,
+              "maxMs": 1.6000000014901161
+            }
+          },
+          "encodingTimings": {
+            "encodingMs": {
+              "count": 1,
+              "meanMs": 43,
+              "minMs": 43,
+              "maxMs": 43
+            }
+          },
+          "detectorWarmup": {
+            "requested": 3,
+            "completed": 3,
+            "totalMs": 28.799999997019768,
+            "meanMs": 9.59999999900659
+          }
+        },
+        "distinctParts": 1,
+        "writes": 1,
+        "bytes": 34195,
+        "attempts": {
+          "abort_w2_abort-worker-2_patch_s000_p000.avi.gz": 1
+        },
+        "pendingArtifacts": 1,
+        "workerLiveAtTerminal": 0,
+        "frameCallbacksAtTerminal": 0,
+        "workerCreatedTotal": 14,
+        "peakWorkersLive": 4,
+        "frameCallbacksCreatedTotal": 7572,
+        "peakFrameCallbacksLive": 1,
+        "heap": {
+          "usedJSHeapSize": 10000000,
+          "totalJSHeapSize": 10000000
+        },
+        "repeatSamePromise": true,
+        "workerCount": 2,
+        "writesAtAbort": 0,
+        "writesAfterRelease": 1,
+        "abortRequestLatencyMs": 112.29999999701977,
+        "pendingCompletionCount": 1,
+        "transportAcknowledgementRefs": [
+          {
+            "filename": "abort_w2_abort-worker-2_patch_s000_p000.avi.gz",
+            "kind": "avi",
+            "aliveAfterGc": true
+          }
+        ],
+        "liveTransportAcknowledgementRefsAfterGc": 1
+      }
+    ],
+    "streamTrackStateAfter": "live"
+  },
+  "distributionAssetHash": "c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c",
+  "sourceCommit": "fcae374",
+  "artifactSha256": {
+    "facecrop.js": "826fe8afbdd055a57d8087cbf15a0961b158debd32e8c4774336c2133bd00065",
+    "facecrop.worker.js": "f93e2452763c01846d8f8985371ba813962d6149e3858a687cf04198a41753ee"
+  },
+  "environment": {
+    "node": "v22.16.0",
+    "npm": "10.9.2",
+    "platform": "Linux x86_64 container",
+    "cpu": "AMD Ryzen 7 7800X3D",
+    "visibleLogicalCpus": 16,
+    "cpuQuota": "max 100000",
+    "workload": "96x96 canvas stream at requested 30 FPS; 40ms writes; first sidecar rejection; forced GC; echoing payload acknowledgements"
+  }
+}

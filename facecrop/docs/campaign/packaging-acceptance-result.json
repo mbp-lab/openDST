@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "node": "v22.16.0",
+  "npm": "10.9.2",
+  "studyName": "facecropping_test",
+  "publicUrl": "/study_assets/facecropping_test/",
+  "distributionAssetHash": "c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c",
+  "archivePath": "/tmp/opendst-packaging-jatos-final2.Hv23FR/archives/facecropping_test.jzip",
+  "archiveSha256": "dc9bca7e1124b786dfa0a7c255a5518ad2ba5d329073f8597bebeb3abb9f728f",
+  "archiveBytes": 7567921,
+  "memberCount": 113,
+  "fileCount": 88,
+  "extractedBytes": 22397291,
+  "extractedTreeSha256": "68151a90f6618442211b40a1b9b4359e75efe6ddf419a3bac023460f827d5e32",
+  "sortedMemberListSha256": "26232a6607244df11b2cadd1928632df6963d6829e6df513647e0e46950e01e8",
+  "archiveMemberList": "archive-member-list.txt",
+  "duplicatePaths": 0,
+  "finalDistributionBytesMatchBuildOutput": true,
+  "nestedPublicUrlVerified": true,
+  "verifiedRuntimeDirectories": [
+    {
+      "hash": "025d438502c2788d56a378966f54c0f51826a30cc45efc97f8f259e58b260095",
+      "files": 14
+    },
+    {
+      "hash": "1ded0b3e2b9925b543a67741e21ac3d25678fbb3e0f40226f658643e29607dac",
+      "files": 14
+    },
+    {
+      "hash": "c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c",
+      "files": 14
+    },
+    {
+      "hash": "fc604147e13b48cb784ff95857534b6d5f8f36ff555b1d4313a55ca587c83b8f",
+      "files": 14
+    }
+  ],
+  "oldHashesRetained": 3,
+  "runner": {
+    "passed": 27,
+    "failed": 0,
+    "skipped": 0,
+    "summary": "runner-final-summary.txt"
+  }
+}

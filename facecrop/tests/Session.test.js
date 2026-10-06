@@ -52,6 +52,15 @@ describe('public lifecycle', () => {
         await session.dispose();
         expect(input.transport.write).not.toHaveBeenCalled();
     });
+    test('repeated stop shares one terminal result and does not repeat persistence', async () => {
+        const input = options();
+        const session = createCaptureSession(input);
+        const first = session.stop();
+        const second = session.stop();
+        expect(second).toBe(first);
+        await expect(second).resolves.toMatchObject({status: 'disabled'});
+        expect(input.transport.write).not.toHaveBeenCalled();
+    });
     test('abort cancels a pending preparation callback and never owns tracks', async () => {
         const track = {stop: jest.fn()};
         const video = {requestVideoFrameCallback: jest.fn(() => 7), cancelVideoFrameCallback: jest.fn(),

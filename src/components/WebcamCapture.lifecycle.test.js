@@ -105,3 +105,19 @@ test('rejected library finalization still waits for component recorder cleanup',
     component.mediaStreamRecorder.onstop({});
     expect(await stopping).toBe(error);
 });
+
+test('cancellation-selected unmount defers the component stop so host abort remains authoritative', async () => {
+    const stop = jest.fn(() => Promise.resolve({status: 'complete'}));
+    const abort = jest.fn(() => Promise.resolve({status: 'aborted'}));
+    const finished = jest.fn();
+    const component = new WebcamCapture({studyPage: 'speechTask',
+        faceCropCancellationState: {current: true}, onFaceCropSessionFinished: finished});
+    component.faceCropController = {captureId: 'capture', stop, abort};
+    component.mediaStreamRecorder = {state: 'inactive'};
+    component.componentWillUnmount();
+    await Promise.resolve();
+    expect(stop).not.toHaveBeenCalled();
+    expect(abort).not.toHaveBeenCalled();
+    expect(finished).not.toHaveBeenCalled();
+    expect(component.faceCropController).toBeNull();
+});

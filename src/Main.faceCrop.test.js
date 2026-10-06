@@ -1,4 +1,5 @@
 import Main from './Main';
+import capturedBrowserReport from '../facecrop/docs/campaign/sustained-final.json';
 
 function deferred() {
     let resolve;
@@ -33,4 +34,57 @@ test('withdrawal aborts each registered capture and retains per-capture status h
     expect(first.abort).toHaveBeenCalledTimes(1);
     expect(second.abort).toHaveBeenCalledTimes(1);
     expect(host.faceCropSessions.size).toBe(0);
+});
+
+test('capture status history replaces snapshots per capture and retains compact per-part outcomes', () => {
+    const host = {data: {studyMetaTracker: {}}};
+    const update = Main.prototype.updateFaceCropCaptureStatus;
+    const captured = capturedBrowserReport.result.sustained[0];
+    const makeStatus = (captureId, sequence) => ({
+        ...JSON.parse(JSON.stringify(captured.terminalStatusSnapshot)),
+        status: sequence === 999 ? 'complete' : 'capturing',
+        capture: {captureId, context: {studyPage: 'speechTask', videoCounter: 2}},
+        artifacts: captured.terminalArtifactOutcomes.map((artifact, part) => ({...artifact,
+            filename: `${captureId}_artifact_${part}`}))
+    });
+
+    for (let sequence = 0; sequence < 1000; sequence += 1) {
+        const previous = host.data.studyMetaTracker.faceCropCapture &&
+            host.data.studyMetaTracker.faceCropCapture.captures[0];
+        update.call(host, makeStatus('repeated', sequence));
+        if (previous) expect(host.data.studyMetaTracker.faceCropCapture.captures[0]).not.toBe(previous);
+    }
+    let history = host.data.studyMetaTracker.faceCropCapture.captures;
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({captureId: 'repeated', status: 'complete', statistics: {acceptedFrames: captured.statistics.acceptedFrames}});
+    expect(history[0].artifacts).toHaveLength(captured.terminalArtifactOutcomes.length);
+
+    for (let capture = 0; capture < 200; capture += 1) {
+        update.call(host, makeStatus(`distinct-${capture}`, capture));
+    }
+    history = host.data.studyMetaTracker.faceCropCapture.captures;
+    expect(history).toHaveLength(201);
+    expect(new Set(history.map(item => item.captureId)).size).toBe(201);
+    expect(history.every(item => !Object.hasOwn(item, 'frames') && !Object.hasOwn(item, 'faceEvents'))).toBe(true);
+    const serialized = JSON.stringify(host.data.studyMetaTracker.faceCropCapture);
+    expect(serialized.length).toBeLessThan(1_000_000);
+    const hasFramePayload = value => {
+        if (!value || typeof value !== 'object') return false;
+        if (value instanceof Blob || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) return true;
+        return Object.keys(value).some(key => key === 'frames' || key === 'gzipBytes' || hasFramePayload(value[key]));
+    };
+    expect(hasFramePayload(host.data.studyMetaTracker.faceCropCapture)).toBe(false);
+});
+
+test('a late page drain cannot advance after Main unmount', async () => {
+    const gate = deferred();
+    const host = {state: {pageIndex: 0, slideIndex: 0, studyPagesSequence: ['task'], slideSequences: {task: ['recording']}},
+        faceCropSessions: new Map([['capture', {}]]), prepareFaceCropCancellation: jest.fn(() => gate.promise),
+        setState: jest.fn(), faceCropHostUnmounted: false, disconnectHeartRateSensor: jest.fn()};
+    const navigation = Main.prototype.handleNext.call(host);
+    host.abortFaceCropSessions = jest.fn();
+    Main.prototype.componentWillUnmount.call(host);
+    gate.resolve();
+    await navigation;
+    expect(host.setState).not.toHaveBeenCalled();
 });

@@ -1,0 +1,107 @@
+{
+  "status": "passed",
+  "gate": "real browser + disposable real JATOS server; not a production server/device test",
+  "jatosVersion": "3.11.1",
+  "browserVersion": "153.0.8010.12",
+  "nodeVersion": "v22.16.0",
+  "distributionAssetHash": "025d438502c2788d56a378966f54c0f51826a30cc45efc97f8f259e58b260095",
+  "distributionMount": "/study_assets/facecropping_test/facecrop/",
+  "studyId": "1",
+  "archiveSha256": "0cf7e08442a52cd67dfae4d3828d64bf865c0d4a26918a1636a1208dd79a1127",
+  "originalIndexReplacedOnlyInFixture": true,
+  "normal": {
+    "status": "complete",
+    "captureId": "jatos-normal",
+    "filenames": [
+      "jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+      "jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+      "jatos_normal_jatos-normal_patch_s000_p001.avi.gz",
+      "jatos_normal_jatos-normal_patch_s000_p001.face-events.json",
+      "jatos_normal_jatos-normal_manifest.json"
+    ],
+    "writes": [
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+        "calledAt": 18438.19999999553,
+        "resolvedAt": 18485.79999999702
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+        "calledAt": 18486.39999999851,
+        "resolvedAt": 18689.59999999404
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p001.avi.gz",
+        "calledAt": 18689.79999999702,
+        "resolvedAt": 18702
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_patch_s000_p001.face-events.json",
+        "calledAt": 18702,
+        "resolvedAt": 18713.09999999404
+      },
+      {
+        "filename": "jatos_normal_jatos-normal_manifest.json",
+        "calledAt": 18714.09999999404,
+        "resolvedAt": 18728.39999999851
+      }
+    ]
+  },
+  "abort": {
+    "status": "aborted",
+    "captureId": "jatos-abort",
+    "abortLatencyMs": 0.29999999701976776,
+    "heldAcceptedFilename": "jatos_abort_jatos-abort_patch_s000_p000.avi.gz",
+    "filenames": [
+      "jatos_abort_jatos-abort_patch_s000_p000.avi.gz"
+    ],
+    "pendingCompletionCount": 1
+  },
+  "marker": {
+    "filename": "config.txt",
+    "firstLine": "save_without_video"
+  },
+  "files": {
+    "jatos_normal_jatos-normal_patch_s000_p000.avi.gz": {
+      "path": "study-result_1/comp-result_1/jatos_normal_jatos-normal_patch_s000_p000.avi.gz",
+      "bytes": 25300,
+      "sha256": "e091dc301761712ec4a7b76b7e26381e606c334f53d87e49ed6aef96e02bafe6"
+    },
+    "jatos_normal_jatos-normal_patch_s000_p000.face-events.json": {
+      "path": "study-result_1/comp-result_1/jatos_normal_jatos-normal_patch_s000_p000.face-events.json",
+      "bytes": 227887,
+      "sha256": "2e463a608a1e7814f8405b582bed3983352ae3f87111fb9fbb276609d536186c"
+    },
+    "jatos_normal_jatos-normal_manifest.json": {
+      "path": "study-result_1/comp-result_1/jatos_normal_jatos-normal_manifest.json",
+      "bytes": 3965,
+      "sha256": "fc2588cd1add1b70ed00a973f06e6f3356d473d51edfcbeca83a8bd8f7f6a28e"
+    },
+    "jatos_abort_jatos-abort_patch_s000_p000.avi.gz": {
+      "path": "study-result_1/comp-result_1/jatos_abort_jatos-abort_patch_s000_p000.avi.gz",
+      "bytes": 24886,
+      "sha256": "dadb83845e7805ec2784907ad0bd3e65506410e857e49bf16b3fe8562c7630a2"
+    },
+    "config.txt": {
+      "path": "study-result_1/comp-result_1/config.txt",
+      "bytes": 60,
+      "sha256": "c38eb488084973550523fc36368ada9bcb38b420aaa5d15a0c861e637dfa23a8"
+    }
+  },
+  "validations": {
+    "realJatosUploadApi": true,
+    "aviGzipRiff": true,
+    "sidecarJson": true,
+    "manifestJson": true,
+    "aviBeforeSidecarBeforeManifest": true,
+    "abortedAcceptedAviRetained": true,
+    "noAbortSidecar": true,
+    "saveWithoutVideoMarker": true,
+    "installedJatosStateUnchanged": true
+  },
+  "remainingGaps": [
+    "participant experience under production deployment",
+    "physical camera/device formats",
+    "production JATOS persistence and cancellation path"
+  ]
+}
