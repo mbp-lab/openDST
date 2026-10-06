@@ -6,7 +6,7 @@ function deferred() {
     return {promise, resolve};
 }
 
-test('host finalization stops ordinary recording before waiting on facecrop writes', async () => {
+test('study finalization stops ordinary recording before waiting on facecrop writes', async () => {
     const gate = deferred();
     const registered = jest.fn();
     const component = new WebcamCapture({onFaceCropSessionCreated: registered});
@@ -70,7 +70,7 @@ test('stop during asynchronous recorder creation prevents recording from startin
     expect(recorder.start).not.toHaveBeenCalled();
 });
 
-test('host abort supersedes drain through a stable coordinator without waiting for transport', async () => {
+test('study abort supersedes drain through a stable coordinator without waiting for transport', async () => {
     const gate = deferred();
     const registered = jest.fn();
     const component = new WebcamCapture({onFaceCropSessionCreated: registered});
@@ -106,7 +106,7 @@ test('rejected library finalization still waits for component recorder cleanup',
     expect(await stopping).toBe(error);
 });
 
-test('cancellation-selected unmount defers the component stop so host abort remains authoritative', async () => {
+test('cancellation-selected unmount defers the component stop so study abort remains authoritative', async () => {
     const stop = jest.fn(() => Promise.resolve({status: 'complete'}));
     const abort = jest.fn(() => Promise.resolve({status: 'aborted'}));
     const finished = jest.fn();

@@ -10,7 +10,7 @@ export function resolveStudyResultId(props = {}, jatosApi = typeof window !== 'u
 }
 
 /** Translate the study's existing environment controls into the standalone library's strict API. */
-export function resolveFaceCropHostConfiguration(environment = process.env, studyPage) {
+export function resolveFaceCropStudyConfiguration(environment = process.env, studyPage) {
     const requestedMode = environment.REACT_APP_FACE_CROP_RECORDING_MODE || 'off';
     if (!FACE_CROP_CAPTURE_MODES.includes(requestedMode)) {
         throw new TypeError('REACT_APP_FACE_CROP_RECORDING_MODE must be off, calibration, or all');
@@ -50,9 +50,9 @@ export function resolveFaceCropHostConfiguration(environment = process.env, stud
     return {requestedMode, mode, enabled: true, config};
 }
 
-/** A stable host handle keeps capture cleanup independent from MediaRecorder and camera-track ownership. */
-export function createFaceCropHostSession({video, props = {}}) {
-    const options = resolveFaceCropHostConfiguration(undefined, props.studyPage);
+/** A stable study handle keeps capture cleanup independent from MediaRecorder and camera-track ownership. */
+export function createFaceCropStudySession({video, props = {}}) {
+    const options = resolveFaceCropStudyConfiguration(undefined, props.studyPage);
     if (!options.enabled) return null;
     const jatosApi = typeof window !== 'undefined' ? window.jatos : null;
     if (!video || !jatosApi || typeof jatosApi.uploadResultFile !== 'function') {
@@ -147,19 +147,19 @@ function notify(props, metadata) {
 }
 
 export function prepareFaceCropCaptureSession({webcam, props}) {
-    let hostSession;
-    try { hostSession = createFaceCropHostSession({video: webcam && webcam.video, props}); }
+    let studySession;
+    try { studySession = createFaceCropStudySession({video: webcam && webcam.video, props}); }
     catch (error) { notify(props, {status: 'incomplete', reason: error.message}); return null; }
-    if (hostSession) hostSession.prepare().catch(error => notify(props, {status: 'incomplete', reason: error.message}));
-    return hostSession;
+    if (studySession) studySession.prepare().catch(error => notify(props, {status: 'incomplete', reason: error.message}));
+    return studySession;
 }
 
 export function startFaceCropCaptureSession({webcam, props}) {
-    let hostSession;
-    try { hostSession = createFaceCropHostSession({video: webcam && webcam.video, props}); }
+    let studySession;
+    try { studySession = createFaceCropStudySession({video: webcam && webcam.video, props}); }
     catch (error) { notify(props, {status: 'incomplete', reason: error.message}); return null; }
-    if (hostSession) hostSession.start().catch(error => notify(props, {status: 'incomplete', reason: error.message}));
-    return hostSession;
+    if (studySession) studySession.start().catch(error => notify(props, {status: 'incomplete', reason: error.message}));
+    return studySession;
 }
 
 export async function stopFaceCropCaptureSession(session) {

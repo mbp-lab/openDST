@@ -11,7 +11,7 @@ const sleep = promisify(setTimeout);
 
 const workbenchRoot = process.env.FACECROP_WORKBENCH_ROOT;
 if (!workbenchRoot) {
-    process.stderr.write('Set FACECROP_WORKBENCH_ROOT to the openDST workbench directory before running this host acceptance harness.\n');
+    process.stderr.write('Set FACECROP_WORKBENCH_ROOT to the openDST workbench directory before running this study acceptance harness.\n');
     process.exit(1);
 }
 const repository = path.resolve(workbenchRoot);

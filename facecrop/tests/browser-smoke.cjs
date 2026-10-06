@@ -81,7 +81,7 @@ async function main() {
             } finally { clearInterval(interval); stream.getTracks().forEach(track => track.stop()); }
         }, mount);
         assert.equal(result.completed.status, 'complete');
-        assert.equal(result.trackAfterStop, 'live', 'library stopped host camera tracks');
+        assert.equal(result.trackAfterStop, 'live', 'library stopped application camera tracks');
         assert.equal(result.aborted.status, 'aborted');
         const avi = result.writes.find(write => write.filename.endsWith('.avi.gz'));
         const sidecar = JSON.parse(result.writes.find(write => write.filename.endsWith('.face-events.json')).data);

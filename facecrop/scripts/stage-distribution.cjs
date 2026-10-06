@@ -1,4 +1,4 @@
-/** Stage a verified browser distribution into explicit host destinations. */
+/** Stage a verified browser distribution into explicit application destinations. */
 const fs = require('fs');
 const path = require('path');
 const {verifyDistribution} = require('./verify-distribution.cjs');

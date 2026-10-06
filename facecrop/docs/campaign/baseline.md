@@ -64,8 +64,8 @@ The checked-in [output regression suite](../../tests/FaceCropOutput.test.js) pin
 | AVI succeeds, sidecar fails | `FaceCropOutput.test.js`: “marks the logical part incomplete when its JSON sidecar fails” | Sidecar retries and incomplete part result |
 | Abort while queue is full and first write unresolved | `FaceCropOutput.test.js`: “abort releases enqueue backpressure and inventories pending completion without waiting for a write” | Prompt abort, queued discard, unresolved completion exposed |
 | Abort supersedes pending preparation | `Session.test.js`: “abort supersedes stop while preparation is pending” | Preparation/stop ordering |
-| Abort cancels preparation callback and preserves host track ownership | `Session.test.js`: “abort cancels a pending preparation callback and never owns tracks” | No camera ownership by library |
+| Abort cancels preparation callback and preserves study track ownership | `Session.test.js`: “abort cancels a pending preparation callback and never owns tracks” | No camera ownership by library |
 | Detector and assembly work must drain before manifest finalization | `FaceCropCapture.test.js`: “drains detector and assembly work before manifest finalization” | Processing drain ordering |
-| Stop/abort/navigation/unmount/camera races in host | `WebcamCapture.lifecycle.test.js`, `Main.faceCrop.test.js`, `FaceCropHost.test.js` | See host suite; not a complete physical-camera or real-JATOS race matrix |
+| Stop/abort/navigation/unmount/camera races in study | `WebcamCapture.lifecycle.test.js`, `Main.faceCrop.test.js`, `FaceCropStudyAdapter.test.js` | See study suite; not a complete physical-camera or real-JATOS race matrix |
 
 At this baseline, repeated stop/start against a live browser capture, slow real JATOS upload during navigation, and sustained browser resource trends were not established by the short smoke test. Final coverage and remaining platform limits are recorded in the [acceptance report](acceptance-report.md).

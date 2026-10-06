@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 const Facecrop = require('../../dist/facecrop');
 const EMPTY_CONTEXT = Object.freeze({});
 
-/** Host supplies a playing video and absolute distribution URL; await onFinalized before navigating. */
+/** Application supplies a playing video and absolute distribution URL; await onFinalized before navigating. */
 export function FacecropRecorder({video, jatosApi, assetBaseUrl, context = EMPTY_CONTEXT, onFinalized}) {
     const session = useRef(null);
     const [status, setStatus] = useState('idle');

@@ -31,7 +31,7 @@ describe('public configuration and construction', () => {
             expect(input.transport.write).not.toHaveBeenCalled();
         } finally { window.Worker = originalWorker; }
     });
-    test('construction preserves host context without mutable aliasing', () => {
+    test('construction preserves application context without mutable aliasing', () => {
         const context = {task: 'speech', trial: {number: 2}};
         const input = options({context, filenamePrefix: 'p42_speech_trial2', captureId: 'unique'});
         const session = createCaptureSession(input);
@@ -89,10 +89,10 @@ describe('public lifecycle', () => {
         expect(input.transport.write).not.toHaveBeenCalled();
     });
     test('observer exceptions are reported without breaking lifecycle', async () => {
-        const session = createCaptureSession(options({onEvent: () => { throw new Error('host callback'); }}));
+        const session = createCaptureSession(options({onEvent: () => { throw new Error('application callback'); }}));
         const result = await session.prepare();
         expect(result.status).toBe('unsupported');
-        expect(result.observerErrors).toEqual([expect.objectContaining({message: 'host callback'})]);
+        expect(result.observerErrors).toEqual([expect.objectContaining({message: 'application callback'})]);
     });
 });
 

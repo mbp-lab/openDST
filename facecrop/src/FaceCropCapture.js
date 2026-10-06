@@ -4,7 +4,7 @@ import {reconcileAccounting} from './Accounting';
 import {buildCaptureManifest} from './Metadata';
 import {ORIENTATION_REFERENCE_SIZE, rotatedDimensions, selectQuarterTurnByLuminance} from './FrameNormalization';
 
-// Capture consumes a host-owned video element. The host decides how runtime
+// Capture consumes an application-owned video element. The application decides how runtime
 // failures affect the study; the library never controls camera tracks or navigation.
 export const FACE_CROP_STATUS = {
     DISABLED: 'disabled',

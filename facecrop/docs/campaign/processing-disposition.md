@@ -15,7 +15,7 @@ Both final captures ran about 108.5 seconds, accepted 3,243/3,241 frames and pro
 | 1 | 7 / 15 | 0 / 0 |
 | 2 | 7 / 15 | 0 / 0 |
 
-Positive WeakRef observations identify original arrays, not arrays reparsed from JSON. Completed parts also had zero live arrays during continued final capture. Tracked workers and video-frame callbacks ended at zero after stop and abort; the host stream stayed live. Repeated stop and held-write abort passed. [Root-mount report](browser-root-mount-final.json) also exercises repeated start. All 14 distribution files, including all WASM variants and model weights, returned successful browser responses at both root and nested mounts.
+Positive WeakRef observations identify original arrays, not arrays reparsed from JSON. Completed parts also had zero live arrays during continued final capture. Tracked workers and video-frame callbacks ended at zero after stop and abort; the study stream stayed live. Repeated stop and held-write abort passed. [Root-mount report](browser-root-mount-final.json) also exercises repeated start. All 14 distribution files, including all WASM variants and model weights, returned successful browser responses at both root and nested mounts.
 
 The mock abort elapsed field includes a post-release 100 ms wait/GC and is not a direct abort latency benchmark. Promptness is proved by abort resolving before release of the held write within the five-second guard. Actual JATOS abort timing is separately recorded in [its final report](jatos-acceptance-final-result.json).
 

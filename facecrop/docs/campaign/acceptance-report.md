@@ -4,12 +4,12 @@ Campaign acceptance complete. Production source is frozen at `fcae374`; the vali
 
 ## Evidence scope
 
-Current focused suites: 94 standalone tests in eight suites, 24 frontend tests in six suites (Node 22.16.0 / npm 10.9.2). These cover output/scientific invariants, persistence success/exhaustion/abort, stage failures and invalid counts, default/custom settings, host lifecycle races, frame-transfer failures, and distribution verification/rollback. The source maps and notes below describe their boundaries rather than claiming physical-device or production-server validation.
+Current focused suites: 94 standalone tests in eight suites, 24 frontend tests in six suites (Node 22.16.0 / npm 10.9.2). These cover output/scientific invariants, persistence success/exhaustion/abort, stage failures and invalid counts, default/custom settings, study lifecycle races, frame-transfer failures, and distribution verification/rollback. The source maps and notes below describe their boundaries rather than claiming physical-device or production-server validation.
 
 - [Baseline and corpus](baseline.md): pinned extraction source, workload, race matrix, AVI/sidecar byte corpus. [Echo baseline](retention-echo-baseline.json) and [current](retention-echo-current.json) distinguish compact history from full frame/acknowledgement retention.
 - [A decision/results](memory-persistence.md): completed/queued payload release, truthful unattempted/uncertain statuses, settled transport acknowledgement release.
 - [B owner/race map](../campaign-lifecycle.md): explicit component coordinator, transfer ownership, latest status per capture and intentionally retained compact study history.
-- [C flow/disposition](config-accounting.md): canonical host defaults, strict public validation, normal-only reconciliation with count-domain validation; abort is partial.
+- [C flow/disposition](config-accounting.md): canonical study defaults, strict public validation, normal-only reconciliation with count-domain validation; abort is partial.
 - [D contract/results](../build-deployment-decision.md): private complete browser distribution, explicit setup/stage, exact file/hash verification and failure recovery.
 - [E profile/disposition](processing-disposition.md): worker design retained; full-frame copies and scientific sampling are unchanged.
 - Final browser evidence: [pinned baseline](sustained-pinned-baseline.json), [six-part final](sustained-final.json), [root mount/repeated start](browser-root-mount-final.json). Positive original-frame observations, acknowledgement release, ordering, complete asset loading and tracked-resource cleanup pass.
@@ -20,7 +20,7 @@ Current focused suites: 94 standalone tests in eight suites, 24 frontend tests i
 
 | Resource | Owner and bound | Release / history policy |
 |---|---|---|
-| Camera / MediaRecorder / navigation | Host | Library never stops camera tracks or navigates; component stops recorder before awaiting facecrop persistence |
+| Camera / MediaRecorder / navigation | Study | Library never stops camera tracks or navigates; component stops recorder before awaiting facecrop persistence |
 | Frame callbacks | Controller; one outstanding callback | Cancel on terminal request, fallback on unmount |
 | VideoFrame | Main request until successful transfer; analysis worker after transfer | Close on pre-transfer rejection/queued failure; worker closes in finally or realm terminates |
 | Full RGBA frame / detector RGB tensor | Analysis then ordered assembly | At most 1–2 admitted analysis/buffered results; tensor disposed in finally; transfer moves backing buffer |
@@ -29,9 +29,9 @@ Current focused suites: 94 standalone tests in eight suites, 24 frontend tests i
 | Encoding work | Controller/encoder; one pending part | Transfer bytes; drop completed job |
 | Encoded payloads / sidecar frames | Sink; at most two admitted parts | Release queued abort immediately, active writes on actual settlement; completed records contain compact outcomes only |
 | Transport acknowledgement promise | Sink while actual write unresolved | Clear settled reference; caller-owned promise snapshots intentionally remain caller-owned |
-| Artifact outcomes / capture history | Sink and host | Grows with part/capture count; retains compact evidence, one latest row per capture ID, not frame payloads or every status snapshot |
+| Artifact outcomes / capture history | Sink and study | Grows with part/capture count; retains compact evidence, one latest row per capture ID, not frame payloads or every status snapshot |
 
-This is an object/ownership policy, not a total browser-memory ceiling. TFJS model/intermediate allocations, native/GPU memory, garbage-collector scheduling and transport implementations have additional costs. Arbitrary host context and diagnostic/rejection values remain caller-controlled evidence. No broad mobile-memory claim is made.
+This is an object/ownership policy, not a total browser-memory ceiling. TFJS model/intermediate allocations, native/GPU memory, garbage-collector scheduling and transport implementations have additional costs. Arbitrary study context and diagnostic/rejection values remain caller-controlled evidence. No broad mobile-memory claim is made.
 
 ## Retained/deferred designs
 
@@ -39,7 +39,7 @@ Retain ordered analysis/assembly/encoding roles because current tests/profile sh
 
 Retain legacy internal filename fallbacks for stored/test compatibility; public sessions/examples use capture IDs and prefixes. No public/schema filename migration is required. Broader metadata-policy deduplication/canonical accounting ledger is deferred: current defaults and normal equations are validated, and there is no evidence that rewriting those layers improves scientific attribution.
 
-Ordinary recorder chunk/filename reuse is a separately documented host risk, deferred pending supported repeated-counter behavior and compatibility evidence. No claim that it was fixed. npm publication is deferred; the supported artifact is the private browser tree, validated through CRA/JATOS consumption.
+Ordinary recorder chunk/filename reuse is a separately documented study risk, deferred pending supported repeated-counter behavior and compatibility evidence. No claim that it was fixed. npm publication is deferred; the supported artifact is the private browser tree, validated through CRA/JATOS consumption.
 
 Physical desktop/mobile camera and production-server behavior, simultaneous sessions/high-resolution pressure, native/process RSS and broader browser performance comparison remain explicit follow-up profiling. None of this campaign's adopted changes alters camera format/orientation/color-space/crop/sampling, so conditional device-sensitive-change gates are not invoked.
 
@@ -51,9 +51,9 @@ Physical desktop/mobile camera and production-server behavior, simultaneous sess
 | A: payload/timing/name equivalence and truthful success/exhaustion/abort inventories | Pinned AVI/sidecar corpus and unchanged worker binary; output regressions, sidecar timestamp/index checks, real stored JATOS outcomes |
 | A: no further writes/retries after abort, unresolved completion observable | Queued/backpressure/retry-delay/late resolve/reject regressions; held-write browser/JATOS scenarios; caller snapshots preserved |
 | B: awaited page finalization and recorder boundary independent of uploads | Main navigation/repeated-wait/late-unmount tests; coordinator recorder-stop-before-drain and rejection cleanup tests |
-| B: prompt abort/useful partial stop, no duplicate/stale/leaked work or missed registry removal | Session/host/controller race tests; repeated browser start/stop/abort; ordered tail parts, zero tracked workers/callbacks; registry removal and prepare-only disposal |
-| B: library camera/navigation boundary and marker policy | Borrowed-track tests; actual stream remains live after stop/abort; explicit host coordinator; actual accepted AVI remains plus stored save_without_video marker |
-| C: strict validation, effective default/custom settings, meaningful integer counters | Public/host config tests and custom worker/sink/metadata initialization; invalid-domain and actual processing/encoding/persistence-failure transitions |
+| B: prompt abort/useful partial stop, no duplicate/stale/leaked work or missed registry removal | Session/study/controller race tests; repeated browser start/stop/abort; ordered tail parts, zero tracked workers/callbacks; registry removal and prepare-only disposal |
+| B: library camera/navigation boundary and marker policy | Borrowed-track tests; actual stream remains live after stop/abort; explicit study coordinator; actual accepted AVI remains plus stored save_without_video marker |
+| C: strict validation, effective default/custom settings, meaningful integer counters | Public/study config tests and custom worker/sink/metadata initialization; invalid-domain and actual processing/encoding/persistence-failure transitions |
 | C: supported terminal reconciliation and compatibility inventory | Normal-only reconciliation passes; abort deliberately partial; additive outcome/count migration documented; production public/example callers use capture IDs, legacy internal naming retained |
 | D: clean setup and actionable explicit failure paths | Disposable locked installs and CRA consumer build; missing dependency guidance; ordinary hooks removed; workbench packaging explicitly installs/stages |
 | D: complete runtime contract, safe corruption failure and repeated hashes | Exact 14-file/shared verifier, corruption/missing/schema/symlink checks, failed build/promotion/double-rollback fixtures, deterministic final hash and packaged-byte comparisons |

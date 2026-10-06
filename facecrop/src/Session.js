@@ -15,7 +15,7 @@ function captureIdentifier() {
         const bytes = cryptoApi.getRandomValues(new Uint32Array(4));
         return 'capture-' + Array.from(bytes, value => value.toString(16).padStart(8, '0')).join('');
     }
-    // Fallback supports older secure-context browsers; a host can supply its own globally unique ID.
+    // Fallback supports older secure-context browsers; an application can supply its own globally unique ID.
     return 'capture-' + Date.now().toString(36) + '-' + (++nextCapture).toString(36) + '-' + Math.random().toString(36).slice(2);
 }
 function cloneContext(context) {
@@ -41,7 +41,7 @@ function reasonCode(status) {
 export function createCaptureSession(options) {
     if (!options || typeof options !== 'object') throw new TypeError('Capture options are required');
     const {video, transport, onEvent} = options;
-    if (!video || typeof video !== 'object') throw new TypeError('video must be a host-owned video element');
+    if (!video || typeof video !== 'object') throw new TypeError('video must be an application-owned video element');
     if (!transport || typeof transport.write !== 'function') throw new TypeError('transport.write is required');
     if (onEvent !== undefined && typeof onEvent !== 'function') throw new TypeError('onEvent must be a function');
     const config = validateConfiguration(options.config);

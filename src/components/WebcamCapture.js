@@ -1,6 +1,6 @@
 import React from 'react';
 import Webcam from "react-webcam";
-import {prepareFaceCropCaptureSession, resolveStudyResultId, startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../faceCrop/FaceCropCapture';
+import {prepareFaceCropCaptureSession, resolveStudyResultId, startFaceCropCaptureSession, stopFaceCropCaptureSession} from '../faceCrop/FaceCropStudyAdapter';
 
 // Put variables in global scope to make them available to the browser console.
 const constraints = window.constraints = {

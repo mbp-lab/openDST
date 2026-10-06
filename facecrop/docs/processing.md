@@ -1,6 +1,6 @@
 # Face-crop implementation notes
 
-This directory contains the standalone face-crop recording pipeline that consumes a host-owned video element. Public configuration and deployment guidance belongs in `README.md`; output interpretation belongs in `docs/metadata.md`; this file records
+This directory contains the standalone face-crop recording pipeline that consumes an application-owned video element. Public configuration and deployment guidance belongs in `README.md`; output interpretation belongs in `docs/metadata.md`; this file records
 the internal design contract for contributors.
 
 ## Runtime flow

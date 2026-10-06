@@ -170,7 +170,7 @@ test('incomplete stage rollback preserves recovery backups and reports their loc
     });
 });
 
-test('staging accepts independent host paths and deployment URLs', () => {
+test('staging accepts independent application paths and deployment URLs', () => {
     withTempDirectory(root => {
         const distribution = path.join(root, 'distribution');
         const hash = makeDistribution(distribution);

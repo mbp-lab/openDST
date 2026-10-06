@@ -340,7 +340,7 @@ class Main extends React.Component {
     }
 
     componentWillUnmount() {
-        this.faceCropHostUnmounted = true;
+        this.faceCropStudyUnmounted = true;
         this.abortFaceCropSessions();
         this.disconnectHeartRateSensor();
     }
@@ -547,7 +547,7 @@ class Main extends React.Component {
         const slideIndex = this.state.slideIndex;
         const nextPage = slideIndex + 1 === this.state.slideSequences[this.state.studyPagesSequence[pageIndex]].length;
         const advance = () => {
-            if (this.faceCropHostUnmounted) return;
+            if (this.faceCropStudyUnmounted) return;
             this.setState(nextPage ? {pageIndex: pageIndex + 1, slideIndex: 0} : {slideIndex: slideIndex + 1});
         };
         if (nextPage && this.faceCropSessions.size) {

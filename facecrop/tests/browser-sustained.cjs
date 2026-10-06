@@ -302,7 +302,7 @@ async function main() {
                     `Transport acknowledgements still retain payloads for workerCount=${report.workerCount}`);
             }
         }
-        assert.equal(result.streamTrackStateAfter, 'live', 'facecrop stopped host-owned camera stream');
+        assert.equal(result.streamTrackStateAfter, 'live', 'facecrop stopped application-owned camera stream');
         assert(requests.some(url => url.endsWith('facecrop.worker.js')));
         assert(requests.some(url => url.includes('.wasm')));
         assert(requests.some(url => url.endsWith('/model/model.json')));

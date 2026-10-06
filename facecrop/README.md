@@ -13,7 +13,7 @@ npm run verify:dist
 npm test
 ```
 
-The supported project toolchain recorded for this checkout is Node 22.x with npm 10.x. These files have been exercised on Node 22.16.0 and npm 10.9.2; other major versions are not currently claimed. On a fresh openDST checkout, install both locked dependency trees and explicitly stage the validated browser distribution before starting, testing, or building the CRA host:
+The supported project toolchain recorded for this checkout is Node 22.x with npm 10.x. These files have been exercised on Node 22.16.0 and npm 10.9.2; other major versions are not currently claimed. On a fresh openDST checkout, install both locked dependency trees and explicitly stage the validated browser distribution before starting, testing, or building the CRA study application:
 
 ```sh
 npm ci
@@ -21,17 +21,17 @@ npm --prefix facecrop ci
 npm run facecrop:stage
 ```
 
-Reusable staging and rollback are implemented in `scripts/stage-distribution.cjs`; the openDST wrapper supplies CRA destinations. Other hosts can supply their own generated directory, public root and URL prefix.
+Reusable staging and rollback are implemented in `scripts/stage-distribution.cjs`; the openDST wrapper supplies CRA destinations. Other applications can supply their own generated directory, public root and URL prefix.
 
-For a different host, stage an already-built distribution with explicit destinations:
+For a different application, stage an already-built distribution with explicit destinations:
 
 ```js
 const {stageDistribution} = require('./scripts/stage-distribution.cjs');
 stageDistribution('/path/to/facecrop/dist', {
-  generatedDirectory: '/path/to/host/generated',
-  publicRoot: '/path/to/host/public/assets/facecrop',
+  generatedDirectory: '/path/to/application/generated',
+  publicRoot: '/path/to/application/public/assets/facecrop',
   publicSubpath: '/assets/facecrop/',
-  workRoot: '/path/to/host'
+  workRoot: '/path/to/application'
 });
 ```
 
@@ -53,7 +53,7 @@ The worker is intentionally classic: it loads TensorFlow.js, the WASM backend, a
 
 ## Browser API
 
-Load the UMD bundle and pass host-owned video, transport, and study context explicitly:
+Load the UMD bundle and pass application-owned video, transport, and study context explicitly:
 
 ```html
 <script src="/assets/facecrop/<assetDirectory>/facecrop.js"></script>
@@ -72,7 +72,7 @@ Load the UMD bundle and pass host-owned video, transport, and study context expl
   });
   await capture.prepare();
   await capture.start();
-  // Later, after the host finishes recording:
+  // Later, after the application finishes recording:
   const result = await capture.stop();
 </script>
 ```
@@ -85,7 +85,7 @@ The library source is licensed under GPL-3.0-only. TensorFlow.js, its WASM backe
 
 ## Integration examples
 
-- [React example](examples/react/FacecropRecorder.jsx) imports the built UMD library and passes host-owned video, transport, and context.
+- [React example](examples/react/FacecropRecorder.jsx) imports the built UMD library and passes application-owned video, transport, and context.
 - [Plain browser/JATOS example](examples/plain-browser/index.html) uses the explicit JATOS adapter and the hash path from `asset-manifest.json`.
 
 See [metadata interpretation and migration](docs/metadata.md) and [integration boundaries](docs/coupling.md).
@@ -105,10 +105,10 @@ Contributor references: [processing contract](docs/processing.md) and [follow-up
 | `persistence.retryDelayMs` | 100 | Integer 0–60000; retry wait is this value × attempt number |
 | `diagnostics` | false | Boolean; opt-in verbose troubleshooting evidence |
 
-Use numeric values, not strings. Missing fields receive defaults; supplied invalid values fail validation. The library always generates a unique capture ID unless the host supplies one. A custom ID must be unique across recordings. `filenamePrefix` and custom IDs accept letters, digits, underscores, and hyphens; context identifiers are stored separately as JSON.
+Use numeric values, not strings. Missing fields receive defaults; supplied invalid values fail validation. The library always generates a unique capture ID unless the application supplies one. A custom ID must be unique across recordings. `filenamePrefix` and custom IDs accept letters, digits, underscores, and hyphens; context identifiers are stored separately as JSON.
 
 ## Refactor validation and retention policy
 
 The campaign's [acceptance report](docs/campaign/acceptance-report.md) records exact browser/JATOS workloads and remaining platform limits. After building, external Playwright can run `node tests/browser-sustained.cjs` (set `FACECROP_SUSTAINED_PARTS=6`, `FACECROP_REQUIRE_FRAME_OBSERVATION=1`, `FACECROP_ASSERT_FRAME_RELEASE=1`, and `FACECROP_ASSERT_TRANSPORT_ACK_RELEASE=1` for the full retention gates). `node tests/browser-jatos.cjs` requires an explicit `FACECROP_WORKBENCH_ROOT` and the documented disposable local JATOS seed/workbench archive; it never modifies a participant study.
 
-Completed frame/encoded payloads and settled transport acknowledgements are released by the sink. Compact artifact history grows with part count; the openDST host retains one latest compact status per capture ID. Caller-held completion promises/context remain caller-owned. Abort prevents new facecrop writes, preserves observable in-flight completions, and cannot prove remote absence after rejection. In openDST, “Cancel and submit data without video” submits `save_without_video`; it does not retract recordings already uploaded or in flight. The host owns camera tracks, navigation, withdrawal and deletion policy.
+Completed frame/encoded payloads and settled transport acknowledgements are released by the sink. Compact artifact history grows with part count; the openDST study retains one latest compact status per capture ID. Caller-held completion promises/context remain caller-owned. Abort prevents new facecrop writes, preserves observable in-flight completions, and cannot prove remote absence after rejection. In openDST, “Cancel and submit data without video” submits `save_without_video`; it does not retract recordings already uploaded or in flight. The study owns camera tracks, navigation, withdrawal and deletion policy.
