@@ -1,6 +1,6 @@
 # Real JATOS browser acceptance
 
-Status: passed on 2026-10-06 against final distribution `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`. Exact final output is preserved in [jatos-acceptance-final-result.json](jatos-acceptance-final-result.json). The harness is `tests/browser-jatos.cjs` and uses Playwright/Chromium outside the library dependencies.
+Historical campaign status: passed on 2026-10-06 against distribution `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`. Exact final output is preserved in [jatos-acceptance-final-result.json](jatos-acceptance-final-result.json). The harness is `tests/browser-jatos.cjs` and uses Playwright/Chromium outside the library dependencies.
 
 The harness creates a fresh fixture under `/tmp`, copies `run-study.bash`, its two required helper files, the provisioned seed for the installed JATOS version, and the disposable `facecropping_test.jzip`. It starts JATOS through the copied runner and waits for `JATOS_STUDY_URL`. It imports into that fixture only, replaces that imported study's `index.html`, and copies the current facecrop distribution into the fixture's nested study asset mount. JATOS paths point at the fixture's `runtime-data`; the harness snapshots installed JATOS data directories and requires them to remain unchanged. It stops the runner and removes the temporary fixture after a successful check. If cleanup cannot be confirmed, it retains and reports the fixture path for inspection.
 
@@ -15,9 +15,10 @@ FACECROP_JATOS_SEED=/path/to/workbench/.jatos-temp/3.11.1 \
 PLAYWRIGHT_MODULE=/tmp/facecrop-browser/node_modules/playwright \
 PLAYWRIGHT_BROWSERS_PATH=/tmp/facecrop-browser/browsers \
 LD_LIBRARY_PATH=/tmp/facecrop-browser/runtime/lib/x86_64-linux-gnu:/tmp/facecrop-browser/runtime/usr/lib/x86_64-linux-gnu \
-FACECROP_EXPECTED_DIST_HASH=c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c \
 node tests/browser-jatos.cjs
 ```
+
+The command above tests the current built distribution. To assert a specific artifact, set `FACECROP_EXPECTED_DIST_HASH` to the `assetDirectory` in its `dist/asset-manifest.json`. Replaying the historical campaign requires a build from checkpoint `fcae374` and expected hash `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`; the latest checkout should not be expected to match that historical hash.
 
 The archive and seed overrides are optional when their workbench-relative defaults exist. The explicit workbench root is mandatory, and the harness reports that requirement before loading Playwright.
 

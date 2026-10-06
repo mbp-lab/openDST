@@ -25,8 +25,7 @@ A guide to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDS
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v16.x
-- npm (comes with Node.js)
+- Node.js 22.x and npm 10.x (the versions declared by both package manifests)
 - [Docker](https://docs.docker.com/get-docker/) (for JATOS deployment)
 - A web server with a public domain (for production)
 
@@ -37,26 +36,26 @@ A guide to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDS
 git clone https://github.com/mbp-lab/openDST.git
 cd openDST
 
-# 2. Install dependencies
-npm install
+# 2. Install the locked dependencies and stage facecrop before start/build
+npm ci
+npm --prefix facecrop ci
+npm run facecrop:stage
 
-# 3. Configure environment variables (see Section 3)
-#    Edit .env to match your setup
+# 3. Review the checked-in .env and set values for this build (see Section 3)
 
 # 4. Run locally for testing
 npm start
 #    Opens http://localhost:3000 in your browser
-#    Use browser dev tools to enable mobile view (the app is mobile-only by default)
+#    The checked-in .env allows desktop browsers; test a narrow viewport with dev tools if needed.
 
 # 5. Build for production
 npm run build
 #    Creates an optimized bundle in the build/ folder
 
-# 6. Deploy to JATOS (see Section 7 for full details)
-#    Copy the build folder contents into your JATOS study assets directory
+# 6. Deploy to JATOS (see Section 7 for valid archive and asset layout)
 ```
 
-> **Tip:** A demo version without data collection is available for testing. Keep `REACT_APP_LOGGING` set to `'false'` and `REACT_APP_VIDEO_RECORDING` set to `'false'` in `.env` to run the DST without storing any participant data.
+> **No-upload local build:** set `REACT_APP_LOGGING=false`, `REACT_APP_VIDEO_RECORDING=false`, `REACT_APP_UPLOAD_CONSOLE_LOG=false`, `REACT_APP_HEART_RATE_DEBUG=false`, and `REACT_APP_FACE_CROP_RECORDING_MODE=off` in `.env`, then rebuild. `REACT_APP_LOGGING` gates the ordinary study data and video uploads; it does not disable face-crop capture by itself.
 
 ---
 
@@ -116,16 +115,16 @@ End Page
 
 ## 3. Configuration Reference
 
-All configuration is done through the `.env` file in the project root. Changes require a rebuild (`npm run build`).
+Boolean and facecrop values below describe defaults when unset; URL rows are examples that require study-specific configuration. The checked-in `.env` overrides several values for this checkout, so review it before building or deploying; CRA embeds `.env` values into the build. Changes require a rebuild (`npm run build`).
 
 ### Environment Variables
 
-| Variable | Type | Default | Description |
+| Variable | Type | Default when unset / example | Description |
 |---|---|---|---|
-| `PUBLIC_URL` | String | `/study_assets/digital-stress-test-published` | The URL path where the built app is served. **Must match** the name of your JATOS study assets folder. |
-| `REACT_APP_MOBILE_ONLY` | `'true'` / `'false'` | `'true'` | When `'true'`, displays a "please use your smartphone" message on desktop browsers. Participants must use a mobile device. For desktop testing, use browser developer tools to simulate a mobile viewport. |
-| `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables webcam video recording during calibration, math task, and speech task. Videos are uploaded to the JATOS backend. **Requires `REACT_APP_LOGGING` to also be `'true'`.** |
-| `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
+| `PUBLIC_URL` | String | CRA default `/` | The URL path where the built app is served. For JATOS, use `/study_assets/<study-name>`. The workbench `build-study.bash` sets this from its local study manifest. |
+| `REACT_APP_MOBILE_ONLY` | `'true'` / `'false'` | `'false'` when unset | When `'true'`, displays a "please use your smartphone" message on desktop browsers. The checked-in `.env` also sets it to `false`. |
+| `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables uploading ordinary webcam recordings from calibration, math task, and speech task. Upload also requires `REACT_APP_LOGGING='true'`. |
+| `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Enables ordinary study result persistence and gates ordinary video uploads. It does not control face-crop capture; set `REACT_APP_FACE_CROP_RECORDING_MODE=off` to disable that feature. |
 | `REACT_APP_HEART_RATE_DEBUG` | `'true'` / `'false'` | `'false'` | Debug-only manual Web Bluetooth heart-rate capture. When enabled, participants can connect a BLE Heart Rate Service sensor before the study or continue without one. Requires `REACT_APP_LOGGING='true'` in a production build to persist separate `<studyResultId>_heartRate_000001.json` chunks. |
 | `REACT_APP_UPLOAD_CONSOLE_LOG` | `'true'` / `'false'` | `'false'` | Opt-in diagnostic upload. When enabled together with `REACT_APP_LOGGING`, new browser-console entries are uploaded in bounded sequential chunks named `<studyResultId>_consoleLog_000001.json`. |
 | `REACT_APP_FACE_CROP_RECORDING_MODE` | `off` / `calibration` / `all` | `off` | `off` disables face-crop recording. `calibration` captures only the introduction feedback recording; `all` captures every recording session. |
@@ -135,10 +134,10 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO` | Signed decimal fraction (`-1`–`1`) | `0.15` | Shifts the square crop vertically by this fraction of its side length: positive values move it upward, negative values downward, and `0` centers it on the detected face box. |
 | `REACT_APP_FACE_DETECTION_MIN_CONFIDENCE` | Decimal (`0`–`1`) | `0.5` | Minimum BlazeFace face-detection score eligible for cropping. A higher value reduces low-confidence detections but can increase missed faces. |
 | `REACT_APP_FACE_DETECTION_DELEGATE`, `REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD` | Removed | — | These legacy settings are rejected; the standalone pipeline uses its documented worker and detector defaults. |
-| `REACT_APP_SURVEY_HOST_PATH` | URL string | `'https://www.soscisurvey.de/resilience2021/'` | Base URL for the post-study survey. Participants are redirected here after completing the DST. The participant ID and JATOS result ID are appended as query parameters. Set to `''` to disable redirect. |
-| `REACT_APP_DEBRIEFING_HOST_PATH` | URL string | `'https://resilience.tf.uni-bielefeld.de/debriefing/'` | URL for the debriefing page shown when a participant cancels the study. Set to `''` to disable. |
-| `REACT_APP_ADDITIONAL_INFORMATION_URL_DE` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (German version). |
-| `REACT_APP_ADDITIONAL_INFORMATION_URL_EN` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (English version). |
+| `REACT_APP_SURVEY_HOST_PATH` | URL string | Example URL | Base URL for the post-study survey. Participants are redirected here after completing the DST. The participant ID and JATOS result ID are appended as query parameters. Set to `''` to disable redirect. |
+| `REACT_APP_DEBRIEFING_HOST_PATH` | URL string | Example URL | URL for the debriefing page shown when a participant cancels the study. Set to `''` to disable. |
+| `REACT_APP_ADDITIONAL_INFORMATION_URL_DE` | URL string | Example URL | URL to an additional information document linked in the consent slide (German version). |
+| `REACT_APP_ADDITIONAL_INFORMATION_URL_EN` | URL string | Example URL | URL to an additional information document linked in the consent slide (English version). |
 
 ### Example `.env` for a Live Study
 
@@ -162,6 +161,8 @@ PUBLIC_URL=/study_assets/digital-stress-test-published
 REACT_APP_MOBILE_ONLY = 'false'
 REACT_APP_VIDEO_RECORDING = 'false'
 REACT_APP_LOGGING = 'false'
+REACT_APP_UPLOAD_CONSOLE_LOG = 'false'
+REACT_APP_HEART_RATE_DEBUG = 'false'
 REACT_APP_SURVEY_HOST_PATH = ''
 REACT_APP_DEBRIEFING_HOST_PATH = ''
 REACT_APP_ADDITIONAL_INFORMATION_URL_DE = ''
@@ -705,15 +706,17 @@ limits cover the additional AVI, sidecar, and manifest files.
 
 ### Data Storage Configuration
 
-The `_data_storage.txt` file controls what happens to participant data server-side:
+The study uploads a `<studyResultId>_data_storage.txt` marker to JATOS's result-upload storage. These values record the participant's requested disposition for downstream processing; the application and JATOS do not automatically delete files or enforce this request.
 
 | Value | Meaning |
 |---|---|
-| `save_all_data` | Keep all data including videos (set after debriefing) |
-| `save_no_data` | Delete all data (set on cancel with no data) |
-| `save_without_video` | Keep JSON data but delete videos (set on cancel without video) |
+| `save_all_data` | Request retention of all collected data, including videos (normal completion) |
+| `save_no_data` | Request to delete all collected data. `StartPage` currently uploads this as an initial marker; no-data cancellation aborts the JATOS study and does not upload a new marker. |
+| `save_without_video` | Request retention of non-video data and deletion of video files (cancel without video) |
 
-Server-side scripts (running as cron jobs) read this file to determine how to process the participant's data. See [Section 7](#7-deployment) for data management details.
+Any retention or deletion action must be implemented by your downstream data-processing procedure. See [Section 7](#7-deployment) for the JATOS result-upload path.
+
+The current no-data cancellation path calls `jatos.abortStudyAjax`; it does not guarantee retraction of files already uploaded or uploads already in flight.
 
 ---
 
@@ -736,7 +739,7 @@ You can use a physical machine, a university VM, or a cloud provider (Azure, AWS
 1. **Docker** — runs the JATOS container
 2. **Nginx** — reverse proxy for port mapping and SSL termination
 3. **JATOS** — study management backend (runs inside Docker)
-4. **Node.js 16** — for building the DST frontend (can be on a separate build machine)
+4. **Node.js 22.x and npm 10.x** — for building the DST frontend and standalone face-crop library (can be on a separate build machine)
 
 ### Step-by-Step Setup
 
@@ -760,9 +763,12 @@ sudo docker pull jatos/jatos:latest
 sudo docker run -d \
   --name jatos \
   -p 9000:9000 \
+  -e JATOS_RESULT_UPLOADS_PATH=/opt/jatos_data/result_uploads \
   -v jatos-data:/opt/jatos_data \
   jatos/jatos:latest
 ```
+
+The explicit `JATOS_RESULT_UPLOADS_PATH` setting keeps uploaded participant files in JATOS's persistent data volume. See [JATOS configuration](https://www.jatos.org/JATOS_Configuration.html) and [JATOS Docker installation](https://www.jatos.org/Install-JATOS-via-Docker.html).
 
 JATOS is now running at `http://your-server:9000`. The default admin credentials are shown in the JATOS logs:
 
@@ -822,49 +828,56 @@ sudo certbot --nginx -d your-domain.com
 
 Follow the prompts to obtain and install the certificate. Certbot will automatically update your Nginx configuration.
 
-#### Step 5: Build the DST
+#### Step 5: Build and stage the DST
 
-On your build machine (can be your local computer):
+Use Node.js 22.x/npm 10.x. From the `openDST/` repository directory, install both locked dependency trees and stage the standalone browser assets before starting or building:
 
 ```bash
 git clone https://github.com/mbp-lab/openDST.git
 cd openDST
 
-# Edit .env — set PUBLIC_URL to match your JATOS study assets folder name
-# Example: PUBLIC_URL=/study_assets/my-dst-study
+npm ci
+npm --prefix facecrop ci
+npm run facecrop:stage
+# Review .env and choose the asset path for this study.
+PUBLIC_URL=/study_assets/my-dst-study npm run build
+```
 
-npm install
-npm run build
+In this development suite, prefer the workspace-level build script, which installs, builds, stages, and packages the study using its configured manifest:
+
+```bash
+# Run from the opendst-development-suite workspace root
+./build-study.bash
 ```
 
 #### Step 6: Deploy to JATOS
 
-**Option A: Copy build files into the Docker container**
+JATOS separates study assets from uploaded result files. Put the built web application in a named study asset directory such as `study_assets_root/my-dst-study`; participant uploads are written under `result_uploads`.
+
+**Option A: Copy build files into the Docker container's study asset directory**
 
 ```bash
 # Find your JATOS container name
 sudo docker ps
 
-# Copy the build output to the JATOS study assets directory
-# The folder name must match the PUBLIC_URL in .env (without /study_assets/ prefix)
+# Copy the built frontend to the matching named study asset directory
 sudo docker cp build/. jatos:/opt/jatos_data/study_assets_root/my-dst-study
 ```
 
-**Option B: Import via JATOS GUI**
+Create/configure the study in JATOS so it uses that asset directory, and set `PUBLIC_URL=/study_assets/my-dst-study` before building.
 
-1. Package the `build/` folder as a `.jzip` file (JATOS ZIP format — a standard zip file with a `.jzip` extension)
-2. Log into the JATOS web interface at `https://your-domain.com`
-3. Click "Import Study"
-4. Upload the `.jzip` file
-5. Configure the study settings in JATOS (worker types, etc.)
+**Option B: Import a valid JATOS study archive**
+
+Do not zip the bare CRA `build/` directory and rename it `.jzip`. A valid study archive contains a `.jas` study manifest and the named study asset directory referenced by that manifest. The workspace `./build-study.bash` creates this layout and writes an importable `.jzip` archive. For a standalone openDST checkout, create/configure the study and upload its named assets in the JATOS GUI, then use JATOS's export function to create an archive for import elsewhere.
+
+To import an archive, log into the JATOS web interface, choose **Studies → + → Import Study**, upload the generated `.jzip`, and review the creation/replacement details before confirming.
 
 #### Step 7: Create a Study in JATOS
 
-1. Log into the JATOS GUI
-2. If you used Option A (docker cp), create a new study and point it to your study assets folder
-3. If you used Option B (import), the study should already be visible
-4. Configure worker types (e.g., "General Multiple" for anonymous participants, or "Personal Multiple" for tracked participants)
-5. Generate study links to distribute to participants
+1. Log into the JATOS GUI.
+2. Create a study and point its start page at the uploaded study assets, or import a valid `.jzip` archive.
+3. Configure worker types (for example, “General Multiple” for anonymous participants, or “Personal Multiple” for tracked participants).
+4. Generate study links to distribute to participants.
 
 ### Data Management
 
@@ -872,15 +885,16 @@ During the study, video files and JSON data are uploaded into the JATOS Docker c
 
 **Recommended approach:**
 
-1. **Extract files from Docker to the host machine** using a cron job:
+Copy uploaded participant files from Docker's result-upload directory to the host or a secure storage system:
 
 ```bash
-# Example: run every 5 minutes
-*/5 * * * * docker cp jatos:/opt/jatos_data/study_assets_root/my-dst-study/uploads/ /home/data/raw/
+# Copy files from the configured JATOS result-upload directory
+docker cp jatos:/opt/jatos_data/result_uploads/. /home/data/raw/
 ```
-2. **Transfer files to a secure storage server**
+This is JATOS's configured `JATOS_RESULT_UPLOADS_PATH`, not the study asset directory. If you automate transfers, use an idempotent process that does not overwrite or mix participant data.
 
-3. **Process data storage preferences** by reading each participant's `_data_storage.txt` file and deleting videos or all data as specified.
+1. **Transfer files to a secure storage server** that is not exposed to the internet.
+2. **Process each participant's `_data_storage.txt` marker** according to the study's approved retention plan. The marker is a request for downstream processing, not an automatic deletion command.
 
 
 ---
@@ -891,7 +905,7 @@ During the study, video files and JSON data are uploaded into the JATOS Docker c
 
 **"Please use your smartphone" message on desktop**
 
-The DST is mobile-only by default. For desktop testing:
+When `REACT_APP_MOBILE_ONLY` is `true`, the DST asks desktop participants to use a smartphone. The variable is false when unset and is also false in the checked-in `.env`. For desktop testing:
 - Set `REACT_APP_MOBILE_ONLY = 'false'` in `.env` and rebuild, OR
 - Open browser developer tools (F12) and toggle the device toolbar to simulate a mobile viewport
 
@@ -906,14 +920,17 @@ Also check that the participant's browser supports `MediaRecorder` API (most mod
 
 **Build fails with Node.js errors**
 
-The project requires Node.js v16.x. Newer versions may cause compatibility issues with `react-scripts` 3.x:
+The project manifests require Node.js 22.x and npm 10.x. Check that both package installs and facecrop staging have completed:
 ```bash
 # Check your version
 node --version
 
-# Use nvm to install v16 if needed
-nvm install 16
-nvm use 16
+# Use nvm to install Node 22 if needed
+nvm install 22
+nvm use 22
+npm ci
+npm --prefix facecrop ci
+npm run facecrop:stage
 ```
 
 **JATOS study page shows a blank screen or 404**
@@ -945,7 +962,7 @@ PUBLIC_URL=/study_assets/my-dst-study
 
 **Math task feedback chart not showing**
 
-Ensure `chart.js` and `react-chartjs-2` are installed. Run `npm install` if you see missing module errors.
+Ensure `chart.js` and `react-chartjs-2` are installed. Run `npm ci` from `openDST/` if frontend dependencies are missing. After a clean checkout, also run `npm --prefix facecrop ci` and `npm run facecrop:stage` before starting or building.
 
 ### FAQ
 

@@ -23,7 +23,7 @@ The web app is written as a single-page application using React.js. The Main.js 
 * **/src/components/**: Contains the reusable components which are used in the different pages components.
 * **/src/img/**: Contains logos and the images for the TrafficLight component.
 * **/src/locales/**: Contains the locale files for the different translations of the app. Internationalization is managed through the i18n-module.
-* **/.env**: Contains environment variables where logging, video-recording, mobile-only and URLs for the app can be configured. <i>Note: mobile-only is enabled as default and the non-mobile layout for the DST is not developed yet. If you want to view the DST on a desktop computer you have to use the mobile mode of your browser.</i>
+* **/.env**: Contains environment variables where logging, video-recording, mobile-only and URLs for the app can be configured. Set `REACT_APP_MOBILE_ONLY=true` to require a mobile device. This checkout sets it to false; use a mobile viewport when testing the intended mobile layout.
 
 
 ### Render Logic:
@@ -43,7 +43,7 @@ During the study flow the variables pageIndex and slideIndex in Main.js are incr
 *	in this directory, the built project must be placed
  
 ## Video recording and data upload/storage
-Per default video recording and data logging are disabled in the .env-file. We developed a dedicated data security concept for collecting data and storing it. Please [contact us](https://www.uni-bielefeld.de/fakultaeten/technische-fakultaet/arbeitsgruppen/multimodal-behavior-processing/index.xml) for further information.
+When unset, ordinary video upload and study-result logging are disabled. The tracked `.env` in this checkout explicitly enables recording, logging, facecrop and debugging; review it before building. For a run without uploads, set `REACT_APP_LOGGING=false`, `REACT_APP_VIDEO_RECORDING=false`, and `REACT_APP_FACE_CROP_RECORDING_MODE=off`. We developed a dedicated data security concept for collecting data and storing it. Please [contact us](https://www.uni-bielefeld.de/fakultaeten/technische-fakultaet/arbeitsgruppen/multimodal-behavior-processing/index.xml) for further information.
  
 <i>Please note: If video recording or data logging are enabled the data privacy statement has to be adapted.</i>
 
@@ -59,7 +59,7 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## For comprehensive guide see:
 
-* **/DOCUMENTATION.md**
+* [DOCUMENTATION.md](DOCUMENTATION.md)
 
 
 
@@ -69,7 +69,7 @@ In the project directory, you can run:
 
 ### Facecrop setup
 
-Install the locked dependencies in both packages and stage facecrop explicitly after a clean checkout or after changing its source:
+Use Node 22.x/npm 10.x. Install the locked dependencies in both packages and stage facecrop explicitly after a clean checkout or after changing its source:
 
 ```sh
 npm ci

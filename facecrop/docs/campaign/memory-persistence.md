@@ -4,7 +4,7 @@ Decision recorded 2026-10-06 before implementation. Implementation and final cam
 
 ## Observed contract
 
-At extraction checkpoint 4fd85bc, `FaceCropSink.enqueuePart` stores the encoded artifact in `entries[].part`. Successful completion clears `gzipBytes`, but retains `faceEvents` and every frame record. `inventory()` reads only the two filenames from the part. Results already contain compact capture/part identity, counts, byte length and outcomes. This is a source observation; the reproducible retention baseline is being recorded separately.
+At extraction checkpoint 4fd85bc, `FaceCropSink.enqueuePart` stores the encoded artifact in `entries[].part`. Successful completion clears `gzipBytes`, but retains `faceEvents` and every frame record. `inventory()` reads only the two filenames from the part. Results already contain compact capture/part identity, counts, byte length and outcomes. This is a source observation; the reproducible retention baseline is preserved in [baseline.md](baseline.md).
 
 After AVI retry exhaustion, `uploadWithRetry` correctly reports the AVI as `uncertain` (a rejected transport promise does not prove remote absence). `uploadPart` reports the never-written sidecar as `failed`, attempts zero. This obscures the distinction between rejected writes and unattempted artifacts.
 

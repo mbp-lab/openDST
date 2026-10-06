@@ -1,10 +1,10 @@
 # Campaign acceptance report
 
-Campaign acceptance complete. Production source is frozen at `fcae374`; the validated built distribution is `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`. Later changes are acceptance tests/documentation only.
+Campaign acceptance complete. The campaign accepted production source at `fcae374`; its validated built distribution was `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`. This report preserves that historical acceptance evidence. Subsequent tooling and naming changes are recorded in [integration boundaries](../coupling.md); they do not retroactively change the artifact tested here.
 
 ## Evidence scope
 
-Current focused suites: 94 standalone tests in eight suites, 24 frontend tests in six suites (Node 22.16.0 / npm 10.9.2). These cover output/scientific invariants, persistence success/exhaustion/abort, stage failures and invalid counts, default/custom settings, study lifecycle races, frame-transfer failures, and distribution verification/rollback. The source maps and notes below describe their boundaries rather than claiming physical-device or production-server validation.
+Campaign-time focused suites: 94 standalone tests in eight suites, 24 frontend tests in six suites (Node 22.16.0 / npm 10.9.2). These cover output/scientific invariants, persistence success/exhaustion/abort, stage failures and invalid counts, default/custom settings, study lifecycle races, frame-transfer failures, and distribution verification/rollback. The source maps and notes below describe their boundaries rather than claiming physical-device or production-server validation.
 
 - [Baseline and corpus](baseline.md): pinned extraction source, workload, race matrix, AVI/sidecar byte corpus. [Echo baseline](retention-echo-baseline.json) and [current](retention-echo-current.json) distinguish compact history from full frame/acknowledgement retention.
 - [A decision/results](memory-persistence.md): completed/queued payload release, truthful unattempted/uncertain statuses, settled transport acknowledgement release.

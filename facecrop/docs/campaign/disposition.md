@@ -1,6 +1,6 @@
 # Final disposition register
 
-The original scope is preserved. Every finding below has an implemented, retained or deferred disposition. Final executable evidence is tied to distribution `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`; production source is frozen at `fcae374`. Validation/documentation commits do not change that binary.
+The original scope is preserved. Every finding below has an implemented, retained or deferred disposition. Final executable evidence is tied to distribution `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`; the campaign accepted production source at `fcae374`. This register records campaign-time decisions and evidence. Subsequent tooling and naming changes, including the newer distribution hash, are documented in [integration boundaries](../coupling.md).
 
 | Finding | Disposition and rationale | Evidence / checkpoint |
 |---|---|---|
