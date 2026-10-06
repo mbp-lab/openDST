@@ -1,893 +1,166 @@
-import {UPLOAD_STATUS} from '../uploadState';
-import {PATCH_VIDEO_FORMAT_VERSION, FaceCropSink, createCaptureManifestFilename} from './FaceCropOutput';
-import {ORIENTATION_REFERENCE_SIZE, rotatedDimensions, selectQuarterTurnByLuminance} from './FrameNormalization';
+import facecropAssets from './generated/facecropAssets.json';
 
-// Face-crop capture is an optional companion to MediaRecorder. It must fail
-// closed so unsupported browsers never affect the participant-facing recording.
+const Facecrop = require('./generated/facecrop');
+const {createCaptureSession, createJatosTransport, validateConfiguration} = Facecrop;
+
 export const FACE_CROP_CAPTURE_MODES = ['off', 'calibration', 'all'];
-export const FACE_CROP_STATUS = {
-    DISABLED: 'disabled',
-    UNSUPPORTED: 'unsupported',
-    CAPTURING: 'capturing',
-    COMPLETE: 'complete',
-    INCOMPLETE: 'incomplete'
-};
-export const DEFAULT_FACE_ROI_SMOOTHING_TAU_MS = 100;
-export const DEFAULT_FACE_ROI_SCALE = 1.5;
-export const DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO = 0.15;
-export const DEFAULT_FACE_DETECTION_MIN_CONFIDENCE = 0.5;
-export const DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD = 0.3;
-export const FACE_DETECTION_DELEGATES = ['CPU', 'GPU'];
-export const DEFAULT_FACE_DETECTION_DELEGATE = 'CPU';
-export const FACE_DETECTION_WARMUP_FRAMES = 3;
-export const DEFAULT_FACE_CROP_ANALYSIS_WORKER_COUNT = 1;
-const MAX_PENDING_ENCODE_PARTS = 1;
-
-function boundedNumber(value, minimum, maximum, fallback, integer = false) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && (!integer || Number.isSafeInteger(parsed)) && parsed >= minimum && parsed <= maximum
-        ? parsed : fallback;
-}
-
-export function resolveFaceCropConfiguration(environment = process.env) {
-    const requestedMode = environment.REACT_APP_FACE_CROP_RECORDING_MODE || 'off';
-    return {
-        requestedMode,
-        mode: FACE_CROP_CAPTURE_MODES.includes(requestedMode) ? requestedMode : 'off',
-        faceDetectionDelegate: FACE_DETECTION_DELEGATES.includes(environment.REACT_APP_FACE_DETECTION_DELEGATE)
-            ? environment.REACT_APP_FACE_DETECTION_DELEGATE : DEFAULT_FACE_DETECTION_DELEGATE,
-        faceRoiSmoothingTauMs: boundedNumber(
-            environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS,
-            0,
-            10000,
-            DEFAULT_FACE_ROI_SMOOTHING_TAU_MS,
-            true
-        ),
-        faceRoiScale: boundedNumber(environment.REACT_APP_FACE_CROP_SCALE, 1, 3, DEFAULT_FACE_ROI_SCALE),
-        faceRoiVerticalShiftRatio: boundedNumber(
-            environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO,
-            -1,
-            1,
-            DEFAULT_FACE_ROI_VERTICAL_SHIFT_RATIO
-        ),
-        faceDetectionMinConfidence: boundedNumber(
-            environment.REACT_APP_FACE_DETECTION_MIN_CONFIDENCE,
-            0,
-            1,
-            DEFAULT_FACE_DETECTION_MIN_CONFIDENCE
-        ),
-        faceDetectionMinSuppressionThreshold: boundedNumber(
-            environment.REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD,
-            0,
-            1,
-            DEFAULT_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD
-        ),
-        analysisWorkerCount: boundedNumber(environment.REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT, 1, 2, DEFAULT_FACE_CROP_ANALYSIS_WORKER_COUNT, true)
-    };
-}
-
-// Calibration mode is deliberately narrow: it supplies one reference capture
-// without adding face-crop work to every speech-task recording.
-export function shouldCaptureFaceCrop(configuration, studyPage) {
-    return configuration.mode === 'all' || (configuration.mode === 'calibration' && studyPage === 'introduction');
-}
-
-const MAX_SOURCE_PIXELS = 1920 * 1080;
-
-function dimensions(video) {
-    return {
-        width: video && Number.isSafeInteger(video.videoWidth) && video.videoWidth > 0 ? video.videoWidth : null,
-        height: video && Number.isSafeInteger(video.videoHeight) && video.videoHeight > 0 ? video.videoHeight : null,
-        readyState: video && Number.isInteger(video.readyState) ? video.readyState : null
-    };
-}
-function supportedDimensions({width, height}) {
-    return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width >= 72 && height >= 72 && width * height <= MAX_SOURCE_PIXELS;
-}
-
-function errorMetadata(error) {
-    return error ? {name: error.name || 'Error', message: error.message || String(error)} : null;
-}
-
-function isTransientVideoFrameError(error) {
-    return Boolean(error && (error.name === 'InvalidStateError' || /invalid source state/i.test(error.message || '')));
-}
-
-function videoStateMetadata(video) {
-    const stream = video && video.srcObject;
-    const track = stream && typeof stream.getVideoTracks === 'function' ? stream.getVideoTracks()[0] : null;
-    return {...dimensions(video), paused: video && typeof video.paused === 'boolean' ? video.paused : null,
-        ended: video && typeof video.ended === 'boolean' ? video.ended : null,
-        seeking: video && typeof video.seeking === 'boolean' ? video.seeking : null,
-        currentTime: video && Number.isFinite(video.currentTime) ? video.currentTime : null,
-        networkState: video && Number.isInteger(video.networkState) ? video.networkState : null,
-        streamActive: stream && typeof stream.active === 'boolean' ? stream.active : null,
-        track: track ? {readyState: track.readyState || null,
-            enabled: typeof track.enabled === 'boolean' ? track.enabled : null,
-            muted: typeof track.muted === 'boolean' ? track.muted : null} : null};
-}
-
-function frameCallbackMetadata(now, metadata) {
-    return {now: Number.isFinite(now) ? now : null,
-        presentationTime: metadata && Number.isFinite(metadata.presentationTime) ? metadata.presentationTime : null,
-        expectedDisplayTime: metadata && Number.isFinite(metadata.expectedDisplayTime) ? metadata.expectedDisplayTime : null,
-        mediaTime: metadata && Number.isFinite(metadata.mediaTime) ? metadata.mediaTime : null,
-        presentedFrames: metadata && Number.isSafeInteger(metadata.presentedFrames) ? metadata.presentedFrames : null,
-        width: metadata && Number.isFinite(metadata.width) ? metadata.width : null,
-        height: metadata && Number.isFinite(metadata.height) ? metadata.height : null};
-}
-
-const FRAME_TIMING_STAGES = ['analysisMs', 'assemblyMs', 'detectionMs', 'roiSelectionMs', 'rgbaCopyMs', 'cropAndSegmentMs'];
-const ENCODING_TIMING_STAGES = ['encodingMs'];
-
-function createTimingMetrics(stages) {
-    return stages.reduce((metrics, stage) => {
-        metrics[stage] = {count: 0, meanMs: null, minMs: null, maxMs: null};
-        return metrics;
-    }, {});
-}
-
-function addTiming(metrics, stage, durationMs) {
-    if (!metrics[stage] || !Number.isFinite(durationMs) || durationMs < 0) return;
-    const current = metrics[stage];
-    current.count += 1;
-    current.meanMs = current.meanMs === null ? durationMs : current.meanMs + (durationMs - current.meanMs) / current.count;
-    current.minMs = current.minMs === null ? durationMs : Math.min(current.minMs, durationMs);
-    current.maxMs = current.maxMs === null ? durationMs : Math.max(current.maxMs, durationMs);
-}
-
-function rectangleMetadata(rectangle) {
-    if (!rectangle) return null;
-    return {x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height};
-}
-
-function colorSpaceMetadata(colorSpace) {
-    if (!colorSpace) return null;
-    return {primaries: colorSpace.primaries, transfer: colorSpace.transfer, matrix: colorSpace.matrix,
-        fullRange: colorSpace.fullRange};
-}
-
-function renderedReferenceLuminance(video) {
-    const canvas = document.createElement('canvas');
-    canvas.width = ORIENTATION_REFERENCE_SIZE;
-    canvas.height = ORIENTATION_REFERENCE_SIZE;
-    const context = canvas.getContext('2d', {willReadFrequently: true});
-    if (!context) throw new Error('2D canvas is unavailable for orientation preflight');
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    const luminance = new Uint8Array(canvas.width * canvas.height);
-    for (let source = 0, destination = 0; source < rgba.length; source += 4) {
-        luminance[destination++] = Math.round(0.2126 * rgba[source] + 0.7152 * rgba[source + 1] + 0.0722 * rgba[source + 2]);
-    }
-    return luminance;
-}
-
-function nv12ColorSpace(colorSpace) {
-    const metadata = colorSpaceMetadata(colorSpace);
-    if (!metadata || metadata.fullRange !== true || metadata.primaries !== 'bt709' || metadata.transfer !== 'bt709' ||
-        (metadata.matrix !== null && metadata.matrix !== 'bt709')) {
-        throw new Error('Only full-range BT.709 NV12 camera frames are supported');
-    }
-    return metadata;
-}
-
-async function normalizationPreflight(frame, video, source) {
-    const format = frame.format || null;
-    const visibleRect = rectangleMetadata(frame.visibleRect);
-    const nativeWidth = visibleRect ? visibleRect.width : frame.codedWidth || frame.displayWidth;
-    const nativeHeight = visibleRect ? visibleRect.height : frame.codedHeight || frame.displayHeight;
-    if (format === 'NV12') {
-        if (frame.flip) throw new Error('Flipped NV12 VideoFrames are unsupported');
-        const colorSpace = nv12ColorSpace(frame.colorSpace);
-        const nativeSize = frame.allocationSize();
-        const bytes = new Uint8Array(nativeSize);
-        const layouts = await frame.copyTo(bytes);
-        let rotation = frame.rotation || 0;
-        let calibration = {method: 'frame-metadata-v1', clockwiseDistance: null, counterclockwiseDistance: null};
-        if (rotation === 0 && nativeWidth === source.height && nativeHeight === source.width && source.width !== source.height) {
-            const selected = selectQuarterTurnByLuminance({bytes, width: nativeWidth, height: nativeHeight, layouts,
-                reference: renderedReferenceLuminance(video)});
-            rotation = selected.rotation;
-            calibration = {method: 'presented-luminance-distance-v1', clockwiseDistance: selected.clockwiseDistance,
-                counterclockwiseDistance: selected.counterclockwiseDistance};
-        }
-        const output = rotatedDimensions(nativeWidth, nativeHeight, rotation);
-        if (output.width !== source.width || output.height !== source.height) {
-            throw new Error('Native VideoFrame geometry cannot be normalized to the presented video dimensions');
-        }
-        return {mode: 'nv12-bt709-full', nativeFormat: format, nativeWidth, nativeHeight,
-            presentedWidth: source.width, presentedHeight: source.height, rotation, flip: Boolean(frame.flip), colorSpace,
-            layouts: layouts.map(layout => ({offset: layout.offset, stride: layout.stride})), nativeAllocationSize: nativeSize,
-            ...calibration};
-    }
-    const options = {format: 'RGBA', colorSpace: 'srgb'};
-    const packedSize = frame.displayWidth * frame.displayHeight * 4;
-    const allocationSize = typeof frame.allocationSize === 'function' ? frame.allocationSize(options) : packedSize;
-    if (allocationSize !== packedSize) throw new Error('VideoFrame RGBA conversion is unavailable for format ' + (format || 'unknown'));
-    const layouts = await frame.copyTo(new Uint8Array(packedSize), options);
-    if (Array.isArray(layouts) && layouts.length && (layouts.length !== 1 || layouts[0].offset !== 0 || layouts[0].stride !== frame.displayWidth * 4)) {
-        throw new Error('VideoFrame did not return packed RGBA');
-    }
-    if (frame.displayWidth !== source.width || frame.displayHeight !== source.height) {
-        throw new Error('RGBA VideoFrame dimensions do not match the presented video');
-    }
-    return {mode: 'rgba-copy', nativeFormat: format, nativeWidth: frame.displayWidth, nativeHeight: frame.displayHeight,
-        presentedWidth: source.width, presentedHeight: source.height, rotation: 0, flip: false,
-        colorSpace: colorSpaceMetadata(frame.colorSpace), layouts: [{offset: 0, stride: frame.displayWidth * 4}],
-        nativeAllocationSize: allocationSize, method: 'native-presentation-v1', clockwiseDistance: null, counterclockwiseDistance: null};
-}
-
-export async function probeFaceCropCapability(video) {
-    const source = dimensions(video);
-    const checks = {};
-    const failed = (reason, stage, error) => ({supported: false,
-        capability: {status: 'failed', checks, failedStage: stage, error: errorMetadata(error)}, source, reason, error});
-    if (!video || typeof video.requestVideoFrameCallback !== 'function' || typeof video.cancelVideoFrameCallback !== 'function') {
-        checks.requestVideoFrameCallback = {status: 'failed'};
-        checks.cancelVideoFrameCallback = {status: 'failed'};
-        return failed('requestVideoFrameCallback is unavailable', 'requestVideoFrameCallback');
-    }
-    checks.requestVideoFrameCallback = {status: 'passed'};
-    checks.cancelVideoFrameCallback = {status: 'passed'};
-    if (typeof window.VideoFrame !== 'function') return failed('VideoFrame is unavailable', 'videoFrame');
-    checks.videoFrame = {status: 'available'};
-    if (typeof window.CompressionStream !== 'function') return failed('Native CompressionStream is unavailable', 'compressionStream');
-    checks.compressionStream = {status: 'passed'};
-    let frame;
-    try {
-        frame = new window.VideoFrame(video);
-        checks.videoFrame.construct = {status: 'passed', format: frame.format || null,
-            codedWidth: frame.codedWidth || null, codedHeight: frame.codedHeight || null,
-            displayWidth: frame.displayWidth, displayHeight: frame.displayHeight,
-            visibleRect: rectangleMetadata(frame.visibleRect), rotation: frame.rotation || 0, flip: Boolean(frame.flip),
-            colorSpace: colorSpaceMetadata(frame.colorSpace)};
-        const frameNormalization = await normalizationPreflight(frame, video, source);
-        checks.videoFrame.copyTo = {status: 'passed', returnedLayouts: frameNormalization.layouts};
-        return {supported: true, capability: {status: 'passed', checks}, source, frameNormalization};
-    } catch (error) {
-        if (!checks.videoFrame.construct) checks.videoFrame.construct = {status: 'failed'};
-        else checks.videoFrame.copyTo = {status: 'failed'};
-        return failed(error.message || 'VideoFrame normalization preflight failed',
-            checks.videoFrame.construct.status === 'failed' ? 'videoFrame.construct' : 'videoFrame.copyTo', error);
-    } finally {
-        if (frame) frame.close();
-    }
-}
-
-class PipelineWorker {
-    constructor() {
-        // eslint-disable-next-line import/no-webpack-loader-syntax
-        const workerModule = require('worker-loader!./FaceCropPipeline.worker');
-        const WorkerConstructor = workerModule.default || workerModule;
-        if (typeof WorkerConstructor !== 'function') {
-            throw new Error('Face-crop worker-loader did not export a Worker constructor');
-        }
-        this.worker = new WorkerConstructor();
-        this.pending = null;
-        this.queue = [];
-        this.closed = false;
-        this.worker.onmessage = event => this.receive(event.data);
-        this.worker.onerror = event => this.fail(new Error(event.message || 'Face-crop worker crashed'));
-        this.worker.onmessageerror = () => this.fail(new Error('Face-crop worker message could not be decoded'));
-    }
-
-    receive(message) {
-        if (message && message.diagnostic) {
-            console.info('[face-crop worker]', message.diagnostic);
-            return;
-        }
-
-        if (!this.pending) return;
-
-        const pending = this.pending;
-        this.pending = null;
-
-        if (message && message.error) {
-            const error = new Error(message.error.message);
-            error.name = message.error.name;
-            if (message.error.stack) error.stack = message.error.stack;
-            pending.reject(error);
-        } else {
-            pending.resolve(message && message.result);
-        }
-
-        this.pump();
-    }
-
-    fail(error) {
-        console.error('[face-crop] Worker failure', error);
-        this.closed = true;
-        this.worker.terminate();
-        if (this.pending) this.pending.reject(error);
-        this.pending = null;
-        this.queue.splice(0).forEach(request => request.reject(error));
-    }
-
-    request(type, payload = {}, transfer = []) {
-        if (this.closed) return Promise.reject(new Error('Face-crop worker is closed'));
-        return new Promise((resolve, reject) => {
-            this.queue.push({type, payload, transfer, resolve, reject});
-            this.pump();
-        });
-    }
-
-    pump() {
-        if (this.pending || this.closed || !this.queue.length) return;
-        const pending = this.queue.shift();
-        this.pending = pending;
-        try {
-            this.worker.postMessage({type: pending.type, payload: pending.payload}, pending.transfer);
-        } catch (error) {
-            this.pending = null;
-            pending.reject(error);
-            this.pump();
-        }
-    }
-
-    initialize(payload) { return this.request('initialize', payload); }
-    processFrame(payload) { return this.request('processFrame', payload, [payload.frame]); }
-    processAnalysisResult(payload) { return this.request('processAnalysisResult', payload, [payload.rgbx.buffer]); }
-    encodePart(payload) { return this.request('encodePart', payload, [payload.bytes.buffer]); }
-    warmup(payload) { return this.request('warmup', payload, [payload.frame]); }
-    finish() { return this.request('finish'); }
-    async close() {
-        if (this.closed) return;
-        try {
-            await this.request('close');
-        } finally {
-            this.closed = true;
-            this.worker.terminate();
-        }
-    }
-}
-
-export class FaceCropCaptureController {
-    constructor({
-        video,
-        studyResultId,
-        studyPage,
-        videoCounter,
-        captureId: providedCaptureId,
-        configuration,
-        uploadTracker,
-        uploadResultFile,
-        onStatus,
-        createPipelineWorker = () => new PipelineWorker()
-    }) {
-        Object.assign(this, {video, studyResultId, studyPage, videoCounter, configuration});
-        this.onStatus = onStatus || (() => {});
-        this.createPipelineWorker = createPipelineWorker;
-        this.sink = new FaceCropSink({uploadResultFile, uploadTracker});
-        this.uploadResultFile = uploadResultFile;
-        this.uploadTracker = uploadTracker;
-        this.state = 'idle';
-        this.status = FACE_CROP_STATUS.DISABLED;
-        this.startPromise = null;
-        this.preparePromise = null;
-        this.stopPromise = null;
-        this.frameWait = null;
-        this.captureLoop = null;
-        this.analysisWorkers = [];
-        this.assemblyWorker = null;
-        this.encoderWorker = null;
-        this.inFlight = new Map();
-        this.encodingJobs = new Map();
-        this.assemblyBufferedResults = 0;
-        this.nextSequence = 0;
-        this.nextWorker = 0;
-        this.incompleteReason = null;
-        this.captureId = providedCaptureId || createCaptureId(studyPage, videoCounter);
-        this.acceptedFrames = 0;
-        this.skippedFrames = 0;
-        this.lastPresentedFrame = null;
-        this.lastPresentationTimeUs = null;
-        this.faceDetections = 0;
-        this.faceDetectionMisses = 0;
-        this.frameTimings = createTimingMetrics(FRAME_TIMING_STAGES);
-        this.encodingTimings = createTimingMetrics(ENCODING_TIMING_STAGES);
-        this.detectorWarmup = {requested: FACE_DETECTION_WARMUP_FRAMES, completed: 0, totalMs: 0, meanMs: null};
-        this.capability = {status: 'not-run', checks: {}};
-        this.source = null;
-        this.frameNormalization = null;
-        this.manifest = null;
-        this.frameCallbacks = 0;
-        this.nextProgressLogFrame = 120;
-    }
-
-    diagnostic(event, details = {}) {
-        console.info('[face-crop] ' + event, {captureId: this.captureId, studyPage: this.studyPage,
-            videoCounter: this.videoCounter, ...details});
-    }
-
-    start() {
-        if (!this.startPromise) this.startPromise = this.startInternal();
-        return this.startPromise;
-    }
-
-    prepare() {
-        if (!this.preparePromise) this.preparePromise = this.prepareInternal();
-        return this.preparePromise;
-    }
-
-    waitForPresentedFrame() {
-        return new Promise(resolve => {
-            const callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
-                if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
-                this.frameWait = null;
-                resolve({now, metadata});
-            });
-            this.frameWait = {callbackId, resolve: () => resolve(null)};
-        });
-    }
-
-    waitForVideoReady() { return this.waitForPresentedFrame(); }
-
-    async prepareInternal() {
-        if (this.state === 'prepared' || this.state === 'capturing') return this.status;
-        this.state = 'starting';
-        this.diagnostic('prepare-started', {analysisWorkerCount: this.configuration.analysisWorkerCount});
-        let capability;
-        const attempts = [];
-        for (let attempt = 1; attempt <= 2; attempt += 1) {
-            const presented = await this.waitForPresentedFrame();
-            if (!presented || this.state === 'stopping') return this.status;
-            const diagnostic = {attempt, video: videoStateMetadata(this.video),
-                callback: frameCallbackMetadata(presented.now, presented.metadata)};
-            capability = await probeFaceCropCapability(this.video);
-            diagnostic.error = capability.capability.error || null;
-            attempts.push(diagnostic);
-            this.diagnostic('probe-attempt', diagnostic);
-            if (capability.supported || !isTransientVideoFrameError(capability.error) || attempt === 2) break;
-        }
-        capability.capability.probeAttempts = attempts;
-        this.capability = capability.capability;
-        this.source = capability.source;
-        this.frameNormalization = capability.frameNormalization || null;
-        const frameCheck = this.capability.checks && this.capability.checks.videoFrame;
-        const construct = frameCheck && frameCheck.construct;
-        const copy = frameCheck && frameCheck.copyTo;
-        if (construct && construct.status === 'passed') {
-            this.diagnostic('frame-layout', {format: construct.format, codedWidth: construct.codedWidth,
-                codedHeight: construct.codedHeight, displayWidth: construct.displayWidth, displayHeight: construct.displayHeight,
-                visibleRect: JSON.stringify(construct.visibleRect), rotation: construct.rotation, flip: construct.flip,
-                colorSpace: JSON.stringify(construct.colorSpace), normalizationMode: this.frameNormalization && this.frameNormalization.mode,
-                selectedRotation: this.frameNormalization && this.frameNormalization.rotation,
-                clockwiseDistance: this.frameNormalization && this.frameNormalization.clockwiseDistance,
-                counterclockwiseDistance: this.frameNormalization && this.frameNormalization.counterclockwiseDistance,
-                returnedLayouts: JSON.stringify(copy && copy.returnedLayouts)});
-        }
-        if (this.state === 'stopping') return this.status;
-        if (!capability.supported) {
-            await this.uploadManifest([], FACE_CROP_STATUS.UNSUPPORTED);
-            return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, capability.reason);
-        }
-        const source = dimensions(this.video);
-        this.source = source;
-        if (!supportedDimensions(source)) {
-            this.capability = {...this.capability, status: 'failed', failedStage: 'sourceDimensions', checks: {
-                ...this.capability.checks,
-                sourceDimensions: {status: 'failed', width: source.width, height: source.height, maxPixels: MAX_SOURCE_PIXELS}
-            }};
-            await this.uploadManifest([], FACE_CROP_STATUS.INCOMPLETE);
-            return this.terminate(FACE_CROP_STATUS.INCOMPLETE, 'Source dimensions are outside supported bounds');
-        }
-        this.capability = {...this.capability, checks: {
-            ...this.capability.checks,
-            sourceDimensions: {status: 'passed', width: source.width, height: source.height, maxPixels: MAX_SOURCE_PIXELS}
-        }};
-        try {
-            const config = this.configuration;
-            const workerConfiguration = {
-                faceRoiSmoothingTauMs: config.faceRoiSmoothingTauMs,
-                faceRoiScale: config.faceRoiScale,
-                faceRoiVerticalShiftRatio: config.faceRoiVerticalShiftRatio,
-                faceDetectionMinConfidence: config.faceDetectionMinConfidence,
-                faceDetectionMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold,
-                faceDetectionDelegate: config.faceDetectionDelegate,
-                analysisWorkerCount: config.analysisWorkerCount,
-                frameNormalization: this.frameNormalization
-            };
-            const identity = {studyResultId: this.studyResultId, studyPage: this.studyPage,
-                videoCounter: this.videoCounter, captureId: this.captureId};
-            this.analysisWorkers = Array.from({length: config.analysisWorkerCount}, () => this.createPipelineWorker());
-            this.assemblyWorker = this.createPipelineWorker();
-            this.encoderWorker = this.createPipelineWorker();
-            await Promise.all(this.analysisWorkers.map(worker => worker.initialize({role: 'analysis', configuration: workerConfiguration})));
-            await Promise.all([
-                this.assemblyWorker.initialize({role: 'assembly', configuration: workerConfiguration, identity}),
-                this.encoderWorker.initialize({role: 'encoder', configuration: workerConfiguration})
-            ]);
-        } catch (error) {
-            await this.closeWorker();
-            return this.terminate(FACE_CROP_STATUS.UNSUPPORTED, error.message || 'BlazeFace detector initialization failed');
-        }
-        if (this.state === 'stopping') {
-            await this.closeWorker();
-            return this.status;
-        }
-        const warmupStartedAt = performance.now();
-        try {
-            for (let index = 0; index < this.detectorWarmup.requested; index += 1) {
-                const timestampUs = index * 1000 + Math.round((performance.now() - warmupStartedAt) * 1000);
-                await Promise.all(this.analysisWorkers.map(worker => {
-                    const warmupFrame = new window.VideoFrame(this.video, {timestamp: timestampUs});
-                    return worker.warmup({frame: warmupFrame, width: source.width, height: source.height, timestampUs});
-                }));
-                this.detectorWarmup.completed += 1;
-            }
-        } finally {
-            this.detectorWarmup.totalMs = performance.now() - warmupStartedAt;
-            this.detectorWarmup.meanMs = this.detectorWarmup.completed
-                ? this.detectorWarmup.totalMs / this.detectorWarmup.completed : null;
-        }
-        this.state = 'prepared';
-        this.diagnostic('prepared', {source: this.source, detectorWarmup: this.detectorWarmup});
-        return this.status;
-    }
-
-    async startInternal() {
-        const status = await this.prepare();
-        if (this.state === 'stopping' || this.state === 'terminal' || status === FACE_CROP_STATUS.UNSUPPORTED) return status;
-        this.state = 'capturing';
-        this.setStatus(FACE_CROP_STATUS.CAPTURING);
-        this.diagnostic('capture-started');
-        this.captureLoop = this.captureFrames();
-        return this.status;
-    }
-
-    stop() {
-        if (!this.stopPromise) this.stopPromise = this.stopInternal();
-        return this.stopPromise;
-    }
-
-    async stopInternal() {
-        // Cancel the browser callback first, then drain the capture loop, then
-        // flush the worker and sink. This prevents frames arriving during teardown.
-        if (this.state !== 'terminal') this.state = 'stopping';
-        this.diagnostic('stop-requested', {frameCallbacks: this.frameCallbacks, inFlight: this.inFlight.size, assemblyBufferedResults: this.assemblyBufferedResults});
-        this.cancelFrameWait();
-        if (this.startPromise) await this.startPromise;
-        if (this.captureLoop) await this.captureLoop;
-        if (this.status === FACE_CROP_STATUS.DISABLED || this.status === FACE_CROP_STATUS.UNSUPPORTED) {
-            await this.closeWorker();
-            if (!this.manifest && this.status !== FACE_CROP_STATUS.DISABLED) await this.uploadManifest([], this.status);
-            return this.status;
-        }
-        return this.finalize();
-    }
-
-    async captureFrames() {
-        try {
-            while (this.state === 'capturing') {
-                const event = await this.waitForFrame();
-                if (!event || this.state !== 'capturing') break;
-                this.recordSkippedFrames(event.metadata);
-                await this.processFrame(event.metadata, event.wallClockMs, event.presentationTimeUs);
-            }
-        } catch (error) {
-            this.markIncomplete(error.message || 'Face-crop frame processing failed');
-        }
-    }
-
-    waitForFrame() {
-        return new Promise((resolve, reject) => {
-            const callbackId = this.video.requestVideoFrameCallback((now, metadata) => {
-                if (!this.frameWait || this.frameWait.callbackId !== callbackId) return;
-                this.frameWait = null;
-                this.frameCallbacks += 1;
-                if (this.frameCallbacks >= this.nextProgressLogFrame) {
-                    this.diagnostic('progress', {frameCallbacks: this.frameCallbacks, acceptedFrames: this.acceptedFrames,
-                        skippedFrames: this.skippedFrames, inFlight: this.inFlight.size, assemblyBufferedResults: this.assemblyBufferedResults});
-                    this.nextProgressLogFrame += 120;
-                }
-                if (!Number.isFinite(now) || !metadata || !Number.isFinite(metadata.presentationTime)) {
-                    reject(new Error('Video frame presentationTime is unavailable'));
-                    return;
-                }
-                const presentationTimeUs = Math.round(metadata.presentationTime * 1000);
-                if (!Number.isSafeInteger(presentationTimeUs) ||
-                    (this.lastPresentationTimeUs !== null && presentationTimeUs <= this.lastPresentationTimeUs)) {
-                    reject(new Error('Video frame presentationTime is non-increasing'));
-                    return;
-                }
-                this.lastPresentationTimeUs = presentationTimeUs;
-                resolve({metadata, presentationTimeUs, wallClockMs: Date.now()});
-            });
-            this.frameWait = {callbackId, resolve};
-        });
-    }
-
-    cancelFrameWait() {
-        if (!this.frameWait) return;
-        const wait = this.frameWait;
-        this.frameWait = null;
-        this.video.cancelVideoFrameCallback(wait.callbackId);
-        wait.resolve(null);
-    }
-
-    recordSkippedFrames(metadata) {
-        if (!Number.isSafeInteger(metadata.presentedFrames)) return;
-        if (this.lastPresentedFrame !== null) {
-            this.skippedFrames += Math.max(0, metadata.presentedFrames - this.lastPresentedFrame - 1);
-        }
-        this.lastPresentedFrame = metadata.presentedFrames;
-    }
-
-    async processFrame(metadata, wallClockMs = Date.now(), presentationTimeUs = null) {
-        return this.processAnalysisFrame(metadata, wallClockMs, presentationTimeUs);
-    }
-
-    async processAnalysisFrame(metadata, wallClockMs, presentationTimeUs = null) {
-        while (this.inFlight.size + this.assemblyBufferedResults >= this.configuration.analysisWorkerCount) {
-            if (this.state !== 'capturing') return;
-            if (!this.inFlight.size) {
-                this.markIncomplete('Face-crop assembly result sequence gap');
-                return;
-            }
-            await Promise.race(this.inFlight.values());
-        }
-        const sequence = this.nextSequence++;
-        const worker = this.analysisWorkers[this.nextWorker++ % this.analysisWorkers.length];
-        const source = dimensions(this.video);
-        this.source = source;
-        if (!supportedDimensions(source)) return this.markIncomplete('Source dimensions changed outside supported bounds');
-        if (!Number.isSafeInteger(presentationTimeUs)) throw new Error('Video frame presentationTime is required');
-        const timestampUs = presentationTimeUs;
-        const frame = new window.VideoFrame(this.video, {timestamp: timestampUs});
-        const task = worker.processFrame({frame, width: this.source.width, height: this.source.height, timestampUs, wallClockMs, sequence})
-            .then(result => this.assemblyWorker.processAnalysisResult(result))
-            .then(result => this.commitAssemblyResult(result))
-            .catch(error => this.markIncomplete(error.message || 'Face-crop frame processing failed'))
-            .finally(() => this.inFlight.delete(sequence));
-        this.inFlight.set(sequence, task);
-    }
-
-    async commitAssemblyResult(result) {
-        this.assemblyBufferedResults = result.bufferedResultCount;
-        for (const commit of result.commits) {
-            await this.enqueueEncodingParts(commit.parts);
-            Object.keys(commit.timings || {}).forEach(stage => addTiming(this.frameTimings, stage, commit.timings[stage]));
-            if (commit.accepted) {
-                if (commit.detectionState === 'largest' || commit.detectionState === 'reacquired') this.faceDetections += 1;
-                else this.faceDetectionMisses += 1;
-                this.acceptedFrames += 1;
-            } else this.faceDetectionMisses += 1;
-        }
-    }
-
-    async enqueueEncodingParts(parts = []) {
-        for (const part of parts || []) await this.enqueueEncodingPart(part);
-    }
-
-    async enqueueEncodingPart(part) {
-        while (this.encodingJobs.size >= MAX_PENDING_ENCODE_PARTS) await Promise.race(this.encodingJobs.values());
-        const partId = String(part.segmentIndex) + ':' + String(part.partIndex);
-        if (this.encodingJobs.has(partId)) throw new Error('Face-crop encoder received a duplicate part');
-        this.diagnostic('part-sealed', {partIndex: part.partIndex, segmentIndex: part.segmentIndex, frameCount: part.frameCount});
-        const job = this.encoderWorker.encodePart(part)
-            .then(result => {
-                Object.keys(result.timings || {}).forEach(stage => addTiming(this.encodingTimings, stage, result.timings[stage]));
-                return this.enqueueEncodedPart(result.artifact);
-            })
-            .catch(error => this.markIncomplete('Face-crop encoding failed: ' + (error.message || 'unknown failure')))
-            .finally(() => this.encodingJobs.delete(partId));
-        this.encodingJobs.set(partId, job);
-    }
-
-    async enqueueEncodedPart(part) {
-        this.diagnostic('part-encoded', {partIndex: part.partIndex, segmentIndex: part.segmentIndex, frameCount: part.frameCount});
-        await this.sink.enqueuePart(part);
-    }
-
-    markIncomplete(reason) {
-        if (this.state === 'terminal') return;
-        this.incompleteReason = reason;
-        this.state = 'stopping';
-        this.cancelFrameWait();
-        this.setStatus(FACE_CROP_STATUS.INCOMPLETE, reason);
-    }
-
-    async finalize() {
-        // AVI and face-event sidecars are finalized together; either upload
-        // failure makes the logical face-crop capture incomplete.
-        let result = {parts: []};
-        this.diagnostic('finalization-started', {frameCallbacks: this.frameCallbacks, inFlight: this.inFlight.size});
-        try {
-            if (this.frameCallbacks === 0) {
-                this.incompleteReason = this.incompleteReason || 'No video frame callbacks were received during face-crop capture';
-            }
-            await Promise.all(this.inFlight.values());
-            const assemblyResult = await this.assemblyWorker.finish();
-            this.assemblyBufferedResults = assemblyResult.bufferedResultCount;
-            await this.enqueueEncodingParts(assemblyResult.parts);
-            await Promise.all(this.encodingJobs.values());
-            result = await this.sink.finalize();
-            if (result.parts.some(part => part.status !== UPLOAD_STATUS.SUCCEEDED)) {
-                this.incompleteReason = 'One or more patch-video uploads failed';
-            }
-        } catch (error) {
-            this.incompleteReason = error.message || 'Face-crop finalization failed';
-        } finally {
-            await this.closeWorker();
-        }
-        await this.uploadManifest(result.parts);
-        this.diagnostic('finalization-finished', {parts: result.parts.length, incompleteReason: this.incompleteReason});
-        return this.terminate(this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE, this.incompleteReason);
-    }
-
-    async uploadManifest(parts, terminalStatus) {
-        const filename = createCaptureManifestFilename({studyResultId: this.studyResultId, studyPage: this.studyPage,
-            videoCounter: this.videoCounter, captureId: this.captureId});
-        const uploadId = 'face-crop-manifest-' + this.captureId;
-        const manifest = {
-            capture: {captureId: this.captureId,
-                identity: {studyResultId: this.studyResultId, studyPage: this.studyPage, videoCounter: this.videoCounter}},
-            source: this.sourceMetadata(),
-            capability: this.capability,
-            configuration: this.configurationMetadata(),
-            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz',
-                aviHeaderFrameRatePolicy: 'required-per-part-from-presentationTimeUs-v1', frameSize: 72},
-            status: terminalStatus || (this.status === FACE_CROP_STATUS.UNSUPPORTED ? FACE_CROP_STATUS.UNSUPPORTED
-                : (this.incompleteReason ? FACE_CROP_STATUS.INCOMPLETE : FACE_CROP_STATUS.COMPLETE)),
-            statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,
-                frameTimings: this.frameTimings, encodingTimings: this.encodingTimings, detectorWarmup: this.detectorWarmup},
-            parts: parts.map(part => ({captureId: part.captureId, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
-                segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, frameRate: part.frameRate, status: part.status}))
-        };
-        this.manifest = {filename, status: 'pending'};
-        this.uploadTracker.registerUpload(uploadId);
-        try {
-            await this.uploadResultFile(JSON.stringify(manifest), filename);
-            this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.SUCCEEDED);
-            this.manifest.status = UPLOAD_STATUS.SUCCEEDED;
-        } catch (error) {
-            this.uploadTracker.settleUpload(uploadId, UPLOAD_STATUS.FAILED);
-            this.manifest.status = UPLOAD_STATUS.FAILED;
-            this.incompleteReason = this.incompleteReason || 'Face-crop manifest upload failed';
-        }
-    }
-
-    sourceMetadata() {
-        const source = this.source || {};
-        const width = source.width;
-        const height = source.height;
-        return {...source,
-            pixelCount: Number.isSafeInteger(width) && Number.isSafeInteger(height) ? width * height : null,
-            aspectRatio: Number.isSafeInteger(width) && Number.isSafeInteger(height) ? width / height : null,
-            orientation: Number.isSafeInteger(width) && Number.isSafeInteger(height)
-                ? (width === height ? 'square' : width > height ? 'landscape' : 'portrait') : null};
-    }
-
-    configurationMetadata() {
-        const config = this.configuration;
-        return {requestedMode: config.requestedMode, appliedMode: config.mode,
-            roi: {smoothingTauMs: config.faceRoiSmoothingTauMs, scale: config.faceRoiScale, verticalShiftRatio: config.faceRoiVerticalShiftRatio},
-            analysisWorkerCount: config.analysisWorkerCount,
-            pipeline: {assemblyWorker: true, encodingWorker: true, artifactEncoding: 'worker-gzip-avi-v1'},
-            frameNormalization: this.frameNormalization ? {...this.frameNormalization, layouts: this.frameNormalization.layouts.map(layout => ({...layout}))} : null,
-            detector: {implementation: 'blazeface', backend: 'wasm', minConfidence: config.faceDetectionMinConfidence,
-                legacyRequestedDelegate: config.faceDetectionDelegate,
-                legacyMinSuppressionThreshold: config.faceDetectionMinSuppressionThreshold, suppressionThresholdApplied: false},
-            selectionPolicy: 'largest-eligible-bounding-box-v1'};
-    }
-
-    terminate(status, reason) {
-        this.state = 'terminal';
-        this.diagnostic('terminal', {status, reason: reason || null, frameCallbacks: this.frameCallbacks,
-            acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames});
-        this.setStatus(status, reason);
-        return status;
-    }
-
-    metadata(status) {
-        return {
-            status,
-            capability: this.capability,
-            capture: {captureId: this.captureId,
-                identity: {studyResultId: this.studyResultId, studyPage: this.studyPage, videoCounter: this.videoCounter}},
-            source: this.sourceMetadata(),
-            manifest: this.manifest,
-            configuration: this.configurationMetadata(),
-            output: {format: PATCH_VIDEO_FORMAT_VERSION, container: 'avi.gz', transportEncoding: 'gzip', videoCodec: 'DIB', pixelFormat: 'bgr24',
-                aviHeaderFrameRatePolicy: 'required-per-part-from-presentationTimeUs-v1', frameSize: 72,
-                extraction: {api: 'VideoFrame.copyTo', normalizationMode: this.frameNormalization && this.frameNormalization.mode,
-                    nativeFormat: this.frameNormalization && this.frameNormalization.nativeFormat, outputFormat: 'RGBA'}},
-            statistics: {faceDetections: this.faceDetections, faceDetectionMisses: this.faceDetectionMisses,
-                acceptedFrames: this.acceptedFrames, skippedFrames: this.skippedFrames, frameCallbacks: this.frameCallbacks,
-                frameTimings: this.frameTimings, encodingTimings: this.encodingTimings, detectorWarmup: this.detectorWarmup}
-        };
-    }
-
-    setStatus(status, reason) {
-        // Status metadata is consumed by Main;
-        // terminal failures are reported but do not block the study flow.
-        this.status = status;
-        const metadata = {...this.metadata(status), reason: reason || null};
-        if (status === FACE_CROP_STATUS.UNSUPPORTED || status === FACE_CROP_STATUS.INCOMPLETE) {
-            console.error('[face-crop] Capture ' + status + ': ' + (reason || 'unknown failure'), metadata);
-        } else if (status === FACE_CROP_STATUS.COMPLETE && metadata.acceptedFrames === 0) {
-            console.warn('[face-crop] Capture completed without an eligible face or output frames', metadata);
-        }
-        this.onStatus(metadata);
-    }
-
-    async closeWorker() {
-        const workers = [...this.analysisWorkers, this.assemblyWorker, this.encoderWorker].filter(Boolean);
-        this.analysisWorkers = [];
-        this.assemblyWorker = null;
-        this.encoderWorker = null;
-        if (!workers.length) return;
-        try {
-            await Promise.all(workers.map(worker => worker.close()));
-        } catch (error) {
-            console.warn('[face-crop] Worker cleanup failed', error);
-        }
-    }
-}
-
-let nextCaptureId = 0;
-function createCaptureId(studyPage, videoCounter) {
-    return 'capture-' + String(studyPage) + '-' + String(videoCounter) + '-' + Date.now() + '-' + nextCaptureId++;
-}
 
 export function resolveStudyResultId(props = {}, jatosApi = typeof window !== 'undefined' ? window.jatos : null) {
     return props.studyResultId || (jatosApi && jatosApi.studyResultId) || null;
 }
 
-function reportStatus(props, status, reason) {
-    if (typeof props.onFaceCropStatus === 'function') {
-        props.onFaceCropStatus({status, reason: reason || null});
+/** Translate the study's existing environment controls into the standalone library's strict API. */
+export function resolveFaceCropHostConfiguration(environment = process.env, studyPage) {
+    const requestedMode = environment.REACT_APP_FACE_CROP_RECORDING_MODE || 'off';
+    if (!FACE_CROP_CAPTURE_MODES.includes(requestedMode)) {
+        throw new TypeError('REACT_APP_FACE_CROP_RECORDING_MODE must be off, calibration, or all');
     }
+    const mode = requestedMode;
+    if (environment.REACT_APP_FACE_DETECTION_DELEGATE !== undefined ||
+        environment.REACT_APP_FACE_DETECTION_MIN_SUPPRESSION_THRESHOLD !== undefined) {
+        throw new TypeError('Face-crop delegate and suppression environment settings are no longer supported');
+    }
+    const enabled = mode === 'all' || (mode === 'calibration' && studyPage === 'introduction');
+    if (!enabled) return {requestedMode, mode, enabled: false, config: null};
+
+    const number = (name, value, minimum, maximum, fallback, integer = false) => {
+        if (value === undefined || value === '') return fallback;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum || (integer && !Number.isSafeInteger(parsed))) {
+            throw new TypeError(`${name} must be a number between ${minimum} and ${maximum}`);
+        }
+        return parsed;
+    };
+    const config = validateConfiguration({
+        roi: {
+            smoothingTauMs: number('REACT_APP_FACE_CROP_SMOOTHING_TAU_MS', environment.REACT_APP_FACE_CROP_SMOOTHING_TAU_MS, 0, 10000, 100, true),
+            scale: number('REACT_APP_FACE_CROP_SCALE', environment.REACT_APP_FACE_CROP_SCALE, 1, 3, 1.5),
+            verticalShiftRatio: number('REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO', environment.REACT_APP_FACE_CROP_VERTICAL_SHIFT_RATIO, -1, 1, 0.15)
+        },
+        detector: {
+            minConfidence: number('REACT_APP_FACE_DETECTION_MIN_CONFIDENCE', environment.REACT_APP_FACE_DETECTION_MIN_CONFIDENCE, 0, 1, 0.5)
+        },
+        pipeline: {
+            analysisWorkerCount: number('REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT', environment.REACT_APP_FACE_CROP_ANALYSIS_WORKER_COUNT, 1, 2, 1, true)
+        },
+        persistence: {maxAttempts: 3, retryDelayMs: 100},
+        diagnostics: false
+    });
+    return {requestedMode, mode, enabled: true, config};
 }
 
-function createFaceCropCaptureController({webcam, props}) {
-    const configuration = resolveFaceCropConfiguration();
-    if (!shouldCaptureFaceCrop(configuration, props.studyPage)) {
-        console.info('[face-crop] Capture disabled for this page', {mode: configuration.mode, studyPage: props.studyPage});
+/** A stable host handle keeps capture cleanup independent from MediaRecorder and camera-track ownership. */
+export function createFaceCropHostSession({video, props = {}}) {
+    const options = resolveFaceCropHostConfiguration(undefined, props.studyPage);
+    if (!options.enabled) return null;
+    const jatosApi = typeof window !== 'undefined' ? window.jatos : null;
+    if (!video || !jatosApi || typeof jatosApi.uploadResultFile !== 'function') {
+        const error = new Error('Face-crop capture requires a video element and JATOS upload API');
+        notify(props, {status: 'incomplete', reason: error.message, capture: {context: {studyPage: props.studyPage}}});
         return null;
     }
-    const video = webcam && webcam.video;
-    if (!video || !window.jatos || typeof window.jatos.uploadResultFile !== 'function') {
-        reportStatus(props, FACE_CROP_STATUS.INCOMPLETE, 'Video element or JATOS upload API is unavailable');
-        return null;
-    }
-    const uploadTracker = {
-        registerUpload: id => props.markVideoAsUploading(id),
-        settleUpload: (id, status) => (status === UPLOAD_STATUS.SUCCEEDED ? props.markVideoAsUploaded(id) : props.markVideoAsFailed(id))
-    };
-    const controller = new FaceCropCaptureController({
-        video,
-        configuration,
-        uploadTracker,
-        studyResultId: resolveStudyResultId(props),
-        studyPage: props.studyPage,
-        videoCounter: props.videoCounter,
-        captureId: props.captureId,
-        uploadResultFile: (payload, filename) => window.jatos.uploadResultFile(payload, filename),
-        onStatus: metadata => {
-            if (typeof props.onFaceCropStatus === 'function') props.onFaceCropStatus(metadata);
+
+    const context = {studyPage: props.studyPage || null, videoCounter: props.videoCounter || null,
+        studyResultId: props.studyResultId || jatosApi.studyResultId || null};
+    const prefixStudyId = String(context.studyResultId || 'study').replace(/[^A-Za-z0-9_-]/g, '_');
+    const filenamePrefix = `${prefixStudyId}_${props.studyPage || 'study'}_${props.videoCounter || 0}`;
+    const track = typeof props.markVideoAsUploading === 'function' ? {
+        register: props.markVideoAsUploading,
+        succeeded: props.markVideoAsUploaded || (() => {}),
+        failed: props.markVideoAsFailed || (() => {})
+    } : null;
+    const baseTransport = createJatosTransport(jatosApi);
+    let captureId = null;
+    let writeNumber = 0;
+    const transport = {
+        async write({filename, payload}) {
+            const uploadId = `face-crop-write-${captureId}-${++writeNumber}`;
+            if (track) track.register(uploadId);
+            try {
+                const result = await baseTransport.write({filename, payload});
+                if (track) track.succeeded(uploadId);
+                return result;
+            } catch (error) {
+                if (track) track.failed(uploadId);
+                throw error;
+            }
         }
-    });
-    return controller;
+    };
+
+    let settled = false;
+    let sentinelId = null;
+    const settleSentinel = status => {
+        if (settled) return;
+        settled = true;
+        if (track) (status === 'complete' ? track.succeeded : track.failed)(sentinelId);
+    };
+    const emit = event => {
+        if (event && event.type === 'status') notify(props, {...event, capture: event.capture || {captureId, context}});
+        if (event && event.type === 'artifact' && typeof props.onFaceCropArtifact === 'function') props.onFaceCropArtifact(event);
+    };
+    const publicUrl = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
+    const assetBaseUrl = new URL(`${publicUrl}${facecropAssets.publicSubpath}`, window.location.href).href;
+    const session = createCaptureSession({video, filenamePrefix, context, config: options.config,
+        assetBaseUrl, transport, onEvent: emit});
+    captureId = session.captureId;
+    sentinelId = `face-crop-session-${captureId}`;
+    if (track) track.register(sentinelId);
+    let preparePromise = null;
+    let stopPromise = null;
+    let abortPromise = null;
+    let started = false;
+    return {
+        captureId,
+        prepare() {
+            if (!preparePromise) preparePromise = Promise.resolve().then(() => session.prepare());
+            return preparePromise;
+        },
+        async start() {
+            if (abortPromise) return abortPromise;
+            await this.prepare();
+            started = true;
+            return session.start();
+        },
+        stop() {
+            if (abortPromise) return abortPromise;
+            if (!stopPromise) stopPromise = Promise.resolve().then(() => started ? session.stop() : session.dispose()).then(result => {
+                settleSentinel(result && result.status === 'complete' ? 'complete' : 'failed');
+                return result;
+            }, error => { settleSentinel('failed'); throw error; });
+            return stopPromise;
+        },
+        abort() {
+            if (!abortPromise) abortPromise = Promise.resolve().then(() => session.abort()).then(result => {
+                // Started writes remain observable; participant withdrawal must not await an uninterruptible network request.
+                notify(props, {...result, artifacts: (result.artifacts || []).map(({completion, ...artifact}) => artifact)});
+                settleSentinel('failed');
+                return result;
+            }, error => { settleSentinel('failed'); throw error; });
+            return abortPromise;
+        }
+    };
+}
+
+function notify(props, metadata) {
+    if (typeof props.onFaceCropStatus === 'function') props.onFaceCropStatus(metadata);
 }
 
 export function prepareFaceCropCaptureSession({webcam, props}) {
-    const controller = createFaceCropCaptureController({webcam, props});
-    if (!controller) return null;
-    controller.prepare().catch(error => reportStatus(props, FACE_CROP_STATUS.UNSUPPORTED,
-        error.message || 'Face-crop capture failed to prepare'));
-    return controller;
+    let hostSession;
+    try { hostSession = createFaceCropHostSession({video: webcam && webcam.video, props}); }
+    catch (error) { notify(props, {status: 'incomplete', reason: error.message}); return null; }
+    if (hostSession) hostSession.prepare().catch(error => notify(props, {status: 'incomplete', reason: error.message}));
+    return hostSession;
 }
 
 export function startFaceCropCaptureSession({webcam, props}) {
-    const controller = createFaceCropCaptureController({webcam, props});
-    if (!controller) return null;
-    controller.start().catch(error => reportStatus(props, FACE_CROP_STATUS.UNSUPPORTED,
-        error.message || 'Face-crop capture failed to start'));
-    return controller;
+    let hostSession;
+    try { hostSession = createFaceCropHostSession({video: webcam && webcam.video, props}); }
+    catch (error) { notify(props, {status: 'incomplete', reason: error.message}); return null; }
+    if (hostSession) hostSession.start().catch(error => notify(props, {status: 'incomplete', reason: error.message}));
+    return hostSession;
 }
 
-export async function stopFaceCropCaptureSession(controller) {
-    if (controller) await controller.stop();
+export async function stopFaceCropCaptureSession(session) {
+    if (session) return session.stop();
 }

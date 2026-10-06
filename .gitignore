@@ -28,3 +28,7 @@ yarn-error.log*
 
 # WebStorm artifacts
 .idea/
+
+# Built standalone facecrop browser assets
+/src/faceCrop/generated/
+/public/facecrop
