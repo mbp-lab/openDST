@@ -45,7 +45,14 @@ Module._extensions['.js'] = (module, filename) => {
 const {FaceCropSink} = require(path.join(sourceRoot, 'src/FaceCropOutput.js'));
 
 async function main() {
-    const sink = new FaceCropSink({write: () => Promise.resolve()});
+    const echoPayload = process.argv.includes('--echo-payload');
+    const acknowledgementRefs = [];
+    const sink = new FaceCropSink({write: ({payload}) => {
+        if (!echoPayload) return Promise.resolve();
+        const acknowledgement = {payload};
+        acknowledgementRefs.push(new WeakRef(acknowledgement));
+        return Promise.resolve(acknowledgement);
+    }});
     if (global.gc) global.gc();
     const before = process.memoryUsage().heapUsed;
     const parts = 200;
@@ -74,11 +81,21 @@ async function main() {
     }
 
     await sink.finalize();
+    // WeakRef targets remain alive through their creation job; leave that job
+    // before collecting, rather than treating immediate deref as retention.
+    await new Promise(resolve => setImmediate(resolve));
     if (global.gc) global.gc();
+    const compactHistoryBytes = Buffer.byteLength(JSON.stringify({parts: sink.results,
+        artifacts: sink.inventory().map(({completion, ...artifact}) => artifact)}));
     const report = {
         scope: 'Node sink fixture; no browser/model/camera; synthetic encoded bytes, realistic metadata shape',
         source: baselineMode ? BASELINE_COMMIT : 'current worktree',
         node: process.version,
+        echoPayload,
+        compactHistorySerializedBytes: compactHistoryBytes,
+        retainedTransportCompletions: sink.fileEntries.filter(entry => entry.completion !== null).length,
+        observedAcknowledgements: acknowledgementRefs.length,
+        liveAcknowledgementsAfterGc: acknowledgementRefs.filter(ref => ref.deref() !== undefined).length,
         explicitGc: typeof global.gc === 'function',
         parts,
         framesPerPart,

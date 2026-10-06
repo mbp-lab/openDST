@@ -403,6 +403,7 @@ export class FaceCropSink {
                 ledger.started = true; ledger.attempts = attempt; emit('pending');
                 ledger.completion = this.write({filename, payload});
                 await ledger.completion;
+                ledger.completion = null;
                 if (this.aborted) {
                     const result = {uploadId, filename, status: UPLOAD_STATUS.SUCCEEDED, attempts: attempt};
                     ledger.result = result; emit(result.status); return result;
@@ -411,6 +412,7 @@ export class FaceCropSink {
                 const result = {uploadId, filename, status: UPLOAD_STATUS.SUCCEEDED, attempts: attempt};
                 ledger.result = result; emit(result.status); return result;
             } catch (currentError) {
+                ledger.completion = null;
                 error = currentError;
                 if (this.aborted) {
                     const result = {uploadId, filename, status: 'uncertain', attempts: attempt, error};

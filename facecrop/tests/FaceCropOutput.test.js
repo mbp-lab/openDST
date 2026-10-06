@@ -489,3 +489,28 @@ test('rejects noncontiguous indexes even when frame count and timestamps look va
             frames: [{frameIndex: 0, presentationTimeUs: 0}, {frameIndex: 2, presentationTimeUs: 40000}]}};
     await expect(encodePatchArtifact(invalid)).rejects.toThrow(/contiguous/);
 });
+
+
+test('settled echoed transport acknowledgements are released while unresolved writes stay observable', async () => {
+    const gate = deferred();
+    let acknowledge;
+    const sink = new FaceCropSink({write: ({payload, filename}) => {
+        if (filename.endsWith('.avi.gz')) {
+            acknowledge = () => gate.resolve({payload});
+            return gate.promise;
+        }
+        return Promise.resolve({payload});
+    }});
+    await sink.enqueuePart(sealedPart(0));
+    await Promise.resolve();
+    const unresolved = sink.inventory().find(file => file.filename.endsWith('.avi.gz')).completion;
+    expect(unresolved).toBe(gate.promise);
+    acknowledge();
+    const result = await sink.finalize();
+    expect(result.parts[0].status).toBe(UPLOAD_STATUS.SUCCEEDED);
+    expect(sink.fileEntries).toHaveLength(2);
+    expect(sink.fileEntries.every(entry => entry.completion === null)).toBe(true);
+    expect(sink.inventory().every(file => file.completion === undefined)).toBe(true);
+    // A consumer's previously exposed promise still resolves to its original acknowledgement.
+    await expect(unresolved).resolves.toMatchObject({payload: expect.any(Blob)});
+});

@@ -1,0 +1,22 @@
+{
+  "scope": "Node sink fixture; no browser/model/camera; synthetic encoded bytes, realistic metadata shape",
+  "source": "current worktree",
+  "node": "v22.16.0",
+  "echoPayload": true,
+  "compactHistorySerializedBytes": 143515,
+  "retainedTransportCompletions": 0,
+  "observedAcknowledgements": 400,
+  "liveAcknowledgementsAfterGc": 0,
+  "explicitGc": true,
+  "parts": 200,
+  "framesPerPart": 500,
+  "inputFrames": 100000,
+  "pendingUploads": 0,
+  "resultParts": 200,
+  "retainedPartEntries": 200,
+  "retainedFileEntries": 400,
+  "retainedPayloadParts": 0,
+  "retainedFrameRecords": 0,
+  "remainingCompressedBuffers": 0,
+  "approximateHeapGrowthMiB": 0.77
+}
