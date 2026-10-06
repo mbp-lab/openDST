@@ -245,6 +245,38 @@ describe('FaceCropProcessor', () => {
         expect(output.slice((71 * PATCH_SIZE + 71) * 3, (71 * PATCH_SIZE + 72) * 3)).toEqual(new Uint8Array([248, 248, 248]));
         expect(output.slice((70 * PATCH_SIZE + 71) * 3, (70 * PATCH_SIZE + 72) * 3)).toEqual(new Uint8Array([0, 0, 0]));
     });
+    test('keeps each downsampled channel mean within half a level of the crop mean', () => {
+        const width = 83;
+        const height = 81;
+        const rgbx = new Uint8Array(width * height * 4);
+        for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+                setPixel(rgbx, width, x, y, [(x * 17 + y * 29) % 256, (x * 31 + y * 7) % 256, (x * 11 + y * 43) % 256]);
+            }
+        }
+        const roi = {coordinateSystem: FACE_COORDINATE_SYSTEM, transformType: DYNAMIC_FACE_SQUARE,
+            samplingVersion: AREA_AVERAGE_V1, descriptorVersion: FACE_ROI_DESCRIPTOR_VERSION,
+            x: 2, y: 1, size: 79};
+
+        const output = new FaceCropProcessor().process({rgbx, width, height, roi});
+        const sourceSums = [0, 0, 0];
+        const outputSums = [0, 0, 0];
+        for (let y = 0; y < roi.size; y += 1) {
+            for (let x = 0; x < roi.size; x += 1) {
+                const offset = ((roi.y + y) * width + roi.x + x) * 4;
+                for (let channel = 0; channel < 3; channel += 1) sourceSums[channel] += rgbx[offset + channel];
+            }
+        }
+        // The stored frame is BGR24, while the source is RGBX.
+        for (let pixel = 0; pixel < PATCH_SIZE * PATCH_SIZE; pixel += 1) {
+            for (let channel = 0; channel < 3; channel += 1) outputSums[channel] += output[pixel * 3 + channel];
+        }
+        const sourceMean = sourceSums.map(sum => sum / (roi.size * roi.size));
+        const outputMeanBgr = outputSums.map(sum => sum / (PATCH_SIZE * PATCH_SIZE));
+        expect(Math.abs(outputMeanBgr[0] - sourceMean[2])).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(outputMeanBgr[1] - sourceMean[1])).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(outputMeanBgr[2] - sourceMean[0])).toBeLessThanOrEqual(0.5);
+    });
     test('emits BGR24 directly from RGBX input', () => {
         const rgbx = new Uint8Array(PATCH_SIZE * PATCH_SIZE * 4);
         for (let offset = 0; offset < rgbx.byteLength; offset += 4) {
