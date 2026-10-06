@@ -33,6 +33,8 @@ Verbose `diagnostics` is omitted by default. Enabling it preserves probe/browser
 
 `prepare()` persists nothing. `stop()` flushes useful partial data and writes a manifest. `abort()` creates no further output; artifacts already written or in flight can remain. Discarded artifacts were never written; pending artifacts expose `completion` promises through the JavaScript result. A rejected write is `uncertain` because the server may have saved data before the response was lost. The host is responsible for deletion and participant withdrawal policy.
 
+An AVI part is uploaded before its face-events sidecar. If AVI retries exhaust without abort, the sidecar is `not_attempted` with zero attempts; this differs from `discarded`, which means abort prevented the write from starting. The logical part remains `failed`, and the host upload tracker marks the sidecar failed so the capture is visibly incomplete. A rejected AVI write remains `uncertain`, since the server may have stored it despite the rejected response. Readers should accept `not_attempted` as an additive artifact outcome; older stored manifests may still use `failed` with zero attempts for this case.
+
 ## Migrating older metadata
 
 | Previous path | New path |

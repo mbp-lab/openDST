@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "4fd85bc6e031f33f3dd3aad6207e25b69fd8d595",
+  "description": "Two-frame deterministic sample built with the extraction checkpoint AVI and face-event serializers. Synthetic pixel bytes; metadata preserves the v3 sidecar shape.",
+  "generation": {
+    "frameSize": "72x72",
+    "pixelFormat": "BGR24",
+    "frameRate": 25,
+    "timestampsUs": [
+      0,
+      40000
+    ],
+    "gzip": "Node zlib gzipSync, mtime=0"
+  },
+  "files": {
+    "sample.avi": {
+      "bytes": 31384,
+      "sha256": "8acd6d4092ca10709e00d749607bad777d577f0f14ee27851f5efbea3e7fb85a"
+    },
+    "sample.avi.gz": {
+      "bytes": 261,
+      "sha256": "ce88976be5d360a849055cbf83ada573fa6da58316340907e891b324de3a1a4a"
+    },
+    "sample.face-events.json": {
+      "bytes": 1634,
+      "sha256": "5c4ef4209914338592b91679fb266df72a8ffd55de9d3417633885db08f73aac"
+    }
+  }
+}

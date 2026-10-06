@@ -208,11 +208,14 @@ describe('uncompressed AVI patch video', () => {
 
 function deferred() {
     let resolve;
+    let reject;
     return {
-        promise: new Promise(nextResolve => {
+        promise: new Promise((nextResolve, nextReject) => {
             resolve = nextResolve;
+            reject = nextReject;
         }),
-        resolve
+        resolve,
+        reject
     };
 }
 
@@ -262,6 +265,7 @@ describe('FaceCropSink', () => {
         });
         const first = sealedPart(0);
         const second = sealedPart(1);
+        const firstSidecar = JSON.stringify(first.faceEvents);
 
         await sink.enqueuePart(first);
         await sink.enqueuePart(second);
@@ -285,6 +289,13 @@ describe('FaceCropSink', () => {
         expect(first.gzipBytes).toBeNull();
         expect(second.gzipBytes).toBeNull();
         expect(third.gzipBytes).toBeNull();
+        expect(sink.entries.map(entry => entry.part)).toEqual([null, null, null]);
+        expect(sink.entries.map(entry => entry.identity.filename)).toEqual([
+            first.filename, second.filename, third.filename
+        ]);
+        expect(sink.results[0]).toMatchObject({captureId: first.captureId, segmentIndex: first.segmentIndex,
+            partIndex: first.partIndex, frameCount: first.frameCount, filename: first.filename});
+        expect(uploads.mock.calls[1][0]).toBe(firstSidecar);
         expect(uploads.mock.calls.map(call => call[1])).toEqual([
             'RESULT_introduction_1_patch_s000_p000.avi.gz',
             'RESULT_introduction_1_patch_s000_p000.face-events.json',
@@ -318,7 +329,8 @@ describe('FaceCropSink', () => {
         const [result] = (await sink.finalize()).parts;
 
         expect(uploads).toHaveBeenCalledTimes(4);
-        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {status: UPLOAD_STATUS.SUCCEEDED}, faceEvents: {attempts: 3}});
+        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {status: UPLOAD_STATUS.SUCCEEDED},
+            faceEvents: {status: 'uncertain', attempts: 3}});
         expect(uploadTracker.settleUpload).toHaveBeenCalledWith(
             'patch-events-1-RESULT_introduction_1_patch_s000_p000.face-events.json',
             UPLOAD_STATUS.FAILED
@@ -347,7 +359,9 @@ describe('FaceCropSink', () => {
             'patch-events-2-RESULT_introduction_1_patch_s000_p000.face-events.json',
             UPLOAD_STATUS.FAILED
         );
-        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {attempts: 3}});
+        expect(result).toMatchObject({status: UPLOAD_STATUS.FAILED, avi: {status: 'uncertain', attempts: 3},
+            faceEvents: {status: 'not_attempted', attempts: 0}});
+        expect(sink.inventory().find(item => item.filename === sealedPart(0).faceEventsFilename).status).toBe('not_attempted');
     });
 
     test('uses distinct tracking IDs for repeated captures with the same filename', async () => {
@@ -373,7 +387,9 @@ describe('FaceCropSink', () => {
     test('abort releases enqueue backpressure and inventories pending completion without waiting for a write', async () => {
         const unresolved = deferred();
         const write = jest.fn(() => unresolved.promise);
-        const sink = new FaceCropSink({write, maxPendingParts: 2});
+        const notifications = [];
+        const sink = new FaceCropSink({write, maxPendingParts: 2,
+            onArtifact: event => notifications.push(event.artifact)});
         const first = sealedPart(0), second = sealedPart(1), third = sealedPart(2);
         await sink.enqueuePart(first);
         await sink.enqueuePart(second);
@@ -382,11 +398,72 @@ describe('FaceCropSink', () => {
         expect(write).toHaveBeenCalledTimes(1);
         const aborted = sink.abort();
         await expect(thirdAdmission).resolves.toBeUndefined();
+        expect(sink.entries.find(entry => entry.identity.filename === third.filename).part).toBeNull();
+        expect(sink.inventory().find(file => file.filename === third.filename).status).toBe('discarded');
+        expect(notifications.filter(item => item.filename === third.filename).map(item => item.status)).toEqual(['discarded']);
+        expect(notifications.filter(item => item.filename === third.faceEventsFilename).map(item => item.status)).toEqual(['discarded']);
+        expect(write).toHaveBeenCalledTimes(1);
         expect(aborted.artifacts.map(file => file.status)).toContain('pending');
         expect(aborted.artifacts.find(file => file.filename === second.filename).status).toBe('discarded');
         expect(aborted.pendingCompletions).toHaveLength(1);
         expect(aborted.artifacts.find(file => file.filename === first.filename)).toMatchObject({status: 'pending', attempts: 1});
+        expect(sink.entries.find(entry => entry.identity.filename === second.filename).part).toBeNull();
+        expect(sink.entries.find(entry => entry.identity.filename === first.filename).part).toBe(first);
         unresolved.resolve();
+        await expect(aborted.pendingCompletions[0]).resolves.toMatchObject({status: 'uncertain',
+            avi: {status: UPLOAD_STATUS.SUCCEEDED}, faceEvents: {status: 'discarded'}});
+        expect(sink.entries.find(entry => entry.identity.filename === first.filename).part).toBeNull();
+        expect(sink.inventory().find(file => file.filename === first.faceEventsFilename).status).toBe('discarded');
+    });
+
+    test('a rejected in-flight AVI write remains uncertain and discards its unstarted sidecar', async () => {
+        const unresolved = deferred();
+        const write = jest.fn(() => unresolved.promise);
+        const sink = new FaceCropSink({write});
+        await sink.enqueuePart(sealedPart(0));
+        await Promise.resolve();
+        const aborted = sink.abort();
+        sink.abort();
+        unresolved.reject(new Error('response lost'));
+        await expect(aborted.pendingCompletions[0]).resolves.toMatchObject({status: UPLOAD_STATUS.FAILED,
+            avi: {status: 'uncertain', attempts: 1}, faceEvents: {status: 'discarded', attempts: 0}});
+        expect(write).toHaveBeenCalledTimes(1);
+        expect(sink.inventory().map(file => file.status)).toContain('uncertain');
+        expect(sink.inventory().map(file => file.status)).toContain('discarded');
+        expect(sink.entries[0].part).toBeNull();
+    });
+
+    test('an in-flight sidecar rejected after abort remains uncertain', async () => {
+        const sidecarWrite = deferred();
+        const write = jest.fn(({filename}) => filename.endsWith('.avi.gz') ? Promise.resolve() : sidecarWrite.promise);
+        const sink = new FaceCropSink({write});
+        await sink.enqueuePart(sealedPart(0));
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(write).toHaveBeenCalledTimes(2);
+        const aborted = sink.abort();
+        sidecarWrite.reject(new Error('sidecar response lost'));
+        await expect(aborted.pendingCompletions[0]).resolves.toMatchObject({status: UPLOAD_STATUS.FAILED,
+            avi: {status: UPLOAD_STATUS.SUCCEEDED}, faceEvents: {status: 'uncertain', attempts: 1}});
+        expect(write).toHaveBeenCalledTimes(2);
+        expect(sink.inventory().find(file => file.filename === sealedPart(0).faceEventsFilename).status).toBe('uncertain');
+        expect(sink.entries[0].part).toBeNull();
+    });
+
+    test('abort during retry delay prevents another AVI write and marks the sidecar discarded', async () => {
+        const retryDelay = deferred();
+        const write = jest.fn(() => Promise.reject(new Error('write rejected')));
+        const sink = new FaceCropSink({write, sleep: () => retryDelay.promise});
+        await sink.enqueuePart(sealedPart(0));
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(write).toHaveBeenCalledTimes(1);
+        const aborted = sink.abort();
+        retryDelay.resolve();
+        await expect(aborted.pendingCompletions[0]).resolves.toMatchObject({status: UPLOAD_STATUS.FAILED,
+            avi: {status: 'uncertain', attempts: 1}, faceEvents: {status: 'discarded', attempts: 0}});
+        expect(write).toHaveBeenCalledTimes(1);
+        expect(sink.entries[0].part).toBeNull();
     });
 });
 

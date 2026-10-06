@@ -244,12 +244,31 @@ export class FaceCropSink {
         while (this.pending.length >= this.maxPendingParts && !this.aborted) {
             await Promise.race([this.pending[0], this.abortWait]);
         }
-        const entry = {part, started: false, result: null, completion: null};
+        const identity = {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex,
+            frameCount: part.frameCount, frameRate: part.frameRate, byteLength: part.gzipBytes.byteLength,
+            filename: part.filename, faceEventsFilename: part.faceEventsFilename};
+        if (this.aborted) {
+            part.gzipBytes = null;
+            const result = this.pendingResult(identity);
+            const entry = {identity, part: null, started: false, result, completion: Promise.resolve(result)};
+            this.entries.push(entry);
+            this.results.push(result);
+            this.notify(identity, 'patch-part-' + this.uploadSessionId + '-' + identity.filename, identity.filename, 'discarded');
+            this.notify(identity, 'patch-events-' + this.uploadSessionId + '-' + identity.faceEventsFilename,
+                identity.faceEventsFilename, 'discarded');
+            return;
+        }
+        const entry = {identity, part, started: false, result: null, completion: null};
         this.entries.push(entry);
-        this.notify(part, 'patch-part-' + this.uploadSessionId + '-' + part.filename, part.filename, 'pending');
-        this.notify(part, 'patch-events-' + this.uploadSessionId + '-' + part.faceEventsFilename, part.faceEventsFilename, 'pending');
-        const completion = this.tail.then(() => this.uploadPart(part, entry)).then(result => {
-            entry.result = result; this.results.push(result); return result;
+        this.notify(identity, 'patch-part-' + this.uploadSessionId + '-' + part.filename, part.filename, 'pending');
+        this.notify(identity, 'patch-events-' + this.uploadSessionId + '-' + part.faceEventsFilename, part.faceEventsFilename, 'pending');
+        // Queue only the compact entry. A closure over `part` here keeps the
+        // full sidecar frame array alive even after abort discards queued work.
+        const completion = this.tail.then(() => this.uploadEntry(entry)).then(result => {
+            entry.result = result;
+            entry.part = null;
+            this.results.push(result);
+            return result;
         });
         entry.completion = completion;
         this.tail = completion;
@@ -269,9 +288,10 @@ export class FaceCropSink {
         // Started transport promises remain observable; abort never waits for them.
         this.entries.filter(entry => !entry.started).forEach(entry => {
             if (entry.part) entry.part.gzipBytes = null;
-            entry.result = this.pendingResult(entry.part);
-            this.notify(entry.part, 'patch-part-' + this.uploadSessionId + '-' + entry.part.filename, entry.part.filename, 'discarded');
-            this.notify(entry.part, 'patch-events-' + this.uploadSessionId + '-' + entry.part.faceEventsFilename, entry.part.faceEventsFilename, 'discarded');
+            entry.result = this.pendingResult(entry.identity);
+            this.notify(entry.identity, 'patch-part-' + this.uploadSessionId + '-' + entry.identity.filename, entry.identity.filename, 'discarded');
+            this.notify(entry.identity, 'patch-events-' + this.uploadSessionId + '-' + entry.identity.faceEventsFilename, entry.identity.faceEventsFilename, 'discarded');
+            entry.part = null;
         });
         this.fileEntries.filter(entry => entry.started && !entry.result).forEach(entry => {
             try { this.uploadTracker.settleUpload(entry.uploadId, UPLOAD_STATUS.FAILED); } catch (_) {}
@@ -284,9 +304,9 @@ export class FaceCropSink {
         const files = new Map(this.fileEntries.map(entry => [entry.filename, entry]));
         const inventory = [];
         this.entries.forEach(entry => {
-            const part = entry.part;
+            const identity = entry.identity;
             const result = entry.result;
-            [part.filename, part.faceEventsFilename].forEach((filename, index) => {
+            [identity.filename, identity.faceEventsFilename].forEach((filename, index) => {
                 const ledger = files.get(filename);
                 const artifactResult = result && (index === 0 ? result.avi : result.faceEvents);
                 inventory.push({filename,
@@ -302,11 +322,17 @@ export class FaceCropSink {
         return inventory;
     }
 
-    pendingResult(part) {
-        return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex,
-            frameCount: part.frameCount, filename: part.filename, faceEventsFilename: part.faceEventsFilename,
-            status: 'discarded', avi: {filename: part.filename, status: 'discarded', attempts: 0},
-            faceEvents: {filename: part.faceEventsFilename, status: 'discarded', attempts: 0}};
+    pendingResult(identity) {
+        return {captureId: identity.captureId, segmentIndex: identity.segmentIndex, partIndex: identity.partIndex,
+            frameCount: identity.frameCount, frameRate: identity.frameRate, byteLength: identity.byteLength,
+            filename: identity.filename, faceEventsFilename: identity.faceEventsFilename,
+            status: 'discarded', avi: {filename: identity.filename, status: 'discarded', attempts: 0},
+            faceEvents: {filename: identity.faceEventsFilename, status: 'discarded', attempts: 0}};
+    }
+
+    async uploadEntry(entry) {
+        if (!entry.part || this.aborted) return this.pendingResult(entry.identity);
+        return this.uploadPart(entry.part, entry);
     }
 
     async writeArtifact(payload, filename, uploadId = filename) {
@@ -314,8 +340,8 @@ export class FaceCropSink {
         return this.uploadWithRetry(payload, filename, uploadId);
     }
 
-    notify(part, uploadId, filename, status, attempts = 0) {
-        try { this.onArtifact({type: 'artifact', artifact: {captureId: part && part.captureId, uploadId, filename, status, attempts}}); } catch (_) {}
+    notify(identity, uploadId, filename, status, attempts = 0) {
+        try { this.onArtifact({type: 'artifact', artifact: {captureId: identity && identity.captureId, uploadId, filename, status, attempts}}); } catch (_) {}
     }
 
     async uploadPart(part, entry) {
@@ -337,16 +363,17 @@ export class FaceCropSink {
             part.gzipBytes = null;
         }
         if (avi.status !== UPLOAD_STATUS.SUCCEEDED) {
+            const sidecarStatus = this.aborted ? 'discarded' : 'not_attempted';
             this.uploadTracker.settleUpload(eventsId, UPLOAD_STATUS.FAILED);
-            this.notify(part, eventsId, part.faceEventsFilename, 'failed');
+            this.notify(entry.identity, eventsId, part.faceEventsFilename, sidecarStatus);
             return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex, frameCount: part.frameCount, frameRate: part.frameRate,
                 byteLength, filename: part.filename, faceEventsFilename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, avi,
-                faceEvents: {uploadId: eventsId, filename: part.faceEventsFilename, status: UPLOAD_STATUS.FAILED, attempts: 0}};
+                faceEvents: {uploadId: eventsId, filename: part.faceEventsFilename, status: sidecarStatus, attempts: 0}};
         }
         if (this.aborted) {
             try { this.uploadTracker.registerUpload(eventsId); } catch (_) {}
             try { this.uploadTracker.settleUpload(eventsId, UPLOAD_STATUS.FAILED); } catch (_) {}
-            this.notify(part, eventsId, part.faceEventsFilename, 'discarded');
+            this.notify(entry.identity, eventsId, part.faceEventsFilename, 'discarded');
             return {captureId: part.captureId, segmentIndex: part.segmentIndex, partIndex: part.partIndex,
                 frameCount: part.frameCount, frameRate: part.frameRate, byteLength, filename: part.filename,
                 faceEventsFilename: part.faceEventsFilename, status: 'uncertain', avi,
@@ -365,7 +392,7 @@ export class FaceCropSink {
         const emit = status => {
             ledger.status = status;
             if (partEntry) partEntry[kind === 'avi' ? 'aviStatus' : kind === 'faceEvents' ? 'eventsStatus' : 'artifactStatus'] = status;
-            this.notify(partEntry && partEntry.part, uploadId, filename, status, ledger.attempts);
+            this.notify(partEntry ? partEntry.identity : null, uploadId, filename, status, ledger.attempts);
         };
         for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
             if (this.aborted) {
