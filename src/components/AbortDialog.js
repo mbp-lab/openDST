@@ -39,7 +39,8 @@ export default function AbortDialog(props) {
                     </div>
                     <div className="p-2">
                         <Button
-                            onClick={() => {
+                            onClick={async () => {
+                                if (props.abortFaceCropSessions) await props.abortFaceCropSessions();
                                 // eslint-disable-next-line no-undef
                                 jatos.abortStudy("participant aborted by pressing abort button");
                             }}

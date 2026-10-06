@@ -302,6 +302,9 @@ class Introduction extends React.Component {
                     markVideoAsUploaded={this.props.markVideoAsUploaded}
                     markVideoAsFailed={this.props.markVideoAsFailed}
                     onFaceCropStatus={this.props.onFaceCropStatus}
+                    onFaceCropSessionCreated={this.props.onFaceCropSessionCreated}
+                    onFaceCropSessionFinished={this.props.onFaceCropSessionFinished}
+                    faceCropCancellationState={this.props.faceCropCancellationState}
                     onVideoCaptureEvent={this.props.onVideoCaptureEvent}
                     studyResultId={this.props.studyResultId}
                     handleAbortDialog={this.handleAbortDialog}
@@ -309,6 +312,7 @@ class Introduction extends React.Component {
             </Slide>
             <AbortDialog
                 handleAbortDialog={this.handleAbortDialog}
+                abortFaceCropSessions={this.props.abortFaceCropSessions}
                 abortDialogIsOpen={this.state.abortDialogIsOpen}
             />
         </>

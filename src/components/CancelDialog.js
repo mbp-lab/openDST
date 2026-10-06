@@ -15,6 +15,7 @@ export default function CancelDialog(props) {
     const [showButton, setShowButton] = React.useState(true);
     const [redirectAllowed, setRedirectAllowed] = React.useState(false);
     const [forceRedirect, setForceRedirect] = React.useState(false);
+    const [preparingRedirect, setPreparingRedirect] = React.useState(false);
 
     function handleChange(event) {
         setCancelValue(event.target.value);
@@ -22,18 +23,24 @@ export default function CancelDialog(props) {
 
     // Redirection renders after the delay only when uploads are settled
     // (succeeded or failed); pending uploads keep the spinner visible.
-    function handleOK() {
+    async function handleOK() {
+        if (preparingRedirect) return;
         if (cancelValue === "cancel_with_video" || cancelValue === "cancel_no_video") {
+            setPreparingRedirect(true);
+            setShowButton(false);
             setTimeout(() => setRedirectAllowed(true), 500);
             setTimeout(() => setForceRedirect(true), 180000);
-            setShowButton(false);
+            if (props.prepareFaceCropCancellation) await props.prepareFaceCropCancellation(cancelValue);
+            setPreparingRedirect(false);
         } else {
             if (cancelValue === "cancel_without_data") {
-                setTimeout(() => {
-                    setRedirectAllowed(true);
-                    setForceRedirect(true);
-                    setShowButton(false);
-                }, 500)
+                setPreparingRedirect(true);
+                setTimeout(() => setRedirectAllowed(true), 500);
+                setTimeout(() => setForceRedirect(true), 180000);
+                if (props.prepareFaceCropCancellation) await props.prepareFaceCropCancellation(cancelValue);
+                setForceRedirect(true);
+                setPreparingRedirect(false);
+                setShowButton(false);
             } else {
                 if (cancelValue === "no_cancel") {
                     props.handleCancelDialog();
@@ -72,7 +79,7 @@ export default function CancelDialog(props) {
             </DialogActions>
             <DialogActions>
                 <div className="center-horizontal">
-                    {showButton
+                    {showButton && !preparingRedirect
                         ? <Button
                             onClick={handleOK}
                             className="alert-buttons">OK</Button>

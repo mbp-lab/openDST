@@ -20,6 +20,8 @@ class WebcamCapture extends React.Component {
         this.mediaStreamRecorder = null;
         this.webcamRef = React.createRef();
         this.faceCropController = null;
+        this.unmounted = false;
+        this.stopPromise = null;
 
         this.startRecording = this.startRecording.bind(this);
         this.stopRecording = this.stopRecording.bind(this);
@@ -29,10 +31,18 @@ class WebcamCapture extends React.Component {
      * For mathTask and speechTask the recording should only stop on unmounting.
      */
     componentWillUnmount() {
+        this.unmounted = true;
+        const deferFaceCropStop = Boolean(this.props.faceCropCancellationState && this.props.faceCropCancellationState.current);
         if(this.props.studyPage === 'mathTask' || this.props.studyPage === 'speechTask' ) {
-            this.stopRecording();
+            this.stopRecording({deferFaceCropStop});
         } else if (this.faceCropController) {
-            stopFaceCropCaptureSession(this.faceCropController);
+            const faceCropSession = this.faceCropController;
+            this.faceCropController = null;
+            if (!deferFaceCropStop) {
+                stopFaceCropCaptureSession(faceCropSession).finally(() => {
+                    if (this.props.onFaceCropSessionFinished) this.props.onFaceCropSessionFinished(faceCropSession);
+                });
+            }
         }
     }
 
@@ -117,13 +127,38 @@ class WebcamCapture extends React.Component {
      * @returns {Promise<void>}
      */
     async startRecording() {
+        if (this.startPromise || this.unmounted) return this.startPromise;
+        if (this.mediaStreamRecorder && this.mediaStreamRecorder.state !== 'inactive') return;
+        this.startPromise = (async () => {
+            if (this.stopPromise) await this.stopPromise;
+            this.stopPromise = null;
+            this.recorderStopPromise = null;
+            this.recordingStopRequested = false;
+            return this.startRecordingInternal();
+        })();
         try {
+            return await this.startPromise;
+        } finally {
+            this.startPromise = null;
+        }
+    }
+
+    async startRecordingInternal() {
+        try {
+            if (this.stopPromise) {
+                await this.stopPromise;
+                this.stopPromise = null;
+            }
+            if (!this.webcamRef.current || !this.webcamRef.current.stream) return;
             await this.createMediaRecorder(this.webcamRef.current.stream);
+            if (this.unmounted || this.recordingStopRequested) return;
             await this.mediaStreamRecorder.start();
+            if (this.unmounted || this.recordingStopRequested) { await this.stopMediaRecorder(); return; }
             if (this.faceCropController) {
                 this.faceCropController.start().catch(error => console.log(error));
             } else {
                 this.faceCropController = startFaceCropCaptureSession({webcam: this.webcamRef.current, props: this.props});
+                this.registerFaceCropSession(this.faceCropController);
             }
             if (this.props.studyPage === 'introduction') {
                 this.setState({
@@ -131,6 +166,13 @@ class WebcamCapture extends React.Component {
                 })
             }
         } catch (err) {
+            const faceCropSession = this.faceCropController;
+            this.faceCropController = null;
+            if (faceCropSession && typeof faceCropSession.abort === 'function') {
+                faceCropSession.abort().finally(() => {
+                    if (this.props.onFaceCropSessionFinished) this.props.onFaceCropSessionFinished(faceCropSession);
+                });
+            }
             console.log(err);
             window.alert(err)
         }
@@ -160,15 +202,58 @@ class WebcamCapture extends React.Component {
         }
     }
 
-    async stopRecording() {
+    stopMediaRecorder() {
+        this.recordingStopRequested = true;
+        if (this.recorderStopPromise) return this.recorderStopPromise;
+        const recorder = this.mediaStreamRecorder;
+        if (!recorder || recorder.state === 'inactive') return Promise.resolve();
+        this.recorderStopPromise = new Promise(resolve => {
+            const previousOnStop = recorder.onstop;
+            recorder.onstop = event => {
+                try { if (previousOnStop) previousOnStop(event); }
+                finally { resolve(); }
+            };
+            try { recorder.stop(); } catch (error) { resolve(); }
+        });
+        return this.recorderStopPromise;
+    }
+
+    registerFaceCropSession(session) {
+        if (!session) return;
+        // Main can finalize before unmount: stop ordinary recording at the same boundary,
+        // then let the standalone session drain independently of camera-track ownership.
+        const stop = session.stop.bind(session);
+        const abort = session.abort.bind(session);
+        session.stop = async () => {
+            const recorderStop = this.stopMediaRecorder();
+            const result = await stop();
+            await recorderStop;
+            return result;
+        };
+        session.abort = async () => {
+            const recorderStop = this.stopMediaRecorder();
+            const result = await abort();
+            await recorderStop;
+            return result;
+        };
+        if (this.props.onFaceCropSessionCreated) this.props.onFaceCropSessionCreated(session);
+    }
+
+    async stopRecording({deferFaceCropStop = false} = {}) {
+        if (this.stopPromise) return this.stopPromise;
         // Stop both pipelines together: recorder stop triggers MP4/WebM upload,
         // and face-crop stop flushes worker/sink state before teardown completes.
-        const patchStop = stopFaceCropCaptureSession(this.faceCropController);
+        const faceCropSession = this.faceCropController;
         this.faceCropController = null;
-        if (this.mediaStreamRecorder) {
-            await this.mediaStreamRecorder.stop();
-        }
-        await patchStop;
+        this.stopPromise = (async () => {
+            const faceCropStop = deferFaceCropStop ? Promise.resolve() : stopFaceCropCaptureSession(faceCropSession);
+            const recorderStop = this.stopMediaRecorder();
+            await Promise.allSettled([Promise.resolve(faceCropStop), recorderStop]);
+            if (faceCropSession && !deferFaceCropStop && this.props.onFaceCropSessionFinished) {
+                this.props.onFaceCropSessionFinished(faceCropSession);
+            }
+        })();
+        return this.stopPromise;
     }
 
     render() {
@@ -195,6 +280,7 @@ class WebcamCapture extends React.Component {
                     }
                     if (this.props.studyPage === "introduction") {
                         this.faceCropController = prepareFaceCropCaptureSession({webcam: this.webcamRef.current, props: this.props});
+                        this.registerFaceCropSession(this.faceCropController);
                     }
                     if (this.props.studyPage === "mathTask" || this.props.studyPage === "speechTask") {
                         this.startRecording();

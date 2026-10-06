@@ -124,6 +124,9 @@ export default class SpeechTaskCalibration extends React.Component {
                                 markVideoAsUploaded={this.props.markVideoAsUploaded}
                                 markVideoAsFailed={this.props.markVideoAsFailed}
                                 onFaceCropStatus={this.props.onFaceCropStatus}
+                                onFaceCropSessionCreated={this.props.onFaceCropSessionCreated}
+                                onFaceCropSessionFinished={this.props.onFaceCropSessionFinished}
+                                faceCropCancellationState={this.props.faceCropCancellationState}
                                 onVideoCaptureEvent={this.props.onVideoCaptureEvent}
                                 studyResultId={this.props.studyResultId}
                                 videoCounter={this.props.videoCounter}

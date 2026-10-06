@@ -147,7 +147,13 @@ class Main extends React.Component {
         this.onHeartRateDisconnected = this.onHeartRateDisconnected.bind(this);
         this.onHeartRateMeasurement = this.onHeartRateMeasurement.bind(this);
         this.onVideoCaptureEvent = this.onVideoCaptureEvent.bind(this);
+        this.onFaceCropSessionCreated = this.onFaceCropSessionCreated.bind(this);
+        this.onFaceCropSessionFinished = this.onFaceCropSessionFinished.bind(this);
+        this.prepareFaceCropCancellation = this.prepareFaceCropCancellation.bind(this);
+        this.abortFaceCropSessions = this.abortFaceCropSessions.bind(this);
         this.onHeartRateDevice = this.onHeartRateDevice.bind(this);
+        this.faceCropSessions = new Map();
+        this.faceCropCancellationState = {current: false};
 
         /**
          * The data object holds various data that is collected during a study run including results from the math- and
@@ -334,6 +340,8 @@ class Main extends React.Component {
     }
 
     componentWillUnmount() {
+        this.faceCropHostUnmounted = true;
+        this.abortFaceCropSessions();
         this.disconnectHeartRateSensor();
     }
 
@@ -465,7 +473,39 @@ class Main extends React.Component {
     }
 
     updateFaceCropCaptureStatus(metadata) {
-        this.data.studyMetaTracker.faceCropCapture = metadata;
+        const current = this.data.studyMetaTracker.faceCropCapture || {status: 'disabled', captures: []};
+        const captureId = metadata && metadata.capture && metadata.capture.captureId;
+        const captures = Array.isArray(current.captures) ? current.captures.slice() : [];
+        if (captureId) {
+            const index = captures.findIndex(capture => capture.captureId === captureId);
+            const capture = {...(index >= 0 ? captures[index] : {}), ...metadata, captureId};
+            if (index >= 0) captures[index] = capture;
+            else captures.push(capture);
+        }
+        this.data.studyMetaTracker.faceCropCapture = {...current, ...metadata, captures};
+    }
+
+    onFaceCropSessionCreated(session) {
+        if (session && session.captureId) this.faceCropSessions.set(session.captureId, session);
+    }
+
+    onFaceCropSessionFinished(session) {
+        if (session && this.faceCropSessions.get(session.captureId) === session) {
+            this.faceCropSessions.delete(session.captureId);
+        }
+    }
+
+    async prepareFaceCropCancellation(cancelValue) {
+        const method = cancelValue === 'cancel_with_video' ? 'stop' : 'abort';
+        const sessions = Array.from(this.faceCropSessions.values());
+        await Promise.allSettled(sessions.map(session => {
+            const cleanup = typeof session[method] === 'function' ? session[method]() : session.stop();
+            return Promise.resolve(cleanup).finally(() => this.onFaceCropSessionFinished(session));
+        }));
+    }
+
+    abortFaceCropSessions() {
+        return this.prepareFaceCropCancellation('cancel_without_data');
     }
 
     /**
@@ -502,16 +542,20 @@ class Main extends React.Component {
      * last slide of a page or not.
      */
     handleNext() {
-        if (this.state.slideIndex + 1 === this.state.slideSequences[this.state.studyPagesSequence[this.state.pageIndex]].length) {
-            this.setState({
-                pageIndex: this.state.pageIndex + 1,
-                slideIndex: 0
-            })
-        } else {
-            this.setState({
-                slideIndex: this.state.slideIndex + 1,
-            })
+        if (this.faceCropNavigationPromise) return this.faceCropNavigationPromise;
+        const pageIndex = this.state.pageIndex;
+        const slideIndex = this.state.slideIndex;
+        const nextPage = slideIndex + 1 === this.state.slideSequences[this.state.studyPagesSequence[pageIndex]].length;
+        const advance = () => {
+            if (this.faceCropHostUnmounted) return;
+            this.setState(nextPage ? {pageIndex: pageIndex + 1, slideIndex: 0} : {slideIndex: slideIndex + 1});
+        };
+        if (nextPage && this.faceCropSessions.size) {
+            this.faceCropNavigationPromise = this.prepareFaceCropCancellation('cancel_with_video')
+                .then(advance).finally(() => { this.faceCropNavigationPromise = null; });
+            return this.faceCropNavigationPromise;
         }
+        advance();
     };
 
     /**
@@ -604,14 +648,16 @@ class Main extends React.Component {
      */
     handleCancelDialog() {
         if (!this.state.cancelDialogIsOpen) {
+            this.faceCropCancellationState.current = true;
             this.logCancelOpen();
             this.setState({
                 cancelDialogIsOpen: true,
             });
         } else {
-            this.logCancelClose()
-            this.setState({
-                cancelDialogIsOpen: false,
+            this.prepareFaceCropCancellation('cancel_with_video').finally(() => {
+                this.logCancelClose();
+                this.faceCropCancellationState.current = false;
+                this.setState({cancelDialogIsOpen: false});
             });
         }
     }
@@ -745,6 +791,10 @@ class Main extends React.Component {
                         referenceTime={this.data.studyTimes.reference}
                         continueFromPanas={this.continueFromPanas}
                         onFaceCropStatus={this.updateFaceCropCaptureStatus}
+                        onFaceCropSessionCreated={this.onFaceCropSessionCreated}
+                        onFaceCropSessionFinished={this.onFaceCropSessionFinished}
+                        faceCropCancellationState={this.faceCropCancellationState}
+                        abortFaceCropSessions={this.abortFaceCropSessions}
                         onVideoCaptureEvent={this.onVideoCaptureEvent}
                         markVideoAsUploading={this.markVideoAsUploading}
                         markVideoAsUploaded={this.markVideoAsUploaded}
@@ -781,6 +831,9 @@ class Main extends React.Component {
                     handleCancelDialog={this.handleCancelDialog}
                     cancelDialogIsOpen={this.state.cancelDialogIsOpen}
                     onFaceCropStatus={this.updateFaceCropCaptureStatus}
+                    onFaceCropSessionCreated={this.onFaceCropSessionCreated}
+                    onFaceCropSessionFinished={this.onFaceCropSessionFinished}
+                    faceCropCancellationState={this.faceCropCancellationState}
                     onVideoCaptureEvent={this.onVideoCaptureEvent}
                     markVideoAsUploading={this.markVideoAsUploading}
                     markVideoAsFailed={this.markVideoAsFailed}
@@ -822,6 +875,9 @@ class Main extends React.Component {
                     endSpeechTask={this.endSpeechTask}
                     updateSpeechTaskFeedback={this.updateSpeechTaskFeedback}
                     onFaceCropStatus={this.updateFaceCropCaptureStatus}
+                    onFaceCropSessionCreated={this.onFaceCropSessionCreated}
+                    onFaceCropSessionFinished={this.onFaceCropSessionFinished}
+                    faceCropCancellationState={this.faceCropCancellationState}
                     onVideoCaptureEvent={this.onVideoCaptureEvent}
                     studyResultId={this.data.studyMetaTracker.studyResultId}
                     markVideoAsFailed={this.markVideoAsFailed}
@@ -892,6 +948,7 @@ class Main extends React.Component {
                         studyMetaTracker={this.data.studyMetaTracker}
                         areAllUploadsSettled={this.state.areAllUploadsSettled}
                         uploadFinalData={this.uploadFinalData}
+                        prepareFaceCropCancellation={this.prepareFaceCropCancellation}
                     />
                     : <div/>
                 }
