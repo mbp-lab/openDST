@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Facecrop browser example</title>
+  <!-- Point this path at the assetDirectory from dist/asset-manifest.json. -->
+  <script src="jatos.js"></script>
+  <script src="/study_assets/my-study/facecrop/HASH_FROM_ASSET_MANIFEST/facecrop.js"></script>
+</head>
+<body>
+  <video id="preview" autoplay muted playsinline></video>
+  <button id="start" disabled>Start capture</button>
+  <button id="stop">Stop and save</button>
+  <pre id="status">Ready</pre>
+  <!-- JATOS supplies `jatos`; the library receives it through an explicit adapter. -->
+  <script>
+    const status = document.querySelector('#status');
+    let stream;
+    let capture;
+    const video = document.querySelector('#preview');
+
+    const startButton = document.querySelector('#start');
+    jatos.onLoad(() => { startButton.disabled = false; });
+
+    startButton.addEventListener('click', async () => {
+      startButton.disabled = true;
+      stream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+      video.srcObject = stream;
+      await video.play();
+      const assetBaseUrl = new URL(
+        '/study_assets/my-study/facecrop/HASH_FROM_ASSET_MANIFEST/', location.href
+      ).href;
+      capture = Facecrop.createCaptureSession({
+        video,
+        filenamePrefix: 'demo',
+        context: {page: 'plain-browser-example'},
+        assetBaseUrl,
+        transport: Facecrop.createJatosTransport(jatos),
+        onEvent: event => { status.textContent = JSON.stringify(event, null, 2); }
+      });
+      status.textContent = JSON.stringify(await capture.prepare(), null, 2);
+      status.textContent = JSON.stringify(await capture.start(), null, 2);
+    });
+
+    document.querySelector('#stop').addEventListener('click', async () => {
+      if (!capture) return;
+      status.textContent = JSON.stringify(await capture.stop(), null, 2);
+      capture = null;
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      stream = null;
+      startButton.disabled = false;
+    });
+  </script>
+</body>
+</html>

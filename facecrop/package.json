@@ -1,0 +1,33 @@
+{
+  "name": "@opendst/facecrop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone browser face-crop capture library",
+  "license": "GPL-3.0-only",
+  "main": "dist/facecrop.js",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.cjs",
+    "build": "node scripts/build.cjs",
+    "test": "jest --runInBand",
+    "test:browser": "node tests/browser-smoke.cjs"
+  },
+  "devDependencies": {
+    "@babel/core": "7.9.0",
+    "@babel/plugin-proposal-nullish-coalescing-operator": "7.18.6",
+    "@babel/preset-env": "7.9.0",
+    "@tensorflow-models/blazeface": "0.1.0",
+    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "babel-jest": "24.9.0",
+    "babel-loader": "8.1.0",
+    "jest": "24.9.0",
+    "pako": "1.0.11",
+    "terser-webpack-plugin": "1.4.6",
+    "webpack": "4.42.0"
+  }
+}
