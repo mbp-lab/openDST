@@ -27,7 +27,9 @@
   "scripts": {
     "start": "react-scripts start",
     "facecrop:stage": "node scripts/stage-facecrop.js",
+    "facecrop:prepare": "node scripts/prepare-facecrop.js",
     "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
+    "build:study": "npm run facecrop:prepare && npm run build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

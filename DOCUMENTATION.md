@@ -37,10 +37,9 @@ git clone --recurse-submodules https://github.com/mbp-lab/openDST.git
 cd openDST
 git submodule update --init --recursive
 
-# 2. Install the locked dependencies and stage facecrop before start/build
+# 2. Install frontend dependencies and prepare the browser capture assets
 npm ci
-npm --prefix browser-facecrop ci
-npm run facecrop:stage
+npm run facecrop:prepare
 
 # 3. Review the checked-in .env and set values for this build (see Section 3)
 
@@ -838,13 +837,12 @@ git clone --recurse-submodules https://github.com/mbp-lab/openDST.git
 cd openDST
 
 npm ci
-npm --prefix browser-facecrop ci
-npm run facecrop:stage
+npm run facecrop:prepare
 # Review .env and choose the asset path for this study.
-PUBLIC_URL=/study_assets/my-dst-study npm run build
+PUBLIC_URL=/study_assets/my-dst-study npm run build:study
 ```
 
-In this development suite, prefer the workspace-level build script, which installs, builds, stages, and packages the study using its configured manifest:
+In this development suite, the workspace-level build script delegates frontend preparation and building to openDST, then packages the result using its configured manifest:
 
 ```bash
 # Run from the opendst-development-suite workspace root
@@ -921,7 +919,7 @@ Also check that the participant's browser supports `MediaRecorder` API (most mod
 
 **Build fails with Node.js errors**
 
-The project manifests require Node.js 22.x and npm 10.x. Check that both package installs and facecrop staging have completed:
+The project manifests require Node.js 22.x and npm 10.x. Check that frontend dependencies are installed and run the app-owned preparation command:
 ```bash
 # Check your version
 node --version
@@ -930,8 +928,7 @@ node --version
 nvm install 22
 nvm use 22
 npm ci
-npm --prefix browser-facecrop ci
-npm run facecrop:stage
+npm run facecrop:prepare
 ```
 
 **JATOS study page shows a blank screen or 404**
@@ -963,7 +960,7 @@ PUBLIC_URL=/study_assets/my-dst-study
 
 **Math task feedback chart not showing**
 
-Ensure `chart.js` and `react-chartjs-2` are installed. Run `npm ci` from `openDST/` if frontend dependencies are missing. After a clean checkout, also run `npm --prefix browser-facecrop ci` and `npm run facecrop:stage` before starting or building.
+Ensure `chart.js` and `react-chartjs-2` are installed. Run `npm ci` from `openDST/` if frontend dependencies are missing. After a clean checkout, run `npm run facecrop:prepare` before starting the development server; `npm run build:study` prepares it automatically for production builds.
 
 ### FAQ
 

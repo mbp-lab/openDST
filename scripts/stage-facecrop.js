@@ -17,7 +17,7 @@ function assertBuildDependencies() {
     Object.entries(packageJson.devDependencies).forEach(([name, expected]) => {
         const actual = installedPackageVersion(name);
         if (actual !== expected) {
-            throw new Error(`Facecrop build dependency ${name}@${expected} is missing (found ${actual || 'none'}). Run npm --prefix browser-facecrop ci, then retry.`);
+            throw new Error(`Facecrop build dependency ${name}@${expected} is missing (found ${actual || 'none'}). Run npm run facecrop:prepare, then retry.`);
         }
     });
 }
