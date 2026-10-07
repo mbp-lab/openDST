@@ -18,7 +18,7 @@ const repository = path.resolve(workbenchRoot);
 const resolveOverride = (value, fallback) => value ? path.resolve(value) : fallback;
 const sourceArchive = resolveOverride(process.env.FACECROP_JATOS_ARCHIVE,
     path.join(repository, 'jatos/archives/facecropping_test.jzip'));
-const distribution = path.resolve(__dirname, '../dist');
+const distribution = path.resolve(__dirname, '../../browser-facecrop/dist');
 const installedJatos = process.env.JATOS_HOME || '/opt/jatos';
 const archiveStudyDirectory = 'facecropping_test';
 const distributionMount = `/study_assets/${archiveStudyDirectory}/facecrop/`;

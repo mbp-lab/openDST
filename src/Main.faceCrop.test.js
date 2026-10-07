@@ -1,5 +1,5 @@
 import Main from './Main';
-import capturedBrowserReport from '../facecrop/docs/campaign/sustained-final.json';
+import capturedBrowserReport from '../docs/facecrop-history/campaign/sustained-final.json';
 
 function deferred() {
     let resolve;

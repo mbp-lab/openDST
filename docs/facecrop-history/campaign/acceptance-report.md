@@ -1,6 +1,6 @@
 # Campaign acceptance report
 
-Campaign acceptance complete. The campaign accepted production source at `fcae374`; its validated built distribution was `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`. This report preserves that historical acceptance evidence. Subsequent tooling and naming changes are recorded in [integration boundaries](../coupling.md); they do not retroactively change the artifact tested here.
+Campaign acceptance complete. The campaign accepted production source at `fcae374`; its validated built distribution was `c1b2cee002a4c2d0050ea3c153eb95b8bdf00cf685254ccd1a34f421fe82e53c`. This report preserves that historical acceptance evidence. Subsequent tooling and naming changes are recorded in [integration boundaries](../../../browser-facecrop/docs/coupling.md); they do not retroactively change the artifact tested here.
 
 ## Evidence scope
 

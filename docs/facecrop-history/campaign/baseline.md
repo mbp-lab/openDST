@@ -1,6 +1,6 @@
 # Facecrop campaign baseline
 
-Recorded 2026-10-06 from the `openDST` checkout before campaign production edits. Coverage gaps and commands below describe that historical checkpoint; current validation and setup are documented in the [acceptance report](acceptance-report.md) and [library README](../../README.md).
+Recorded 2026-10-06 from the `openDST` checkout before campaign production edits. Coverage gaps and commands below describe that historical checkpoint; current validation and setup are documented in the [acceptance report](acceptance-report.md) and [library README](../../../browser-facecrop/README.md).
 
 ## Source and environment
 
@@ -38,7 +38,7 @@ CI=true npm run build
 
 The retained baseline logs report 71/71 standalone facecrop tests passing across six suites, 17/17 frontend tests, successful standalone and production builds, 27 isolated JATOS runner checks, and a Chromium real-worker/WASM/model smoke run (`browser 153.0.8010.12`, 19 frames, 3 files). The browser test used a canvas stream and mocked transport. After workstream A, the standalone suite passes 77 tests across seven suites, including regressions for bounded retention, truthful skipped-sidecar status, queued abort, AVI/sidecar in-flight rejection, retry-delay abort, repeated abort, and unchanged sidecar serialization. These are historical or focused results, not campaign-wide acceptance. The JATOS runner may skip when prerequisites are absent, so inspect its summary.
 
-Browser smoke prerequisites and invocation are documented in [README](../../README.md). It is an external Playwright setup and is not installed by the facecrop package:
+Browser smoke prerequisites and invocation are documented in [README](../../../browser-facecrop/README.md). It is an external Playwright setup and is not installed by the facecrop package:
 
 ```sh
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright npm --prefix facecrop run test:browser
@@ -53,7 +53,7 @@ Workbench packaging/runner checks from the workbench root (when a valid study ma
 
 ## Compatibility corpus
 
-The checked-in [output regression suite](../../tests/FaceCropOutput.test.js) pins output behavior: indexed top-down BGR24 AVI headers and frame/index bytes, timestamp-derived frame rate, deterministic AVI/sidecar filenames, segment boundaries, compact manifest shape, and paired upload result outcomes. A deterministic two-frame output from the extraction serializers is preserved in [the corpus manifest](output-corpus/manifest.json), with uncompressed AVI bytes, the gzip upload payload and matching v3 sidecar, each carrying a SHA-256 digest. The bytes were regenerated from modules extracted with `git show 4fd85bc6e031f33f3dd3aad6207e25b69fd8d595:facecrop/src/...` and compared byte-for-byte with the corpus. It uses synthetic pixels and metadata with production shape. [Metadata documentation](../metadata.md) and [processing documentation](../processing.md) describe persisted fields and scientific interpretation.
+The checked-in [output regression suite](../../../browser-facecrop/tests/FaceCropOutput.test.js) pins output behavior: indexed top-down BGR24 AVI headers and frame/index bytes, timestamp-derived frame rate, deterministic AVI/sidecar filenames, segment boundaries, compact manifest shape, and paired upload result outcomes. A deterministic two-frame output from the extraction serializers is preserved in [the corpus manifest](output-corpus/manifest.json), with uncompressed AVI bytes, the gzip upload payload and matching v3 sidecar, each carrying a SHA-256 digest. The bytes were regenerated from modules extracted with `git show 4fd85bc6e031f33f3dd3aad6207e25b69fd8d595:facecrop/src/...` and compared byte-for-byte with the corpus. It uses synthetic pixels and metadata with production shape. [Metadata documentation](../../../browser-facecrop/docs/metadata.md) and [processing documentation](../../../browser-facecrop/docs/processing.md) describe persisted fields and scientific interpretation.
 
 ## Existing race and terminal-path matrix
 

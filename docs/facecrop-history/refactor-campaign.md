@@ -1,6 +1,6 @@
 # Facecrop audit and refactor campaign — archived scope
 
-Brief status: complete. Campaign status: complete; see the [final disposition](campaign/disposition.md) and [acceptance report](campaign/acceptance-report.md). This document preserves the original agreed scope and execution protocol as a historical record. Its investigative instructions and starting-point findings are not current tasks or descriptions of the final implementation. Use the linked acceptance report for final results and [backlog](backlog.md) for follow-up work.
+Brief status: complete. Campaign status: complete; see the [final disposition](campaign/disposition.md) and [acceptance report](campaign/acceptance-report.md). This document preserves the original agreed scope and execution protocol as a historical record. Its investigative instructions and starting-point findings are not current tasks or descriptions of the final implementation. Use the linked acceptance report for final results and [backlog](../../browser-facecrop/docs/backlog.md) for follow-up work.
 
 Date: 2026-10-06.
 
@@ -79,15 +79,15 @@ Paths below are relative to this document. The findings describe the extraction 
 
 | Area | Authoritative source and existing checks |
 |---|---|
-| Retention, retries, inventories | [Output sink](../src/FaceCropOutput.js), [sink tests](../tests/FaceCropOutput.test.js) |
-| Public lifecycle and controller | [Session](../src/Session.js), [controller](../src/FaceCropCapture.js), [session tests](../tests/Session.test.js), [controller tests](../tests/FaceCropCapture.test.js) |
+| Retention, retries, inventories | [Output sink](../../browser-facecrop/src/FaceCropOutput.js), [sink tests](../../browser-facecrop/tests/FaceCropOutput.test.js) |
+| Public lifecycle and controller | [Session](../../browser-facecrop/src/Session.js), [controller](../../browser-facecrop/src/FaceCropCapture.js), [session tests](../../browser-facecrop/tests/Session.test.js), [controller tests](../../browser-facecrop/tests/FaceCropCapture.test.js) |
 | Study lifecycle/cancellation | [Study adapter](../../src/faceCrop/FaceCropStudyAdapter.js), [WebcamCapture](../../src/components/WebcamCapture.js), [Main](../../src/Main.js), [CancelDialog](../../src/components/CancelDialog.js), [Redirection](../../src/components/Redirection.js) |
 | Study race checks | [Webcam lifecycle tests](../../src/components/WebcamCapture.lifecycle.test.js), [Main tests](../../src/Main.faceCrop.test.js), [adapter tests](../../src/faceCrop/FaceCropStudyAdapter.test.js) |
-| Settings and accounting | [Configuration](../src/Configuration.js), [Accounting](../src/Accounting.js), [accounting tests](../tests/Accounting.test.js) |
-| Scientific contracts | [Metadata](../src/Metadata.js), [metadata documentation](metadata.md), [processing documentation](processing.md), [normalization](../src/FrameNormalization.js), [worker tests](../tests/FaceCropPipeline.test.js) |
-| Build and deployment | [Standalone builder](../scripts/build.cjs), [study staging](../../scripts/stage-facecrop.js), [standalone package](../package.json), [study package](../../package.json) |
-| Consumer examples and browser check | [Plain-browser example](../examples/plain-browser/index.html), [React example](../examples/react/FacecropRecorder.jsx), [Chromium smoke test](../tests/browser-smoke.cjs) |
-| Existing boundaries and deferred profiling | [Coupling documentation](coupling.md), [backlog](backlog.md) |
+| Settings and accounting | [Configuration](../../browser-facecrop/src/Configuration.js), [Accounting](../../browser-facecrop/src/Accounting.js), [accounting tests](../../browser-facecrop/tests/Accounting.test.js) |
+| Scientific contracts | [Metadata](../../browser-facecrop/src/Metadata.js), [metadata documentation](../../browser-facecrop/docs/metadata.md), [processing documentation](../../browser-facecrop/docs/processing.md), [normalization](../../browser-facecrop/src/FrameNormalization.js), [worker tests](../../browser-facecrop/tests/FaceCropPipeline.test.js) |
+| Build and deployment | [Standalone builder](../../browser-facecrop/scripts/build.cjs), [study staging](../../scripts/stage-facecrop.js), [standalone package](../../browser-facecrop/package.json), [study package](../../package.json) |
+| Consumer examples and browser check | [Plain-browser example](../../browser-facecrop/examples/plain-browser/index.html), [React example](../../browser-facecrop/examples/react/FacecropRecorder.jsx), [Chromium smoke test](../../browser-facecrop/tests/browser-smoke.cjs) |
+| Existing boundaries and deferred profiling | [Coupling documentation](../../browser-facecrop/docs/coupling.md), [backlog](../../browser-facecrop/docs/backlog.md) |
 
 The original audit reports, retention script/results and validation logs were session artifacts under `/tmp/facecrop-campaign-*` and `/tmp/facecrop-*tests.log`. They are not durable repository fixtures. The reproducible baseline and final results are now preserved in [campaign/baseline.md](campaign/baseline.md) and the acceptance report; temporary session files are not required.
 
@@ -223,7 +223,7 @@ CI=true npm run build
 
 The study commands require its installed lockfile dependencies (`npm ci` from openDST). The standalone build should also be checked without an inherited `NODE_OPTIONS` setting. The supported toolchain is Node 22/npm 10; the validated versions are Node 22.16.0/npm 10.9.2. Other major versions are not claimed supported.
 
-For the existing browser smoke test, build first, then use the external Playwright/Chromium setup documented in the [library README](../README.md):
+For the existing browser smoke test, build first, then use the external Playwright/Chromium setup documented in the [library README](../../browser-facecrop/README.md):
 
 ```sh
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright npm --prefix facecrop run test:browser
