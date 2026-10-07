@@ -1,0 +1,3 @@
+[submodule "browser-facecrop"]
+	path = browser-facecrop
+	url = https://github.com/mbp-lab/browser-facecrop.git
