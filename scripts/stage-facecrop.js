@@ -1,10 +1,10 @@
 /** Explicitly build facecrop and stage its verified browser distribution for CRA/JATOS. */
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {promoteFiles, stageDistribution: stageBrowserDistribution} = require('../facecrop/scripts/stage-distribution.cjs');
+const {promoteFiles, stageDistribution: stageBrowserDistribution} = require('../browser-facecrop/scripts/stage-distribution.cjs');
 
 const appRoot = path.resolve(__dirname, '..');
-const packageRoot = path.join(appRoot, 'facecrop');
+const packageRoot = path.join(appRoot, 'browser-facecrop');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function installedPackageVersion(packageName) {
@@ -17,7 +17,7 @@ function assertBuildDependencies() {
     Object.entries(packageJson.devDependencies).forEach(([name, expected]) => {
         const actual = installedPackageVersion(name);
         if (actual !== expected) {
-            throw new Error(`Facecrop build dependency ${name}@${expected} is missing (found ${actual || 'none'}). Run npm --prefix facecrop ci, then retry.`);
+            throw new Error(`Facecrop build dependency ${name}@${expected} is missing (found ${actual || 'none'}). Run npm --prefix browser-facecrop ci, then retry.`);
         }
     });
 }

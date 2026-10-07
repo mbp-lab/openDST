@@ -72,10 +72,13 @@ In the project directory, you can run:
 Use Node 22.x/npm 10.x. Install the locked dependencies in both packages and stage facecrop explicitly after a clean checkout or after changing its source:
 
 ```sh
+git submodule update --init --recursive
 npm ci
-npm --prefix facecrop ci
+npm --prefix browser-facecrop ci
 npm run facecrop:stage
 ```
+
+The reusable library lives in the [`browser-facecrop/` submodule](browser-facecrop/README.md). Historical study campaign evidence is preserved in [docs/facecrop-history/](docs/facecrop-history/README.md).
 
 The stage command builds and validates the complete browser distribution. It does not install packages. `npm start`, `npm test`, and `npm run build` use the last staged distribution and never stage it implicitly.
 

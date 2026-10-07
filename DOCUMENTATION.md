@@ -33,12 +33,13 @@ A guide to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDS
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/mbp-lab/openDST.git
+git clone --recurse-submodules https://github.com/mbp-lab/openDST.git
 cd openDST
+git submodule update --init --recursive
 
 # 2. Install the locked dependencies and stage facecrop before start/build
 npm ci
-npm --prefix facecrop ci
+npm --prefix browser-facecrop ci
 npm run facecrop:stage
 
 # 3. Review the checked-in .env and set values for this build (see Section 3)
@@ -833,11 +834,11 @@ Follow the prompts to obtain and install the certificate. Certbot will automatic
 Use Node.js 22.x/npm 10.x. From the `openDST/` repository directory, install both locked dependency trees and stage the standalone browser assets before starting or building:
 
 ```bash
-git clone https://github.com/mbp-lab/openDST.git
+git clone --recurse-submodules https://github.com/mbp-lab/openDST.git
 cd openDST
 
 npm ci
-npm --prefix facecrop ci
+npm --prefix browser-facecrop ci
 npm run facecrop:stage
 # Review .env and choose the asset path for this study.
 PUBLIC_URL=/study_assets/my-dst-study npm run build
@@ -929,7 +930,7 @@ node --version
 nvm install 22
 nvm use 22
 npm ci
-npm --prefix facecrop ci
+npm --prefix browser-facecrop ci
 npm run facecrop:stage
 ```
 
@@ -962,7 +963,7 @@ PUBLIC_URL=/study_assets/my-dst-study
 
 **Math task feedback chart not showing**
 
-Ensure `chart.js` and `react-chartjs-2` are installed. Run `npm ci` from `openDST/` if frontend dependencies are missing. After a clean checkout, also run `npm --prefix facecrop ci` and `npm run facecrop:stage` before starting or building.
+Ensure `chart.js` and `react-chartjs-2` are installed. Run `npm ci` from `openDST/` if frontend dependencies are missing. After a clean checkout, also run `npm --prefix browser-facecrop ci` and `npm run facecrop:stage` before starting or building.
 
 ### FAQ
 
