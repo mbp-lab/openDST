@@ -1,5 +1,11 @@
 # Facecrop browser library
 
+## Purpose
+
+Facecrop adds an optional, on-device video capture path for studies that need face-region footage for remote photoplethysmography (rPPG) analysis. It detects and crops the face in the browser, downsamples frames to 72×72, and saves them as gzip-compressed AVI with lossless pixel encoding and timestamped crop metadata.
+
+Use it when your analysis needs more image fidelity than the study's ordinary lossy MP4/WebM recording preserves. Facecrop produces an additional analysis recording; it does not replace the study's regular video. Cropping and downsampling still discard spatial detail, and capture can skip frames under load, so check the supplied timestamps and test performance on your target devices before enabling it.
+
 This directory is a standalone, submodule-ready browser library. It is an ordinary directory inside the existing `openDST` Git submodule; it does not initialize another Git repository.
 
 ## Build and test
