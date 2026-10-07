@@ -7,8 +7,4 @@
 - Expand browser support beyond the current accepted source layouts.
 - Validate browser upload/cancellation behavior against production JATOS deployments.
 - Profile native/GPU/process memory beyond the measured JavaScript retention fixtures.
-- Resolve ordinary-recorder chunk and filename reuse for repeated recording with the same counter; establish supported study behavior and compatibility before changing it.
-
-The [completed campaign acceptance report](campaign/acceptance-report.md) records final evidence and limitations. These follow-ups are outside its accepted implementation scope.
-
-Stage accounting, capture history, the output boundary, and standalone worker loading are implemented in this extraction. Study cache and service-worker policy remains outside this library.
+These are open investigations for future library contributors, not promised capabilities. Camera acquisition, study cache and service-worker policy, navigation, and participant withdrawal remain application responsibilities.

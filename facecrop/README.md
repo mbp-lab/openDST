@@ -6,7 +6,7 @@ Facecrop adds an optional, on-device video capture path for studies that need fa
 
 Use it when your analysis needs more image fidelity than the study's ordinary lossy MP4/WebM recording preserves. Facecrop produces an additional analysis recording; it does not replace the study's regular video. Cropping and downsampling still discard spatial detail, and capture can skip frames under load, so check the supplied timestamps and test performance on your target devices before enabling it.
 
-This directory is a standalone, submodule-ready browser library. It is an ordinary directory inside the existing `openDST` Git submodule; it does not initialize another Git repository.
+The library has no React or study-framework dependency. It accepts an application-owned video element, explicit configuration and asset URL, and a promise-based transport. See [integration boundaries](docs/coupling.md) for the responsibilities that remain with the consuming study.
 
 ## Build and test
 
@@ -19,17 +19,11 @@ npm run verify:dist
 npm test
 ```
 
-The supported project toolchain recorded for this checkout is Node 22.x with npm 10.x. These files have been exercised on Node 22.16.0 and npm 10.9.2; other major versions are not currently claimed. On a fresh openDST checkout, install both locked dependency trees and explicitly stage the validated browser distribution before starting, testing, or building the CRA study application:
+The supported project toolchain is Node 22.x with npm 10.x. These files have been exercised on Node 22.16.0 and npm 10.9.2; other major versions are not currently claimed.
 
-```sh
-npm ci
-npm --prefix facecrop ci
-npm run facecrop:stage
-```
+Reusable staging and rollback are implemented in `scripts/stage-distribution.cjs`. Each consuming application supplies its own generated-entry directory, public asset root, URL prefix and work directory.
 
-Reusable staging and rollback are implemented in `scripts/stage-distribution.cjs`; the openDST wrapper supplies CRA destinations. Other applications can supply their own generated directory, public root and URL prefix.
-
-For a different application, stage an already-built distribution with explicit destinations:
+To stage an already-built distribution into a consuming application, supply explicit destinations:
 
 ```js
 const {stageDistribution} = require('./scripts/stage-distribution.cjs');
@@ -43,7 +37,7 @@ stageDistribution('/path/to/facecrop/dist', {
 
 The generated files are `facecrop.js` and `facecropAssets.json`; the latter supplies the matching runtime URL. `workRoot` must exist and support renaming staged files into the destinations.
 
-`facecrop:stage` builds and verifies the standalone output and then stages its generated CRA entry, public URL metadata, and content-hashed runtime directory. It never installs dependencies. Ordinary `npm start`, `npm test`, and `npm run build` do not build or stage facecrop. If you change facecrop sources, rerun the explicit stage command first. Failed build or staging validation preserves the previous usable output. Prior hash directories are retained so already-open pages can finish fetching their runtime assets; remove old versions only as a separate deployment cleanup after they are no longer referenced.
+The consuming application can call `stageDistribution` with its own destinations after building. Staging verifies the distribution, preserves the previous usable output if validation fails, and retains prior content-hashed asset directories so already-open pages can finish fetching runtime assets. Remove old versions only after they are no longer referenced.
 
 A real Chromium acceptance run also checks classic worker loading, TFJS WASM/model fetches, completed artifact writes, and abort behavior. Playwright and its Chromium binary stay outside the package's normal lockfile and install:
 
@@ -53,7 +47,7 @@ PLAYWRIGHT_MODULE=/tmp/facecrop-browser/node_modules/playwright /tmp/facecrop-br
 PLAYWRIGHT_MODULE=/tmp/facecrop-browser/node_modules/playwright npm run test:browser
 ```
 
-The lockfile pins the Webpack 4 build tool, test tools, TFJS 4.22.0, the TFJS WASM backend 4.22.0, and BlazeFace 0.1.0. `npm run build` writes `dist/facecrop.js` (UMD), `dist/facecrop.worker.js` (classic worker), the versioned `dist/tfjs/4.22.0/` runtime/WASM/model assets, third-party license notices, and `dist/asset-manifest.json`. `npm run verify:dist` checks the complete required file set and recomputes the manifest's SHA-256 directory hash. Publish the complete `dist/` contents under a path ending in that directory value, such as `/assets/facecrop/<assetDirectory>/`, and keep that URL stable. The openDST CRA integration stages the same distribution under `/facecrop/<assetDirectory>/` and derives the runtime URL from `PUBLIC_URL`. Use HTTPS or localhost for camera and `VideoFrame` APIs.
+The lockfile pins the Webpack 4 build tool, test tools, TFJS 4.22.0, the TFJS WASM backend 4.22.0, and BlazeFace 0.1.0. `npm run build` writes `dist/facecrop.js` (UMD), `dist/facecrop.worker.js` (classic worker), the versioned `dist/tfjs/4.22.0/` runtime/WASM/model assets, third-party license notices, and `dist/asset-manifest.json`. `npm run verify:dist` checks the complete required file set and recomputes the manifest's SHA-256 directory hash. Publish the complete `dist/` contents under a path ending in that directory value, such as `/assets/facecrop/<assetDirectory>/`, and keep that URL stable. Use HTTPS or localhost for camera and `VideoFrame` APIs.
 
 The worker is intentionally classic: it loads TensorFlow.js, the WASM backend, and BlazeFace with `importScripts`. Keep `facecrop.worker.js` and `tfjs/` at the same distribution root. The library accepts the absolute directory URL as `assetBaseUrl`, so it can be deployed under a versioned or nested path without a build-time `PUBLIC_URL`.
 
@@ -113,8 +107,6 @@ Contributor references: [processing contract](docs/processing.md) and [follow-up
 
 Use numeric values, not strings. Missing fields receive defaults; supplied invalid values fail validation. The library always generates a unique capture ID unless the application supplies one. A custom ID must be unique across recordings. `filenamePrefix` and custom IDs accept letters, digits, underscores, and hyphens; context identifiers are stored separately as JSON.
 
-## Refactor validation and retention policy
+## Capture lifecycle and persistence
 
-The campaign's [acceptance report](docs/campaign/acceptance-report.md) records exact browser/JATOS workloads and remaining platform limits. After building, external Playwright can run `node tests/browser-sustained.cjs` (set `FACECROP_SUSTAINED_PARTS=6`, `FACECROP_REQUIRE_FRAME_OBSERVATION=1`, `FACECROP_ASSERT_FRAME_RELEASE=1`, and `FACECROP_ASSERT_TRANSPORT_ACK_RELEASE=1` for the full retention gates). `node tests/browser-jatos.cjs` requires an explicit `FACECROP_WORKBENCH_ROOT` and the documented disposable local JATOS seed/workbench archive; it never modifies a participant study.
-
-Completed frame/encoded payloads and settled transport acknowledgements are released by the sink. Compact artifact history grows with part count; the openDST study retains one latest compact status per capture ID. Caller-held completion promises/context remain caller-owned. Abort prevents new facecrop writes, preserves observable in-flight completions, and cannot prove remote absence after rejection. In openDST, “Cancel and submit data without video” submits `save_without_video`; it does not retract recordings already uploaded or in flight. The study owns camera tracks, navigation, withdrawal and deletion policy.
+Completed frame and encoded payloads are released by the sink after processing and transport settle. The returned result and caller-held context remain application-owned. `abort()` prevents new writes but cannot retract a write already in flight or prove that a rejected write was not stored. The consuming study owns camera tracks, recording lifecycle, navigation, participant withdrawal and any remote deletion policy.
