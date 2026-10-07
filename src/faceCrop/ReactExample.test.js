@@ -12,7 +12,7 @@ import * as Facecrop from 'browser-facecrop';
 import {FacecropRecorder} from '../../browser-facecrop/examples/react/FacecropRecorder';
 
 test('React example uses explicit preparation and awaits stop before finalization', async () => {
-    let result = {status: 'idle'};
+    let result = {status: 'disabled'};
     const prepare = jest.fn(async () => { result = {status: 'ready'}; return result; });
     const start = jest.fn(async () => { result = {status: 'capturing'}; return result; });
     const stop = jest.fn(async () => { result = {status: 'complete'}; return result; });
