@@ -120,6 +120,7 @@ class Main extends React.Component {
         this.speechTestAnalysisCallback = this.speechTestAnalysisCallback.bind(this)
         this.endMathTask = this.endMathTask.bind(this)
         this.setStudyTimes = this.setStudyTimes.bind(this)
+        this.nextVideoUploadIndex = 0;
 
         /**
          * The data object holds various data that is collected during a study run including results from the math- and
@@ -262,13 +263,14 @@ class Main extends React.Component {
      * @returns {number} the index of the false entry
      */
     markVideoAsUploading() {
+        const index = this.nextVideoUploadIndex++;
         this.setState(prevState => ({
             uploadedVideos: [...prevState.uploadedVideos, false]
         }), () => this.setState(prevState => ({
                 areAllVideosUploaded: prevState.uploadedVideos.reduce((accumulator, currentValue) => accumulator && currentValue, true),
             }))
         )
-        return this.state.uploadedVideos.length - 1;
+        return index;
     }
 
     /**
