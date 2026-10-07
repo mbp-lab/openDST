@@ -81,6 +81,8 @@ The reusable library lives in the [`browser-facecrop/` submodule](browser-facecr
 
 The preparation command installs facecrop's locked dependencies, builds and validates its browser distribution, and stages it for this app. `npm start`, `npm test`, and `npm run build` use the last staged distribution. `npm run build:study` prepares facecrop and then builds the app.
 
+The study adapter owns openDST's environment settings, task selection, context, filename convention, and upload gate. Capture lifecycle belongs to the library; upload tracking consumes its artifact events. The library's optional React hook is available for functional consumers, while this app keeps its existing component integration.
+
 ### `npm start`
 
 Runs the app in the development mode.<br />

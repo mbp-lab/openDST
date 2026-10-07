@@ -70,75 +70,47 @@ export function createFaceCropStudySession({video, props = {}}) {
         succeeded: props.markVideoAsUploaded || (() => {}),
         failed: props.markVideoAsFailed || (() => {})
     } : null;
-    const baseTransport = createJatosTransport(jatosApi);
+    const trackedArtifacts = new Set();
     let captureId = null;
-    let writeNumber = 0;
-    const transport = {
-        async write({filename, payload}) {
-            const uploadId = `face-crop-write-${captureId}-${++writeNumber}`;
-            if (track) track.register(uploadId);
-            try {
-                const result = await baseTransport.write({filename, payload});
-                if (track) track.succeeded(uploadId);
-                return result;
-            } catch (error) {
-                if (track) track.failed(uploadId);
-                throw error;
-            }
-        }
-    };
-
     let settled = false;
-    let sentinelId = null;
     const settleSentinel = status => {
         if (settled) return;
         settled = true;
-        if (track) (status === 'complete' ? track.succeeded : track.failed)(sentinelId);
+        if (track) (status === 'complete' ? track.succeeded : track.failed)(`face-crop-session-${captureId}`);
     };
     const emit = event => {
         if (event && event.type === 'status') notify(props, {...event, capture: event.capture || {captureId, context}});
-        if (event && event.type === 'artifact' && typeof props.onFaceCropArtifact === 'function') props.onFaceCropArtifact(event);
+        if (event && event.type === 'artifact') {
+            const artifact = event.artifact;
+            if (track && artifact && artifact.uploadId) {
+                if (!trackedArtifacts.has(artifact.uploadId)) {
+                    trackedArtifacts.add(artifact.uploadId);
+                    track.register(artifact.uploadId);
+                }
+                if (artifact.status === 'succeeded') track.succeeded(artifact.uploadId);
+                else if (artifact.status !== 'pending') track.failed(artifact.uploadId);
+            }
+            if (typeof props.onFaceCropArtifact === 'function') props.onFaceCropArtifact(event);
+        }
     };
     const publicUrl = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
     const assetBaseUrl = new URL(`${publicUrl}${facecropAssets.publicSubpath}`, window.location.href).href;
     const session = createCaptureSession({video, filenamePrefix, context, config: options.config,
-        assetBaseUrl, transport, onEvent: emit});
+        assetBaseUrl, transport: createJatosTransport(jatosApi), onEvent: emit});
     captureId = session.captureId;
-    sentinelId = `face-crop-session-${captureId}`;
-    if (track) track.register(sentinelId);
-    let preparePromise = null;
-    let stopPromise = null;
-    let abortPromise = null;
-    let started = false;
+    if (track) track.register(`face-crop-session-${captureId}`);
+    const finish = (operation, reportResult = false) => Promise.resolve().then(operation).then(result => {
+        if (reportResult && !settled) notify(props, result);
+        settleSentinel(result && result.status);
+        return result;
+    }, error => { settleSentinel('failed'); throw error; });
     return {
         captureId,
-        prepare() {
-            if (!preparePromise) preparePromise = Promise.resolve().then(() => session.prepare());
-            return preparePromise;
-        },
-        async start() {
-            if (abortPromise) return abortPromise;
-            await this.prepare();
-            started = true;
-            return session.start();
-        },
-        stop() {
-            if (abortPromise) return abortPromise;
-            if (!stopPromise) stopPromise = Promise.resolve().then(() => started ? session.stop() : session.dispose()).then(result => {
-                settleSentinel(result && result.status === 'complete' ? 'complete' : 'failed');
-                return result;
-            }, error => { settleSentinel('failed'); throw error; });
-            return stopPromise;
-        },
-        abort() {
-            if (!abortPromise) abortPromise = Promise.resolve().then(() => session.abort()).then(result => {
-                // Started writes remain observable; participant withdrawal must not await an uninterruptible network request.
-                notify(props, {...result, artifacts: (result.artifacts || []).map(({completion, ...artifact}) => artifact)});
-                settleSentinel('failed');
-                return result;
-            }, error => { settleSentinel('failed'); throw error; });
-            return abortPromise;
-        }
+        prepare: () => session.prepare(),
+        start: () => session.start(),
+        // Core disposal chooses finalization for started captures and abort for unstarted ones.
+        stop: () => finish(() => session.dispose()),
+        abort: () => finish(() => session.abort(), true)
     };
 }
 
