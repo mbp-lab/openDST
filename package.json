@@ -10,6 +10,7 @@
     "@testing-library/react": "^12.1.5",
     "@testing-library/user-event": "^7.2.1",
     "bootstrap": "^4.6.1",
+    "browser-facecrop": "file:vendor/browser-facecrop-0.1.2.tgz",
     "chart.js": "^2.9.3",
     "detect-browser-language": "0.0.2",
     "i18next": "^19.9.2",
