@@ -125,6 +125,17 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_MOBILE_ONLY` | `'true'` / `'false'` | `'true'` | When `'true'`, displays a "please use your smartphone" message on desktop browsers. Participants must use a mobile device. For desktop testing, use browser developer tools to simulate a mobile viewport. |
 | `REACT_APP_VIDEO_RECORDING` | `'true'` / `'false'` | `'false'` | Enables webcam video recording during calibration, math task, and speech task. Videos are uploaded to the JATOS backend. **Requires `REACT_APP_LOGGING` to also be `'true'`.** |
 | `REACT_APP_LOGGING` | `'true'` / `'false'` | `'false'` | Master switch for all data persistence. When `'false'`, no participant data is saved to JATOS. This includes JSON result files and video recordings. |
+| `REACT_APP_FACECROP_RECORDING` | `'true'` / `'false'` | `'false'` | Enables the additional browser-facecrop recording during introduction calibration, math, and speech recordings. Requires both `REACT_APP_VIDEO_RECORDING` and `REACT_APP_LOGGING` to be `'true'`. |
+| `REACT_APP_FACECROP_ROI_SMOOTHING_TAU_MS` | Number | `100` | Facecrop ROI smoothing time constant in milliseconds; `0` disables smoothing. Range: 0–10000. |
+| `REACT_APP_FACECROP_ROI_SCALE` | Number | `1.4` | Facecrop ROI scale. Range: 1–3. |
+| `REACT_APP_FACECROP_ROI_VERTICAL_SHIFT_RATIO` | Number | `0.15` | Facecrop ROI vertical shift ratio. Range: −1–1; positive values move the crop upward. |
+| `REACT_APP_FACECROP_DETECTOR_MIN_CONFIDENCE` | Number | `0.5` | Minimum face-detection confidence. Range: 0–1. |
+| `REACT_APP_FACECROP_PIPELINE_ANALYSIS_WORKER_COUNT` | Integer | `2` | Number of concurrent face-analysis workers. Range: 1–2. |
+| `REACT_APP_FACECROP_PERSISTENCE_MAX_ATTEMPTS` | Integer | `3` | Maximum persistence attempts. Range: 1–10. |
+| `REACT_APP_FACECROP_PERSISTENCE_RETRY_DELAY_MS` | Integer | `100` | Base retry delay in milliseconds; each attempt multiplies this value. Range: 0–60000. |
+| `REACT_APP_FACECROP_OUTPUT_RESOLUTION` | Integer | `72` | Square crop output width and height in pixels. Range: 16–512, divisible by 4. Larger values use more memory, processing time, and storage; upsampling does not add image detail. |
+| `REACT_APP_FACECROP_OUTPUT_MAX_PART_MIB` | Number or blank | blank | Optional encoded AVI part size ceiling in MiB (1 MiB = 1,048,576 bytes). Range: 0.03125–32 MiB; fractional values are rounded down to whole bytes (for example, `0.1` MiB becomes 104857 bytes). The limit must fit at least two frames at the configured resolution. Blank leaves the library's explicit 4 MiB default in effect, which holds at most 269 frames at 72×72. Set `null` through the library API to select the legacy raw buffer budget, which holds 539 frames at 72×72. Smaller limits create more parts and upload/index overhead; actual gzip compression may yield smaller files than the conservative size bound. |
+| `REACT_APP_FACECROP_UPLOAD_DIAGNOSTICS` | `'true'` / `'false'` | `'false'` | Enables facecrop troubleshooting diagnostics, including console logging and incremental uploads to JATOS. |
 | `REACT_APP_SURVEY_HOST_PATH` | URL string | `'https://www.soscisurvey.de/resilience2021/'` | Base URL for the post-study survey. Participants are redirected here after completing the DST. The participant ID and JATOS result ID are appended as query parameters. Set to `''` to disable redirect. |
 | `REACT_APP_DEBRIEFING_HOST_PATH` | URL string | `'https://resilience.tf.uni-bielefeld.de/debriefing/'` | URL for the debriefing page shown when a participant cancels the study. Set to `''` to disable. |
 | `REACT_APP_ADDITIONAL_INFORMATION_URL_DE` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (German version). |
@@ -133,6 +144,10 @@ All configuration is done through the `.env` file in the project root. Changes r
 ### Browser Facecrop Integration
 
 The optional facecrop integration uses the vendored `browser-facecrop` 0.1.2 package in `vendor/`. `npm ci` installs this local package from the lockfile. Before `npm start` or `npm run build`, the package's hashed browser assets are staged under `public/`; the `prestart` and `prebuild` scripts do this automatically. Re-run the relevant command after changing the package or its staged assets. Set `PUBLIC_URL` to the deployed study-assets path so the app can load the staged files.
+
+Use the ignored `.env.local` file for local facecrop test overrides. Review the recording and logging opt-ins and set `PUBLIC_URL` to your study-assets path before building for deployment.
+
+openDST connects through its core capture-session API adapter in `src/facecropAdapter.js`. It does not use the package's optional React wrapper. The adapter reuses the existing webcam stream and shares one upload queue for the study session. Artifact registration and settlement callbacks connect facecrop uploads to the host's upload tracker.
 
 ### Example `.env` for a Live Study
 
