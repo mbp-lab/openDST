@@ -362,6 +362,7 @@
       "no_data_saved": "Ihre Daten wurden nicht gespeichert.",
       "non_video_data_saved": "Nur Ihre Nicht-Video-Daten wurden gespeichert.",
       "all_data_saved": "Ihre Daten wurden gespeichert.",
+      "some_video_data_not_saved": "Einige Aufzeichnungsdaten konnten nicht als gespeichert bestätigt werden.",
       "headingAlt": "Wir würden uns freuen, wenn Sie uns mit dem folgenden Fragenbogen ein kurzes Feedback geben würden.",
       "studyResultId": "Falls Sie Ihre Daten zu einem späteren Zeitpunkt löschen lassen möchten, können Sie uns gerne kontaktieren. Notieren Sie sich hierzu bitte Ihre persönliche Studien-ID: ",
       "thanking": "Vielen Dank für Ihre Teilnahme!",

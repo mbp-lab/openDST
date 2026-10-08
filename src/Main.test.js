@@ -39,6 +39,24 @@ afterEach(() => {
     window.scrollTo = originalScrollTo;
 });
 
+test('tracks two facecrop artifacts independently when one settles late and uncertain', () => {
+    const main = makeMain();
+    const firstCaptureArtifact = main.markVideoAsUploading();
+    const secondCaptureArtifact = main.markVideoAsUploading();
+
+    main.markVideoAsUploaded(secondCaptureArtifact, 'succeeded');
+    expect(main.state.areAllVideosUploaded).toBe(false);
+    expect(main.state.uploadedVideos).toEqual(['pending', 'succeeded']);
+
+    // The first capture may report after the second one has completed.
+    main.markVideoAsUploaded(firstCaptureArtifact, 'uncertain');
+    expect(main.state).toMatchObject({
+        uploadedVideos: ['failed', 'succeeded'],
+        areAllVideosUploaded: true,
+        failedVideoUploads: 1
+    });
+});
+
 test.each([
     ['math', main => main.endMathTask(12), 'mathTask_end'],
     ['speech', main => main.endSpeechTask(), 'speechTask_end']

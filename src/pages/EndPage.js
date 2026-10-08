@@ -128,7 +128,9 @@ export default class EndPage extends React.Component{
                             <div className="font-weight-bold">
                                 {
                                     process.env.REACT_APP_LOGGING === 'true'
-                                        ? i18next.t('end.questionnaire.all_data_saved')
+                                        ? (this.props.failedVideoUploads > 0 || !this.props.areAllVideosUploaded
+                                            ? i18next.t('end.questionnaire.some_video_data_not_saved')
+                                            : i18next.t('end.questionnaire.all_data_saved'))
                                         : i18next.t('end.explanation.noLogging')
                                 }
                             </div>

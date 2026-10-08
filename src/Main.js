@@ -88,13 +88,14 @@ class Main extends React.Component {
             },
 
             /**
-             * An array of booleans that will indicate whether the video uploads were successful or not. The n-th video
+             * An array of upload states: pending, succeeded, or failed. The n-th recording
              * upload corresponds to the element at index n.
              *
-             * areAllVideosUploaded is derived from uploadedVideos.
+             * areAllVideosUploaded means every upload has settled, including failed uploads.
              */
             uploadedVideos: [],
             areAllVideosUploaded: true,
+            failedVideoUploads: 0,
 
             /**
              * cancelDialogIsOpen is passed to the cancelDialog component as a prop and controls if it is open or closed.
@@ -259,36 +260,32 @@ class Main extends React.Component {
     }
 
     /**
-     * This function pushes a new false entry to the this.state.uploadedVideos array indicating that a new video is being uploaded
-     * but not yet successfully so.
-     * @returns {number} the index of the false entry
+     * Register one pending upload in the existing study-level tracker.
+     * @returns {number} the index of the pending entry
      */
     markVideoAsUploading() {
         const index = this.nextVideoUploadIndex++;
         this.setState(prevState => ({
-            uploadedVideos: [...prevState.uploadedVideos, false]
-        }), () => this.setState(prevState => ({
-                areAllVideosUploaded: prevState.uploadedVideos.reduce((accumulator, currentValue) => accumulator && currentValue, true),
-            }))
-        )
+            uploadedVideos: [...prevState.uploadedVideos, 'pending'],
+            areAllVideosUploaded: false
+        }));
         return index;
     }
 
     /**
-     * This function changes a particular entry of the this.state.uploadedVideos array to true, indicating that the particular
-     * video has been successfully uploaded.
-     * It also updates the this.state.areAllVideosUploaded variable.
-     * @param index the index of the entry that will be changed to true
+     * Set an upload's terminal result and release the existing study-level wait when none remain pending.
+     * @param index the index of the upload being settled
      */
-    markVideoAsUploaded(index) {
+    markVideoAsUploaded(index, status = 'succeeded') {
         this.setState(prevState => {
             let copy = [...prevState.uploadedVideos];
-            copy[index] = true;
-            return {uploadedVideos: copy};
-        }, () => this.setState(prevState => ({
-            areAllVideosUploaded: prevState.uploadedVideos.reduce((accumulator, currentValue) => accumulator && currentValue, true),
-            }))
-        )
+            copy[index] = status === 'succeeded' ? 'succeeded' : 'failed';
+            return {
+                uploadedVideos: copy,
+                areAllVideosUploaded: copy.every(result => result !== 'pending'),
+                failedVideoUploads: copy.filter(result => result === 'failed').length
+            };
+        });
     }
 
     /**
@@ -658,6 +655,7 @@ class Main extends React.Component {
                         continueFromPanas={this.continueFromPanas}f
                         referenceTime={this.data.studyTimes.reference}
                         areAllVideosUploaded={this.state.areAllVideosUploaded}
+                        failedVideoUploads={this.state.failedVideoUploads}
                         studyMetaTracker={this.data.studyMetaTracker}
                         speechTestAnalysis={this.data.speechTestAnalysis}
                         handleCancelDialog={this.handleCancelDialog}

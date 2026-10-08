@@ -358,6 +358,7 @@
       "no_data_saved": "Your data is not saved.",
       "non_video_data_saved": "Only your non-video-data is saved.",
       "all_data_saved": "Your data is saved.",
+      "some_video_data_not_saved": "Some recording data could not be confirmed as saved.",
       "headingAlt": "We would appreciate, if you give us a short feedback in the following questionnaire.",
       "studyResultId": "If at a later point in time you want your data to be deleted, please contact us. Make a note of your personal study ID for this: ",
       "thanking": "Thank you for your participation!",

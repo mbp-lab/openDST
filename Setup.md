@@ -147,7 +147,7 @@ The optional facecrop integration uses the vendored `browser-facecrop` 0.1.2 pac
 
 Use the ignored `.env.local` file for local facecrop test overrides. Review the recording and logging opt-ins and set `PUBLIC_URL` to your study-assets path before building for deployment.
 
-openDST connects through its core capture-session API adapter in `src/facecropAdapter.js`. It does not use the package's optional React wrapper. The adapter reuses the existing webcam stream and shares one upload queue for the study session. Artifact registration and settlement callbacks connect facecrop uploads to the host's upload tracker.
+openDST connects through its core capture-session API adapter in `src/facecropAdapter.js`. It does not use the package's optional React wrapper. The adapter reuses the existing webcam stream and shares one upload queue for the study session. Facecrop's `artifact_registered` and `artifact_settled` events feed openDST's existing video-upload tracker. The final page waits while uploads are pending and reports unconfirmed recording data when an upload fails or has an uncertain outcome; settled uploads include both success and failure.
 
 On normal completion, the introduction and task flows request a graceful facecrop stop and wait for finalization before moving on. Graceful stop closes capture processing and queues any final artifacts; their network uploads settle asynchronously through the shared queue and tracker.
 

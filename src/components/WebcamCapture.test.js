@@ -59,3 +59,34 @@ test('interrupted introduction aborts its own facecrop session', async () => {
     expect(abortFacecropCapture).toHaveBeenCalledWith(session);
     expect(stopActiveFacecropCapture).not.toHaveBeenCalled();
 });
+
+test('records a regular video upload rejection as failed', async () => {
+    const previous = {nodeEnv: process.env.NODE_ENV, recording: process.env.REACT_APP_VIDEO_RECORDING,
+        logging: process.env.REACT_APP_LOGGING, jatos: global.jatos};
+    process.env.NODE_ENV = 'test';
+    process.env.REACT_APP_VIDEO_RECORDING = 'true';
+    process.env.REACT_APP_LOGGING = 'true';
+    const failure = new Error('upload rejected');
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    global.jatos = {uploadResultFile: jest.fn(() => Promise.reject(failure))};
+    const component = introductionRecording();
+    component.props.markVideoAsUploading.mockReturnValue(5);
+    component.recordedChunks = [new Blob(['video'])];
+    component.state.mimeType = 'video/webm';
+    component.props.setVideoURL = jest.fn();
+
+    try {
+        component.uploadVideo();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(component.props.markVideoAsUploaded).toHaveBeenCalledWith(5, 'failed');
+        expect(component.props.markVideoAsUploaded).not.toHaveBeenCalledWith(5, 'succeeded');
+    } finally {
+        process.env.NODE_ENV = previous.nodeEnv;
+        process.env.REACT_APP_VIDEO_RECORDING = previous.recording;
+        process.env.REACT_APP_LOGGING = previous.logging;
+        log.mockRestore();
+        if (previous.jatos === undefined) delete global.jatos;
+        else global.jatos = previous.jatos;
+    }
+});
