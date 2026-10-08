@@ -149,7 +149,7 @@ Use the ignored `.env.local` file for local facecrop test overrides. Review the 
 
 openDST connects through its core capture-session API adapter in `src/facecropAdapter.js`. It does not use the package's optional React wrapper. The adapter reuses the existing webcam stream and shares one upload queue for the study session. Facecrop's `artifact_registered` and `artifact_settled` events feed openDST's existing video-upload tracker. The final page waits while uploads are pending and reports unconfirmed recording data when an upload fails or has an uncertain outcome; settled uploads include both success and failure.
 
-On normal completion, the introduction and task flows request a graceful facecrop stop and wait for finalization before moving on. Graceful stop closes capture processing and queues any final artifacts; their network uploads settle asynchronously through the shared queue and tracker.
+On normal completion, the introduction and task flows request a graceful facecrop stop and wait for finalization before moving on. Graceful stop closes capture processing and queues any final artifacts; their network uploads settle asynchronously through the shared queue and tracker. For cancellation, `cancel_with_video` gracefully stops facecrop, then follows the existing video-upload wait (with its three-minute redirect fallback); `cancel_no_video` and `cancel_without_data` abort capture. Abort stops further capture work but cannot delete uploads already accepted by JATOS. The existing `save_without_video` retention behavior remains unchanged; facecrop does not alter the study's data-storage policy.
 
 ### Example `.env` for a Live Study
 

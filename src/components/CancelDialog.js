@@ -9,36 +9,47 @@ import i18next from "i18next";
 import FormControl from "@material-ui/core/FormControl";
 import {CircularProgress, FormControlLabel, Radio, RadioGroup} from "@material-ui/core";
 import Redirection from "./Redirection";
+import {abortActiveFacecropCapture, stopActiveFacecropCapture} from '../facecropAdapter';
 
 export default function CancelDialog(props) {
     const [cancelValue, setCancelValue] = React.useState("cancel_without_data");
     const [showButton, setShowButton] = React.useState(true);
     const [redirectAllowed, setRedirectAllowed] = React.useState(false);
     const [forceRedirect, setForceRedirect] = React.useState(false);
+    const timers = React.useRef([]);
+
+    React.useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
     function handleChange(event) {
         setCancelValue(event.target.value);
     }
 
-    // the redirection to the debriefing slides happens in Redirection which is only rendered after 0.5s AND if all videos have been uploaded
-    function handleOK() {
-        if (cancelValue === "cancel_with_video" || cancelValue === "cancel_no_video") {
-            setTimeout(() => setRedirectAllowed(true), 500);
-            setTimeout(() => setForceRedirect(true), 180000);
-            setShowButton(false);
-        } else {
-            if (cancelValue === "cancel_without_data") {
-                setTimeout(() => {
-                    setRedirectAllowed(true);
-                    setForceRedirect(true);
-                    setShowButton(false);
-                }, 500)
-            } else {
-                if (cancelValue === "no_cancel") {
-                    props.handleCancelDialog();
-                }
-            }
+    async function handleOK() {
+        if (cancelValue === "no_cancel") {
+            props.handleCancelDialog();
+            return;
         }
+        setShowButton(false);
+        // Preserve the existing escape hatch while normal cancellation waits for
+        // capture closure and any final artifacts registered by graceful stop.
+        if (cancelValue !== "cancel_without_data") {
+            timers.current.push(setTimeout(() => {
+                setForceRedirect(true);
+                setRedirectAllowed(true);
+            }, 180000));
+        }
+        const minimumDelay = new Promise(resolve => {
+            timers.current.push(setTimeout(resolve, 500));
+        });
+        try {
+            if (cancelValue === "cancel_with_video") await stopActiveFacecropCapture();
+            else await abortActiveFacecropCapture();
+        } catch (error) {
+            console.error('Facecrop could not close during cancellation', error);
+        }
+        await minimumDelay;
+        if (cancelValue === "cancel_without_data") setForceRedirect(true);
+        setRedirectAllowed(true);
     }
 
     return (
@@ -61,7 +72,7 @@ export default function CancelDialog(props) {
             </DialogContent>
             <DialogActions>
                 <FormControl component="fieldset">
-                    <RadioGroup aria-label="cancel" name="cancel" value={cancelValue} onChange={handleChange}>
+                    <RadioGroup aria-label="cancel" name="cancel" value={cancelValue} onChange={showButton ? handleChange : undefined}>
                         <FormControlLabel value="cancel_without_data" control={<Radio />} label={i18next.t('cancelDialog.cancel_without_data')} />
                         <FormControlLabel value="cancel_no_video" control={<Radio />} label={i18next.t('cancelDialog.cancel_no_video')} />
                         <FormControlLabel value="cancel_with_video" control={<Radio />} label={i18next.t('cancelDialog.cancel_with_video')} />

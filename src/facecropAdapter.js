@@ -202,6 +202,11 @@ export function stopActiveFacecropCapture() {
     return session ? session.stop() : Promise.resolve(null);
 }
 
+/** Stop producing artifacts when the study is cancelled without video. */
+export function abortActiveFacecropCapture() {
+    return abortFacecropCapture(activeSession);
+}
+
 /**
  * Stop a capture during component teardown or interrupted navigation.
  * Also aborts a session whose stop is still draining; abort after finalization is a no-op.

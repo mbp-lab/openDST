@@ -1,5 +1,5 @@
 import * as Facecrop from './facecrop-generated/facecrop.js';
-import {abortFacecropCapture, startFacecropCapture, stopActiveFacecropCapture} from './facecropAdapter';
+import {abortActiveFacecropCapture, abortFacecropCapture, startFacecropCapture, stopActiveFacecropCapture} from './facecropAdapter';
 
 jest.mock('./facecrop-generated/facecrop.js', () => ({
     createCaptureSession: jest.fn(),
@@ -117,6 +117,21 @@ test('tracks explicit upload transitions and preserves late settlement after abo
     expect(callbacks.markVideoAsUploading).toHaveBeenCalledTimes(1);
     expect(callbacks.markVideoAsUploaded).toHaveBeenCalledTimes(1);
     expect(callbacks.markVideoAsUploaded).toHaveBeenCalledWith(37, 'uncertain');
+});
+
+test('active cancellation aborts capture while preserving accepted upload settlement', async () => {
+    const callbacks = inputs();
+    const session = startFacecropCapture(callbacks);
+    const {onEvent} = sessions[0].options;
+    const artifact = {uploadId: 'cancel-upload', status: 'pending'};
+    onEvent({type: 'artifact_registered', artifact});
+    await abortActiveFacecropCapture();
+    expect(session.abort).toHaveBeenCalledTimes(1);
+    expect(session.stop).not.toHaveBeenCalled();
+    onEvent({type: 'artifact_settled', artifact: {...artifact, status: 'succeeded'}});
+    expect(callbacks.markVideoAsUploaded).toHaveBeenCalledWith(37, 'succeeded');
+    await expect(abortActiveFacecropCapture()).resolves.toBeNull();
+    expect(session.abort).toHaveBeenCalledTimes(1);
 });
 
 test('failed startup frees the capture slot without overwriting its structured failure', async () => {
