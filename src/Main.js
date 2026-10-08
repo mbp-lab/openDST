@@ -1,4 +1,5 @@
 import React from 'react';
+import {stopActiveFacecropCapture} from './facecropAdapter';
 import StartPage from "./pages/StartPage";
 import Introduction from "./pages/Introduction";
 import MathTaskTutorial from "./pages/MathTaskTutorial";
@@ -456,9 +457,12 @@ class Main extends React.Component {
         this.handleNext();
     }
 
-    endMathTask(mathTaskScore) {
+    async endMathTask(mathTaskScore) {
         window.scrollTo(0, 0)
         this.data.mathTaskScore = mathTaskScore;
+        // Finalize Facecrop while this task is still mounted; navigation would unmount
+        // WebcamCapture and take its abort-cleanup path instead of normal completion.
+        await stopActiveFacecropCapture();
         this.uploadData('mathTask_end', null)
         this.handleNext();
     }
@@ -493,8 +497,11 @@ class Main extends React.Component {
         this.uploadData('speechTask_start', null)
     }
 
-    endSpeechTask() {
+    async endSpeechTask() {
         window.scrollTo(0, 0);
+        // Finalize Facecrop while this task is still mounted; navigation would unmount
+        // WebcamCapture and take its abort-cleanup path instead of normal completion.
+        await stopActiveFacecropCapture();
         this.uploadData('speechTask_end', null)
         this.handleNext();
     }

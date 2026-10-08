@@ -1,5 +1,6 @@
 import React from 'react';
 import Webcam from "react-webcam";
+import {abortFacecropCapture, startFacecropCapture, stopActiveFacecropCapture} from '../facecropAdapter';
 
 // Put variables in global scope to make them available to the browser console.
 const constraints = window.constraints = {
@@ -18,6 +19,7 @@ class WebcamCapture extends React.Component {
         this.recordedChunks = [];
         this.mediaStreamRecorder = null;
         this.webcamRef = React.createRef();
+        this.facecropSession = null;
 
         this.startRecording = this.startRecording.bind(this);
         this.stopRecording = this.stopRecording.bind(this);
@@ -27,6 +29,10 @@ class WebcamCapture extends React.Component {
      * For mathTask and speechTask the recording should only stop on unmounting.
      */
     componentWillUnmount() {
+        if (this.facecropSession) {
+            // Unmount can interrupt task capture; abort stops further work but cannot undo uploads.
+            abortFacecropCapture(this.facecropSession);
+        }
         if(this.props.studyPage === 'mathTask' || this.props.studyPage === 'speechTask' ) {
             this.stopRecording();
         }
@@ -108,6 +114,8 @@ class WebcamCapture extends React.Component {
         try {
             await this.createMediaRecorder(this.webcamRef.current.stream);
             await this.mediaStreamRecorder.start();
+            // Facecrop follows the ordinary recording, including introduction calibration.
+            this.startFacecropRecording();
             if (this.props.studyPage === 'introduction') {
                 this.setState({
                     timeoutID: setTimeout(() => this.stopRecording(), 30000)
@@ -117,6 +125,20 @@ class WebcamCapture extends React.Component {
             console.log(err);
             window.alert(err)
         }
+    }
+
+    startFacecropRecording() {
+        const webcam = this.webcamRef.current;
+        if (!webcam || !webcam.video || this.facecropSession) return;
+        // Facecrop consumes the same live video element as the regular task recording.
+        this.facecropSession = startFacecropCapture({
+            video: webcam.video,
+            studyPage: this.props.studyPage,
+            studyResultId: this.props.studyResultId,
+            videoCounter: this.props.videoCounter,
+            markVideoAsUploading: this.props.markVideoAsUploading,
+            markVideoAsUploaded: this.props.markVideoAsUploaded
+        });
     }
 
     /**
@@ -141,7 +163,14 @@ class WebcamCapture extends React.Component {
     }
 
     async stopRecording() {
+        // Introduction switches to playback immediately after stopRecord. Start finalization
+        // synchronously and release the teardown handle so that normal unmount does not abort it.
+        const facecropStop = this.props.studyPage === 'introduction' && this.facecropSession
+            ? stopActiveFacecropCapture()
+            : null;
+        if (facecropStop) this.facecropSession = null;
         await this.mediaStreamRecorder.stop();
+        await facecropStop;
     }
 
     render() {

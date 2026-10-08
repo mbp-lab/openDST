@@ -149,6 +149,8 @@ Use the ignored `.env.local` file for local facecrop test overrides. Review the 
 
 openDST connects through its core capture-session API adapter in `src/facecropAdapter.js`. It does not use the package's optional React wrapper. The adapter reuses the existing webcam stream and shares one upload queue for the study session. Artifact registration and settlement callbacks connect facecrop uploads to the host's upload tracker.
 
+On normal completion, the introduction and task flows request a graceful facecrop stop and wait for finalization before moving on. Graceful stop closes capture processing and queues any final artifacts; their network uploads settle asynchronously through the shared queue and tracker.
+
 ### Example `.env` for a Live Study
 
 ```env
