@@ -26,7 +26,9 @@
     "ua-parser-js": "^1.0.2"
   },
   "scripts": {
+    "prestart": "node scripts/stage-facecrop.cjs",
     "start": "react-scripts start",
+    "prebuild": "node scripts/stage-facecrop.cjs",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

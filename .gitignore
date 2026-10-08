@@ -13,6 +13,8 @@
 
 # production
 /build
+/public/assets/facecrop
+/src/facecrop-generated
 
 # misc
 .DS_Store

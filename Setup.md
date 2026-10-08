@@ -25,8 +25,7 @@ A guide to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDS
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v16.x
-- npm (comes with Node.js)
+- [Node.js](https://nodejs.org/) 22.x and npm 10.x. The facecrop staging package requires these versions, and staging runs as part of this checkout's normal install/start/build workflow.
 - [Docker](https://docs.docker.com/get-docker/) (for JATOS deployment)
 - A web server with a public domain (for production)
 
@@ -37,8 +36,8 @@ A guide to use the [Digital Stress Test (DST)](https://github.com/mbp-lab/openDS
 git clone https://github.com/mbp-lab/openDST.git
 cd openDST
 
-# 2. Install dependencies
-npm install
+# 2. Install the locked dependencies
+npm ci
 
 # 3. Configure environment variables (see Section 3)
 #    Edit .env to match your setup
@@ -130,6 +129,10 @@ All configuration is done through the `.env` file in the project root. Changes r
 | `REACT_APP_DEBRIEFING_HOST_PATH` | URL string | `'https://resilience.tf.uni-bielefeld.de/debriefing/'` | URL for the debriefing page shown when a participant cancels the study. Set to `''` to disable. |
 | `REACT_APP_ADDITIONAL_INFORMATION_URL_DE` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (German version). |
 | `REACT_APP_ADDITIONAL_INFORMATION_URL_EN` | URL string | `'some_url'` | URL to an additional information document linked in the consent slide (English version). |
+
+### Browser Facecrop Integration
+
+The optional facecrop integration uses the vendored `browser-facecrop` 0.1.2 package in `vendor/`. `npm ci` installs this local package from the lockfile. Before `npm start` or `npm run build`, the package's hashed browser assets are staged under `public/`; the `prestart` and `prebuild` scripts do this automatically. Re-run the relevant command after changing the package or its staged assets. Set `PUBLIC_URL` to the deployed study-assets path so the app can load the staged files.
 
 ### Example `.env` for a Live Study
 
